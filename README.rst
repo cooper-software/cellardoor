@@ -77,7 +77,7 @@ Example
 
 	HTTP/1.1 201 CREATED
 	Connection: keep-alive
-	Content-Length: 302
+	Content-Length: 219
 	Content-Type: application/json
 	Date: Wed, 27 Aug 2014 15:02:27 GMT
 	Server: gunicorn/19.1.1
