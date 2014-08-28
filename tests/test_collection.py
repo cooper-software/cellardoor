@@ -2,6 +2,7 @@ import unittest
 import mongoengine as me
 from bson.objectid import ObjectId
 from hammock import Collection
+from hammock.auth.errors import NotAuthorizedError
 
 class TestDoc(me.Document):
 	name = me.StringField()
@@ -256,3 +257,17 @@ class TestCollection(unittest.TestCase):
 			
 		self.assertEquals(Foo5Collection.singular_name, 'squee')
 		self.assertEquals(Foo5Collection.plural_name, 'squee')
+		
+		
+	def test_allowed_methods(self):
+		class TestDocCollection(Collection):
+			document = TestDoc
+			
+			def allowed_methods(self):
+				return ('get',)
+				
+		testdocs = TestDocCollection()
+		
+		with self.assertRaises(NotAuthorizedError):
+			testdocs.list()
+		

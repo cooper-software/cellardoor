@@ -1,5 +1,6 @@
 from .auth.errors import NotAuthorizedError
 
+
 class ParameterException(Exception):
 	pass
 
@@ -121,7 +122,7 @@ class Collection(object):
 		"""Override to change which methods are allowed.
 
 		MUST return a list or tuple containing zero or more method names. Methods that are in this list
-		will be allowed. All other methods will raise `hammock.auth.NotAuthorizedException`.
+		will be allowed. All other methods will raise `hammock.auth.NotAuthorizedError`.
 		"""
 		return ('list', 'get', 'create', 'update', 'delete')
 
@@ -154,8 +155,8 @@ class Collection(object):
 
 
 	def _require_method_allowed(self, method):
-		if method not in self.allowed_methods():
-			raise NotAuthorizedException
+		if method not in set(self.allowed_methods()):
+			raise NotAuthorizedError
 
 
 	def _list(self, filter=None, sort=None, include_fields=None, exclude_fields=None, skip=0, limit=0):
