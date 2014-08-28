@@ -216,3 +216,43 @@ class TestCollection(unittest.TestCase):
 		
 		self.assertEquals(testdocs.list(limit=50).count(), 19)
 		
+		
+	def test_naming(self):
+		class Foo(me.Document):
+			pass
+			
+			
+		class FooCollection(Collection):
+			document = Foo
+			
+		self.assertEquals(FooCollection.singular_name, 'foo')
+		self.assertEquals(FooCollection.plural_name, 'foos')
+		
+		class Foo2Collection(Collection):
+			document = Foo
+			singular_name = 'bar'
+			
+		self.assertEquals(Foo2Collection.singular_name, 'bar')
+		self.assertEquals(Foo2Collection.plural_name, 'bars')
+		
+		class Foo3Collection(Collection):
+			document = Foo
+			plural_name = 'bazs'
+			
+		self.assertEquals(Foo3Collection.singular_name, 'baz')
+		self.assertEquals(Foo3Collection.plural_name, 'bazs')
+		
+		class Foo4Collection(Collection):
+			document = Foo
+			singular_name = 'what the fox say'
+			plural_name = 'quxes'
+			
+		self.assertEquals(Foo4Collection.singular_name, 'what the fox say')
+		self.assertEquals(Foo4Collection.plural_name, 'quxes')
+		
+		class Foo5Collection(Collection):
+			document = Foo
+			plural_name = 'squee'
+			
+		self.assertEquals(Foo5Collection.singular_name, 'squee')
+		self.assertEquals(Foo5Collection.plural_name, 'squee')

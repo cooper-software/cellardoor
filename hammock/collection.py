@@ -4,12 +4,45 @@ class ParameterException(Exception):
 	pass
 
 
+class CollectionMeta(type):
+	
+	def __new__(cls, name, bases, dict):
+		singular_name = dict.get('singular_name')
+		plural_name = dict.get('plural_name')
+		document = dict.get('document')
+		if document:
+			document_name = document.__name__.lower()
+		else:
+			document_name = 'unknown'
+		
+		if not singular_name and not plural_name:
+			singular_name = document_name
+			plural_name = document_name + 's'
+		
+		elif not singular_name:
+			if plural_name[-1] == 's':
+				singular_name = plural_name[:-1]
+			else:
+				singular_name = plural_name
+		
+		elif not plural_name:
+			plural_name = singular_name + 's'
+				
+		
+		dict['singular_name'] = singular_name
+		dict['plural_name'] = plural_name
+		
+		return super(CollectionMeta, cls).__new__(cls, name, bases, dict)
+
+
 class Collection(object):
 	"""
 	A collection is a generic API for managing document instances.
 	"""
-
-	# The mongoengine.Document descendant managed by this collection
+	
+	__metaclass__ = CollectionMeta
+	
+	# The mongoengine.Document managed by this collection
 	document = None
 
 	# The default number of objects returned at a time by list()
