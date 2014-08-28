@@ -16,6 +16,19 @@ class TestCollection(unittest.TestCase):
 		TestDoc.objects().delete()
 
 
+	def generate_collection(self, n=20):
+		class TestDocs(Collection):
+			document = TestDoc
+
+		docs = []
+		for i in range(0, n):
+			doc = TestDoc(name='doc#%02d' % i, another_field=n-i)
+			doc.save()
+			docs.append(doc)
+
+		return TestDocs, docs
+
+
 	def test_identity(self):
 		class TestDocs(Collection):
 			document = TestDoc
@@ -26,17 +39,12 @@ class TestCollection(unittest.TestCase):
 
 
 	def test_list_limits_and_skip(self):
-		for i in range(0, 20):
-			doc = TestDoc(name='doc#%d' % i)
-			doc.save()
+		TestDocs, docs = self.generate_collection(n=20)
 
 		self.assertEquals(TestDoc.objects().count(), 20)
-
-		class TestDocs(Collection):
-			document = TestDoc
-			default_limit = 10
-			max_limit = 15
-
+		
+		TestDocs.default_limit = 10
+		TestDocs.max_limit = 15
 		testdocs = TestDocs()
 
 		# No limit argument fetches the default limit
@@ -56,7 +64,7 @@ class TestCollection(unittest.TestCase):
 
 		# skip works
 		results = list(testdocs.list(skip=3, limit=1))
-		self.assertEquals(results[0].name, 'doc#3')
+		self.assertEquals(results[0].name, 'doc#03')
 
 
 	def test_list_fields(self):
@@ -84,15 +92,7 @@ class TestCollection(unittest.TestCase):
 
 
 	def test_list_sort(self):
-		docs = []
-		for i in range(0, 20):
-			doc = TestDoc(name='doc#%02d' % i, another_field=20-i)
-			doc.save()
-			docs.append(doc)
-
-		class TestDocs(Collection):
-			document = TestDoc
-
+		TestDocs, docs = self.generate_collection(n=20)
 		testdocs = TestDocs()
 
 		# ascending by name
@@ -113,15 +113,7 @@ class TestCollection(unittest.TestCase):
 
 
 	def test_list_filter(self):
-		docs = []
-		for i in range(0, 20):
-			doc = TestDoc(name='doc#%02d' % i, another_field=20-i)
-			doc.save()
-			docs.append(doc)
-
-		class TestDocs(Collection):
-			document = TestDoc
-
+		TestDocs, docs = self.generate_collection(n=20)
 		testdocs = TestDocs()
 
 		# simple equality filter
@@ -135,15 +127,7 @@ class TestCollection(unittest.TestCase):
 
 
 	def test_list_complex(self):
-		docs = []
-		for i in range(0, 20):
-			doc = TestDoc(name='doc#%02d' % i, another_field=20-i)
-			doc.save()
-			docs.append(doc)
-
-		class TestDocs(Collection):
-			document = TestDoc
-
+		TestDocs, docs = self.generate_collection(n=20)
 		testdocs = TestDocs()
 
 		results = list(testdocs.list(
@@ -159,4 +143,22 @@ class TestCollection(unittest.TestCase):
 
 
 	def test_get(self):
-		pass
+		TestDocs, docs = self.generate_collection(n=20)
+		testdocs = TestDocs()
+
+		doc = testdocs.get(docs[5].id)
+		self.assertEquals(doc.id, docs[5].id)
+
+
+	def test_get_fields(self):
+		TestDocs, docs = self.generate_collection(n=20)
+		testdocs = TestDocs()
+
+		doc = testdocs.get(docs[5].id, include_fields=('name',)).to_mongo()
+		self.assertEquals(doc.get('name'), docs[5].name)
+		self.assertEquals(doc.get('another_field'), None)
+
+		doc = testdocs.get(docs[5].id, exclude_fields=('name',)).to_mongo()
+		self.assertEquals(doc.get('name'), None)
+		self.assertEquals(doc.get('another_field'), docs[5].another_field)
+		

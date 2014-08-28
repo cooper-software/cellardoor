@@ -47,7 +47,7 @@ class Collection(object):
 		:param :exclude_fields A list of fields to exclude
 		"""
 		self._require_method_allowed('get')
-		results = self._list({'id':id}, None, include_fields, exclude_fields, 0, 0)
+		results = self._list(filter={'_id':id}, include_fields=include_fields, exclude_fields=exclude_fields)
 		return results.first()
 
 
