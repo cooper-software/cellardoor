@@ -1,5 +1,6 @@
 import unittest
 import mongoengine as me
+from bson.objectid import ObjectId
 from hammock import Collection
 
 class TestDoc(me.Document):
@@ -161,3 +162,25 @@ class TestCollection(unittest.TestCase):
 		doc = testdocs.get(docs[5].id, exclude_fields=('name',)).to_mongo()
 		self.assertEquals(doc.get('name'), None)
 		self.assertEquals(doc.get('another_field'), docs[5].another_field)
+
+
+	def test_create(self):
+		class TestDocs(Collection):
+			document = TestDoc
+
+		testdocs = TestDocs()
+		
+		# should fail if a field doesn't validate
+		with self.assertRaises(me.ValidationError):
+			doc = testdocs.create({'name':'foo', 'another_field': 'not an int'})
+
+		doc = testdocs.create({'name':'foo', 'another_field': 123})
+
+		# we create one and only one doc per create() and save it to the database
+		num_docs = testdocs.list().count()
+		self.assertEquals(num_docs, 1)
+		
+		self.assertIsInstance(doc.id, ObjectId)
+		self.assertEquals(doc.name, 'foo')
+		self.assertEquals(doc.another_field, 123)
+
