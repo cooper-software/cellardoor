@@ -156,3 +156,7 @@ class TestCollection(unittest.TestCase):
 
 		self.assertEquals(len(results), 2)
 		self.assertEquals(results[0].id, docs[18].id)
+
+
+	def test_get(self):
+		pass
