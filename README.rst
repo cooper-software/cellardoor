@@ -18,11 +18,11 @@ Example
 		air_speed_velocity = me.FloatField()
 
 
-	class Swallows(hammock.Collection):
+	class SwallowCollection(hammock.Collection):
 		document = Swallow
 
 
-	app = hammock.create_api([Swallows])
+	app = hammock.create_api([SwallowCollection])
 
 .. code:: bash
 	
