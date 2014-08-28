@@ -149,6 +149,9 @@ class TestCollection(unittest.TestCase):
 
 		doc = testdocs.get(docs[5].id)
 		self.assertEquals(doc.id, docs[5].id)
+		
+		doc = testdocs.get(ObjectId())
+		self.assertEquals(doc, None)
 
 
 	def test_get_fields(self):
@@ -179,8 +182,25 @@ class TestCollection(unittest.TestCase):
 		# we create one and only one doc per create() and save it to the database
 		num_docs = testdocs.list().count()
 		self.assertEquals(num_docs, 1)
-		
+
 		self.assertIsInstance(doc.id, ObjectId)
 		self.assertEquals(doc.name, 'foo')
 		self.assertEquals(doc.another_field, 123)
 
+
+	def test_update(self):
+		class TestDocs(Collection):
+			document = TestDoc
+
+		testdocs = TestDocs()
+		
+		doc = testdocs.create({'name':'foo', 'another_field': 123})
+		
+		updated_doc = testdocs.update(doc.id, {'name':'bar'})
+		
+		self.assertEquals(updated_doc.id, doc.id)
+		self.assertEquals(updated_doc.name, 'bar')
+		
+		# update() should return None if the specified doc doesn't exist
+		result = testdocs.update(ObjectId(), {'name':'bar'})
+		self.assertEquals(result, None)

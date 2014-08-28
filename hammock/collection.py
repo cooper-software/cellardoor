@@ -64,8 +64,18 @@ class Collection(object):
 
 		Returns None if the specified object does not exist, otherwise it returns the updated object."""
 		self._require_method_allowed('update')
+
+		doc = self.document.objects(id=id).first()
+		if doc is None:
+			return None
+		
 		modified_fields = self.modify_update_fields(fields)
-		return self.document.objects(id=id).modify(new=True, **modified_fields)
+		modified_fields = dict( [('set__%s' % k, v) for k,v in modified_fields.items()] )
+		
+		doc.update(**modified_fields)
+		doc.save()
+
+		return self.document.objects(id=id).first()
 
 
 	def delete(self, id):
