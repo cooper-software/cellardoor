@@ -81,7 +81,7 @@ class Collection(object):
 	def delete(self, id):
 		"""Remove an object."""
 		self._require_method_allowed('delete')
-		self.document.objects(id=id).remove()
+		self.document.objects(id=id).delete()
 
 
 	def allowed_methods(self):

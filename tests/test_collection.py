@@ -18,7 +18,7 @@ class TestCollection(unittest.TestCase):
 
 
 	def generate_collection(self, n=20):
-		class TestDocCollection(Collection):
+		class TestDocs(Collection):
 			document = TestDoc
 
 		docs = []
@@ -27,26 +27,26 @@ class TestCollection(unittest.TestCase):
 			doc.save()
 			docs.append(doc)
 
-		return TestDocCollection, docs
+		return TestDocs, docs
 
 
 	def test_identity(self):
-		class TestDocCollection(Collection):
+		class TestDocs(Collection):
 			document = TestDoc
 
 		identity = {'foo':'bar'}
-		testdocs = TestDocCollection(identity)
+		testdocs = TestDocs(identity)
 		self.assertEquals(testdocs.identity, identity)
 
 
 	def test_list_limits_and_skip(self):
-		TestDocCollection, docs = self.generate_collection(n=20)
+		TestDocs, docs = self.generate_collection(n=20)
 
 		self.assertEquals(TestDoc.objects().count(), 20)
 		
-		TestDocCollection.default_limit = 10
-		TestDocCollection.max_limit = 15
-		testdocs = TestDocCollection()
+		TestDocs.default_limit = 10
+		TestDocs.max_limit = 15
+		testdocs = TestDocs()
 
 		# No limit argument fetches the default limit
 		results = list(testdocs.list())
@@ -71,10 +71,10 @@ class TestCollection(unittest.TestCase):
 	def test_list_fields(self):
 		TestDoc(name='foo', another_field=23).save()
 		
-		class TestDocCollection(Collection):
+		class TestDocs(Collection):
 			document = TestDoc
 
-		testdocs = TestDocCollection()
+		testdocs = TestDocs()
 
 		# include_fields exclusively includes the listed fields
 		doc = testdocs.list(include_fields=('name',)).first().to_mongo()
@@ -93,8 +93,8 @@ class TestCollection(unittest.TestCase):
 
 
 	def test_list_sort(self):
-		TestDocCollection, docs = self.generate_collection(n=20)
-		testdocs = TestDocCollection()
+		TestDocs, docs = self.generate_collection(n=20)
+		testdocs = TestDocs()
 
 		# ascending by name
 		doc = testdocs.list(sort=('+name',)).first()
@@ -114,8 +114,8 @@ class TestCollection(unittest.TestCase):
 
 
 	def test_list_filter(self):
-		TestDocCollection, docs = self.generate_collection(n=20)
-		testdocs = TestDocCollection()
+		TestDocs, docs = self.generate_collection(n=20)
+		testdocs = TestDocs()
 
 		# simple equality filter
 		results = list(testdocs.list(filter={'name': 'doc#04'}))
@@ -128,8 +128,8 @@ class TestCollection(unittest.TestCase):
 
 
 	def test_list_complex(self):
-		TestDocCollection, docs = self.generate_collection(n=20)
-		testdocs = TestDocCollection()
+		TestDocs, docs = self.generate_collection(n=20)
+		testdocs = TestDocs()
 
 		results = list(testdocs.list(
 			filter={'another_field': {'$lt':5}},
@@ -144,8 +144,8 @@ class TestCollection(unittest.TestCase):
 
 
 	def test_get(self):
-		TestDocCollection, docs = self.generate_collection(n=20)
-		testdocs = TestDocCollection()
+		TestDocs, docs = self.generate_collection(n=20)
+		testdocs = TestDocs()
 
 		doc = testdocs.get(docs[5].id)
 		self.assertEquals(doc.id, docs[5].id)
@@ -155,8 +155,8 @@ class TestCollection(unittest.TestCase):
 
 
 	def test_get_fields(self):
-		TestDocCollection, docs = self.generate_collection(n=20)
-		testdocs = TestDocCollection()
+		TestDocs, docs = self.generate_collection(n=20)
+		testdocs = TestDocs()
 
 		doc = testdocs.get(docs[5].id, include_fields=('name',)).to_mongo()
 		self.assertEquals(doc.get('name'), docs[5].name)
@@ -168,10 +168,10 @@ class TestCollection(unittest.TestCase):
 
 
 	def test_create(self):
-		class TestDocCollection(Collection):
+		class TestDocs(Collection):
 			document = TestDoc
 
-		testdocs = TestDocCollection()
+		testdocs = TestDocs()
 		
 		# should fail if a field doesn't validate
 		with self.assertRaises(me.ValidationError):
@@ -189,14 +189,10 @@ class TestCollection(unittest.TestCase):
 
 
 	def test_update(self):
-		class TestDocCollection(Collection):
+		class TestDocs(Collection):
 			document = TestDoc
-			
-			
-	def test_delete(self):
-		pass
 
-		testdocs = TestDocCollection()
+		testdocs = TestDocs()
 		
 		doc = testdocs.create({'name':'foo', 'another_field': 123})
 		
@@ -208,3 +204,15 @@ class TestCollection(unittest.TestCase):
 		# update() should return None if the specified doc doesn't exist
 		result = testdocs.update(ObjectId(), {'name':'bar'})
 		self.assertEquals(result, None)
+		
+		
+	def test_delete(self):
+		TestDocs, docs = self.generate_collection(n=20)
+		testdocs = TestDocs()
+		
+		self.assertEquals(testdocs.list(limit=50).count(), 20)
+		
+		testdocs.delete(docs[0].id)
+		
+		self.assertEquals(testdocs.list(limit=50).count(), 19)
+		
