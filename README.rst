@@ -1,6 +1,8 @@
 Hammock
 =======
 
+|Build Status| |Coverage Status|
+
 Hammock generates a `falcon API <http://falconframework.org/>`_ from a set of `mongoengine <http://mongoengine.org/>`_ documents. Its goal is to enhance DRY and a declarative mode without sacrificing flexibility.
 
 Example
@@ -104,3 +106,9 @@ Hammock is in the planning and pre-alpha stages. There are high expectations of 
 Acknowledgements
 ~~~~~~~~~~~~~~~~
 This project is basically some sugar on top of `falcon <http://falconframework.org/>`_ and `mongoengine <http://mongoengine.org/>`_. Massive credit to those teams. In additon, `eve <http://python-eve.org/>`_ was a big inspiration. In fact, hammock aspires to produce essentially the same ReST APIs. Why not just use eve? A few reasons: performance, tighter mongoengine integration, simpler API.
+
+.. |Build Status| image:: https://travis-ci.org/cooper-software/hammock.svg
+   :target: https://travis-ci.org/cooper-software/hammock
+
+.. |Coverage Status| image:: https://img.shields.io/coveralls/cooper-software/hammock.svg
+   :target: https://coveralls.io/r/cooper-software/hammock

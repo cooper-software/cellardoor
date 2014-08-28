@@ -3,9 +3,13 @@ python:
   - "2.6"
   - "2.7"
 
-install: "pip install -r requirements.txt"
+install: "pip install falcon mongoengine coveralls"
 
-script: nosetests
+script:
+  coverage run --source=hammock nosetests
+
+after_success:
+  coveralls
 
 services:
   - mongodb
