@@ -161,4 +161,3 @@ class TestCollection(unittest.TestCase):
 		doc = testdocs.get(docs[5].id, exclude_fields=('name',)).to_mongo()
 		self.assertEquals(doc.get('name'), None)
 		self.assertEquals(doc.get('another_field'), docs[5].another_field)
-		
