@@ -42,6 +42,11 @@ class Collection(object):
 	
 	# The mongoengine.Document managed by this collection
 	document = None
+	
+	# The methods that are enabled for this collection
+	# Note that this is not the same as methods that are allowed, which may 
+	# change depending on the identity used in the request or other factors.
+	enabled_methods = ('list', 'get', 'create', 'update', 'delete')
 
 	# The default number of objects returned at a time by list()
 	default_limit = 10
@@ -66,7 +71,7 @@ class Collection(object):
 		:param :skip Skip this many results
 		:param :limit Only return this many, subject to the `max_limit` restriction
 		"""
-		self._require_method_allowed('list')
+		self._require_method_allowed_and_enabled('list')
 		return self._list(filter, sort, fields, skip, limit)
 
 
@@ -75,14 +80,14 @@ class Collection(object):
 
 		:param :fields A list of fields to include
 		"""
-		self._require_method_allowed('get')
+		self._require_method_allowed_and_enabled('get')
 		results = self._list(filter={'_id':id}, fields=fields)
 		return results.first()
 
 
 	def create(self, fields):
 		"""Create a new object."""
-		self._require_method_allowed('create')
+		self._require_method_allowed_and_enabled('create')
 		modified_fields = self.modify_update_fields(fields)
 		instance = self.document(**modified_fields)
 		return instance.save()
@@ -92,7 +97,7 @@ class Collection(object):
 		"""Update an existing object. 
 
 		Returns None if the specified object does not exist, otherwise it returns the updated object."""
-		self._require_method_allowed('update')
+		self._require_method_allowed_and_enabled('update')
 
 		doc = self.document.objects(id=id).first()
 		if doc is None:
@@ -109,7 +114,7 @@ class Collection(object):
 
 	def delete(self, id):
 		"""Remove an object."""
-		self._require_method_allowed('delete')
+		self._require_method_allowed_and_enabled('delete')
 		self.document.objects(id=id).delete()
 
 
@@ -149,7 +154,9 @@ class Collection(object):
 		return fields
 
 
-	def _require_method_allowed(self, method):
+	def _require_method_allowed_and_enabled(self, method):
+		if method not in set(self.enabled_methods):
+			raise NotAllowedError
 		if method not in set(self.allowed_methods()):
 			raise NotAuthorizedError
 
