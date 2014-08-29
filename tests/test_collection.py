@@ -19,7 +19,7 @@ class TestCollection(unittest.TestCase):
 
 
 	def generate_collection(self, n=20):
-		class TestDocs(Collection):
+		class TestDocCollection(Collection):
 			document = TestDoc
 
 		docs = []
@@ -28,26 +28,26 @@ class TestCollection(unittest.TestCase):
 			doc.save()
 			docs.append(doc)
 
-		return TestDocs, docs
+		return TestDocCollection, docs
 
 
 	def test_identity(self):
-		class TestDocs(Collection):
+		class TestDocCollection(Collection):
 			document = TestDoc
 
 		identity = {'foo':'bar'}
-		testdocs = TestDocs(identity)
+		testdocs = TestDocCollection(identity)
 		self.assertEquals(testdocs.identity, identity)
 
 
 	def test_list_limits_and_skip(self):
-		TestDocs, docs = self.generate_collection(n=20)
+		TestDocCollection, docs = self.generate_collection(n=20)
 
 		self.assertEquals(TestDoc.objects().count(), 20)
 		
-		TestDocs.default_limit = 10
-		TestDocs.max_limit = 15
-		testdocs = TestDocs()
+		TestDocCollection.default_limit = 10
+		TestDocCollection.max_limit = 15
+		testdocs = TestDocCollection()
 
 		# No limit argument fetches the default limit
 		results = list(testdocs.list())
@@ -72,10 +72,10 @@ class TestCollection(unittest.TestCase):
 	def test_list_fields(self):
 		TestDoc(name='foo', another_field=23).save()
 		
-		class TestDocs(Collection):
+		class TestDocCollection(Collection):
 			document = TestDoc
 
-		testdocs = TestDocs()
+		testdocs = TestDocCollection()
 
 		# include_fields exclusively includes the listed fields
 		doc = testdocs.list(include_fields=('name',)).first().to_mongo()
@@ -94,8 +94,8 @@ class TestCollection(unittest.TestCase):
 
 
 	def test_list_sort(self):
-		TestDocs, docs = self.generate_collection(n=20)
-		testdocs = TestDocs()
+		TestDocCollection, docs = self.generate_collection(n=20)
+		testdocs = TestDocCollection()
 
 		# ascending by name
 		doc = testdocs.list(sort=('+name',)).first()
@@ -115,8 +115,8 @@ class TestCollection(unittest.TestCase):
 
 
 	def test_list_filter(self):
-		TestDocs, docs = self.generate_collection(n=20)
-		testdocs = TestDocs()
+		TestDocCollection, docs = self.generate_collection(n=20)
+		testdocs = TestDocCollection()
 
 		# simple equality filter
 		results = list(testdocs.list(filter={'name': 'doc#04'}))
@@ -129,8 +129,8 @@ class TestCollection(unittest.TestCase):
 
 
 	def test_list_complex(self):
-		TestDocs, docs = self.generate_collection(n=20)
-		testdocs = TestDocs()
+		TestDocCollection, docs = self.generate_collection(n=20)
+		testdocs = TestDocCollection()
 
 		results = list(testdocs.list(
 			filter={'another_field': {'$lt':5}},
@@ -145,8 +145,8 @@ class TestCollection(unittest.TestCase):
 
 
 	def test_get(self):
-		TestDocs, docs = self.generate_collection(n=20)
-		testdocs = TestDocs()
+		TestDocCollection, docs = self.generate_collection(n=20)
+		testdocs = TestDocCollection()
 
 		doc = testdocs.get(docs[5].id)
 		self.assertEquals(doc.id, docs[5].id)
@@ -156,8 +156,8 @@ class TestCollection(unittest.TestCase):
 
 
 	def test_get_fields(self):
-		TestDocs, docs = self.generate_collection(n=20)
-		testdocs = TestDocs()
+		TestDocCollection, docs = self.generate_collection(n=20)
+		testdocs = TestDocCollection()
 
 		doc = testdocs.get(docs[5].id, include_fields=('name',)).to_mongo()
 		self.assertEquals(doc.get('name'), docs[5].name)
@@ -169,10 +169,10 @@ class TestCollection(unittest.TestCase):
 
 
 	def test_create(self):
-		class TestDocs(Collection):
+		class TestDocCollection(Collection):
 			document = TestDoc
 
-		testdocs = TestDocs()
+		testdocs = TestDocCollection()
 		
 		# should fail if a field doesn't validate
 		with self.assertRaises(me.ValidationError):
@@ -190,10 +190,10 @@ class TestCollection(unittest.TestCase):
 
 
 	def test_update(self):
-		class TestDocs(Collection):
+		class TestDocCollection(Collection):
 			document = TestDoc
 
-		testdocs = TestDocs()
+		testdocs = TestDocCollection()
 		
 		doc = testdocs.create({'name':'foo', 'another_field': 123})
 		
@@ -208,8 +208,8 @@ class TestCollection(unittest.TestCase):
 		
 		
 	def test_delete(self):
-		TestDocs, docs = self.generate_collection(n=20)
-		testdocs = TestDocs()
+		TestDocCollection, docs = self.generate_collection(n=20)
+		testdocs = TestDocCollection()
 		
 		self.assertEquals(testdocs.list(limit=50).count(), 20)
 		
@@ -270,4 +270,27 @@ class TestCollection(unittest.TestCase):
 		
 		with self.assertRaises(NotAuthorizedError):
 			testdocs.list()
+		
+		
+	def test_modify_filter(self):
+		class TestDocCollection(Collection):
+			document = TestDoc
+			default_limit = 20
+			
+			def modify_filter(self, filter):
+				return {'another_field':{'$gt': 5}}
+		
+		docs = []
+		for i in range(0, 20):
+			doc = TestDoc(name='doc#%02d' % i, another_field=20-i)
+			doc.save()
+			docs.append(doc)
+		
+		testdocs = TestDocCollection()
+		results = testdocs.list(filter={'name':'doc#19'}, sort=('-another_field',))
+		
+		self.assertEquals(results.count(), 15)
+		self.assertEquals(results.first().another_field, 20)
+		
+		
 		
