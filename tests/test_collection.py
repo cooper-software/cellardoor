@@ -84,33 +84,17 @@ class TestCollection(unittest.TestCase):
 
 		testdocs = TestDocCollection()
 
-		# include_fields exclusively includes the listed fields
-		doc = testdocs.list(include_fields=('name',)).first().to_mongo()
+		# fields exclusively includes the listed fields
+		doc = testdocs.list(fields=('name',)).first().to_mongo()
 		self.assertEquals(doc.get('name'), 'foo')
 		self.assertEquals(doc.get('another_field'), None)
-
-		# exclude fields excludes only the listed fields
-		doc = testdocs.list(exclude_fields=('name',)).first().to_mongo()
-		self.assertEquals(doc.get('name'), None)
-		self.assertEquals(doc.get('another_field'), 23)
-
-		# exclude overrides include
-		doc = testdocs.list(include_fields=('name',), exclude_fields=('name',)).first().to_mongo()
-		self.assertEquals(doc.get('name'), None)
-		self.assertEquals(doc.get('another_field'), 23)
 		
 		# fields have to be lists or tuples of strings
 		with self.assertRaises(ParameterError):
-			testdocs.list(include_fields='olives')
+			testdocs.list(fields='olives')
 			
 		with self.assertRaises(ParameterError):
-			testdocs.list(include_fields=(1,3))
-			
-		with self.assertRaises(ParameterError):
-			testdocs.list(exclude_fields='artichokes')	
-			
-		with self.assertRaises(ParameterError):
-			testdocs.list(exclude_fields=(1,3))
+			testdocs.list(fields=(1,3))
 
 
 	def test_list_sort(self):
@@ -162,7 +146,7 @@ class TestCollection(unittest.TestCase):
 		results = list(testdocs.list(
 			filter={'another_field': {'$lt':5}},
 			sort=('-another_field',),
-			include_fields=('name',),
+			fields=('name',),
 			skip=2,
 			limit=2
 		))
@@ -186,13 +170,9 @@ class TestCollection(unittest.TestCase):
 		TestDocCollection, docs = self.generate_collection(n=20)
 		testdocs = TestDocCollection()
 
-		doc = testdocs.get(docs[5].id, include_fields=('name',)).to_mongo()
+		doc = testdocs.get(docs[5].id, fields=('name',)).to_mongo()
 		self.assertEquals(doc.get('name'), docs[5].name)
 		self.assertEquals(doc.get('another_field'), None)
-
-		doc = testdocs.get(docs[5].id, exclude_fields=('name',)).to_mongo()
-		self.assertEquals(doc.get('name'), None)
-		self.assertEquals(doc.get('another_field'), docs[5].another_field)
 
 
 	def test_create(self):
@@ -357,14 +337,30 @@ class TestCollection(unittest.TestCase):
 		class TestDocCollection(Collection):
 			document = TestDoc
 			
-			def modify_get_fields(self, include_fields, exclude_fields):
-				return ('name', ), None
+			def modify_get_fields(self, fields):
+				return ('name', )
 		
 		doc = TestDoc(name='foo', another_field=23)
 		doc.save()
 		
 		testdocs = TestDocCollection()
-		fetched_doc = testdocs.get(doc.id, include_fields=('another_field',)).to_mongo()
+		fetched_doc = testdocs.get(doc.id, fields=('another_field',)).to_mongo()
+		self.assertEquals(fetched_doc.get('name'), 'foo')
+		self.assertEquals(fetched_doc.get('another_field'), None)
+		
+		
+	def test_modify_get_fields_set(self):
+		class TestDocCollection(Collection):
+			document = TestDoc
+			
+			def modify_get_fields(self, fields):
+				return set(fields).intersection({'name'})
+		
+		doc = TestDoc(name='foo', another_field=23)
+		doc.save()
+		
+		testdocs = TestDocCollection()
+		fetched_doc = testdocs.get(doc.id, fields=('another_field','name')).to_mongo()
 		self.assertEquals(fetched_doc.get('name'), 'foo')
 		self.assertEquals(fetched_doc.get('another_field'), None)
 		
@@ -385,3 +381,4 @@ class TestCollection(unittest.TestCase):
 		doc = testdocs.update(doc.id, {'name':'bar', 'another_field':3})
 		self.assertEquals(doc.name, 'bar')
 		self.assertEquals(doc.another_field, 8)
+		

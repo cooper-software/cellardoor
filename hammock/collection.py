@@ -58,27 +58,25 @@ class Collection(object):
 		self.identity = identity
 
 
-	def list(self, filter=None, sort=None, include_fields=None, exclude_fields=None, skip=0, limit=0):
+	def list(self, filter=None, sort=None, fields=None, skip=0, limit=0):
 		"""Returns a list of objects, subject to filtering and limiting.
 
 		:param :filter A mongodb query applied to the list
-		:param :include_fields A list of fields to include
-		:param :exclude_fields A list of fields to exclude
+		:param :fields A list of fields to include
 		:param :skip Skip this many results
 		:param :limit Only return this many, subject to the `max_limit` restriction
 		"""
 		self._require_method_allowed('list')
-		return self._list(filter, sort, include_fields, exclude_fields, skip, limit)
+		return self._list(filter, sort, fields, skip, limit)
 
 
-	def get(self, id, include_fields=None, exclude_fields=None):
+	def get(self, id, fields=None):
 		"""Get a single object.
 
-		:param :include_fields A list of fields to include
-		:param :exclude_fields A list of fields to exclude
+		:param :fields A list of fields to include
 		"""
 		self._require_method_allowed('get')
-		results = self._list(filter={'_id':id}, include_fields=include_fields, exclude_fields=exclude_fields)
+		results = self._list(filter={'_id':id}, fields=fields)
 		return results.first()
 
 
@@ -141,9 +139,9 @@ class Collection(object):
 		return sort
 
 
-	def modify_get_fields(self, include_fields, exclude_fields):
+	def modify_get_fields(self, fields):
 		"""Override to change which fields are included in returned objects"""
-		return include_fields, exclude_fields
+		return fields
 
 
 	def modify_update_fields(self, fields):
@@ -156,13 +154,13 @@ class Collection(object):
 			raise NotAuthorizedError
 
 
-	def _list(self, filter=None, sort=None, include_fields=None, exclude_fields=None, skip=0, limit=0):
+	def _list(self, filter=None, sort=None, fields=None, skip=0, limit=0):
 		modified_filter = self._get_modified_filter(filter)
-		modified_sort = self.modify_sort(sort)
-		modified_include_fields, modified_exclude_fields = self.modify_get_fields(include_fields, exclude_fields)
+		modified_sort = self.modify_sort(sort if sort else ())
+		modified_fields = self.modify_get_fields(fields if fields else ())
 
 		results = self.document.objects(__raw__=modified_filter)
-		results = self._apply_fields(results, modified_include_fields, modified_exclude_fields)
+		results = self._apply_fields(results, modified_fields)
 		results = self._apply_sort(results, modified_sort)
 		results = self._apply_limits(results, skip, limit)
 
@@ -179,25 +177,10 @@ class Collection(object):
 		return modified_filter
 
 
-	def _apply_fields(self, queryset, include_fields, exclude_fields):
-		if include_fields:
-			self._validate_list_of_strings('include_fields', include_fields)
-			
-		if exclude_fields:
-			self._validate_list_of_strings('exclude_fields', exclude_fields)
-		
-		if exclude_fields:
-			for k in exclude_fields:
-				queryset = queryset.exclude(k)
-
-			if include_fields:
-				exclude_fields = set(exclude_fields)
-				for k in include_fields:
-					if k not in exclude_fields:
-						queryset = queryset.only(include_fields)
-		
-		elif include_fields:
-			for k in include_fields:
+	def _apply_fields(self, queryset, fields):
+		if fields:
+			self._validate_list_of_strings('fields', fields)
+			for k in fields:
 				queryset = queryset.only(k)
 
 		return queryset
@@ -232,7 +215,7 @@ class Collection(object):
 		
 		
 	def _validate_list_of_strings(self, field_name, value):
-		if not isinstance(value, (list, tuple)):
+		if not isinstance(value, (list, tuple, set)):
 			raise ParameterError, "%s must be a sequence of strings" % field_name
 
 		for x in value:
