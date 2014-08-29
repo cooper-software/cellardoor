@@ -2,6 +2,7 @@ import unittest
 import mongoengine as me
 from bson.objectid import ObjectId
 from hammock import Collection
+from hammock.collection import ParameterError
 from hammock.auth.errors import NotAuthorizedError
 
 class TestDoc(me.Document):
@@ -67,6 +68,13 @@ class TestCollection(unittest.TestCase):
 		# skip works
 		results = list(testdocs.list(skip=3, limit=1))
 		self.assertEquals(results[0].name, 'doc#03')
+		
+		# skip and limit have to be ints
+		with self.assertRaises(ParameterError):
+			testdocs.list(skip='olives')
+			
+		with self.assertRaises(ParameterError):
+			testdocs.list(limit='artichokes')
 
 
 	def test_list_fields(self):
@@ -90,7 +98,20 @@ class TestCollection(unittest.TestCase):
 		# exclude overrides include
 		doc = testdocs.list(include_fields=('name',), exclude_fields=('name',)).first().to_mongo()
 		self.assertEquals(doc.get('name'), None)
-		self.assertEquals(doc.get('another_field'), 23)		
+		self.assertEquals(doc.get('another_field'), 23)
+		
+		# fields have to be lists or tuples of strings
+		with self.assertRaises(ParameterError):
+			testdocs.list(include_fields='olives')
+			
+		with self.assertRaises(ParameterError):
+			testdocs.list(include_fields=(1,3))
+			
+		with self.assertRaises(ParameterError):
+			testdocs.list(exclude_fields='artichokes')	
+			
+		with self.assertRaises(ParameterError):
+			testdocs.list(exclude_fields=(1,3))
 
 
 	def test_list_sort(self):
@@ -112,6 +133,13 @@ class TestCollection(unittest.TestCase):
 		# descending by another_field
 		doc = testdocs.list(sort=('-another_field',)).first()
 		self.assertEquals(doc.id, docs[0].id)
+		
+		# sort has to be a list or tuple of strings
+		with self.assertRaises(ParameterError):
+			testdocs.list(sort='olives')
+			
+		with self.assertRaises(ParameterError):
+			testdocs.list(sort=(17, doc))
 
 
 	def test_list_filter(self):
@@ -293,4 +321,21 @@ class TestCollection(unittest.TestCase):
 		self.assertEquals(results.first().another_field, 20)
 		
 		
+	def test_modify_sort(self):
+		class TestDocCollection(Collection):
+			document = TestDoc
+			
+			def modify_sort(self, sort):
+				return ('-name',)
+		
+		docs = []
+		for i in range(0, 20):
+			doc = TestDoc(name='doc#%02d' % i, another_field=20-i)
+			doc.save()
+			docs.append(doc)
+		
+		testdocs = TestDocCollection()
+		results = testdocs.list(sort=('+name',))
+		
+		self.assertEquals(results.first().another_field, 1)
 		

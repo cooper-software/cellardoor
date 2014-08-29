@@ -1,7 +1,8 @@
+import types
 from .auth.errors import NotAuthorizedError
 
 
-class ParameterException(Exception):
+class ParameterError(Exception):
 	pass
 
 
@@ -165,8 +166,8 @@ class Collection(object):
 		modified_include_fields, modified_exclude_fields = self.modify_get_fields(include_fields, exclude_fields)
 
 		results = self.document.objects(__raw__=modified_filter)
-		results = self._apply_fields(results, include_fields, exclude_fields)
-		results = self._apply_sort(results, sort)
+		results = self._apply_fields(results, modified_include_fields, modified_exclude_fields)
+		results = self._apply_sort(results, modified_sort)
 		results = self._apply_limits(results, skip, limit)
 
 		return results
@@ -175,14 +176,20 @@ class Collection(object):
 	def _get_modified_filter(self, filter):
 		filter = filter if filter else {}
 		modified_filter = self.modify_filter(filter)
-
-		if modified_filter is None:
-			raise Exception, "%s.modify_filter() must return a dict, got None instead" % (self.__class__.__name__)
-		else:
-			return modified_filter
+		
+		if not isinstance(filter, (dict, types.NoneType)):
+			raise ParameterError, "filter must be a dict"
+		
+		return modified_filter
 
 
 	def _apply_fields(self, queryset, include_fields, exclude_fields):
+		if include_fields:
+			self._validate_list_of_strings('include_fields', include_fields)
+			
+		if exclude_fields:
+			self._validate_list_of_strings('exclude_fields', exclude_fields)
+		
 		if exclude_fields:
 			for k in exclude_fields:
 				queryset = queryset.exclude(k)
@@ -201,6 +208,12 @@ class Collection(object):
 
 
 	def _apply_limits(self, queryset, skip, limit):
+		if not isinstance(skip, int):
+			raise ParameterError, "Skip must be an int"
+			
+		if not isinstance(limit, int):
+			raise ParameterError, "Limit must be an int"
+		
 		if skip > 0:
 			queryset = queryset.skip(skip)
 
@@ -213,18 +226,19 @@ class Collection(object):
 
 
 	def _apply_sort(self, queryset, sort):
-		sort = sort if sort else ()
-
-		if not isinstance(sort, (list, tuple)):
-			raise ParameterException, "Sort must be a list"
-
-		for n in sort:
-			if not isinstance(n, basestring):
-				raise ParameterException, "Sort fields must be strings"
-
-		sort = self.modify_sort(sort)
-
-		if sort is not None:
-			queryset = queryset.order_by(*sort)
+		if not sort:
+			return queryset
+			
+		self._validate_list_of_strings('sort', sort)
+		queryset = queryset.order_by(*sort)
 
 		return queryset
+		
+		
+	def _validate_list_of_strings(self, field_name, value):
+		if not isinstance(value, (list, tuple)):
+			raise ParameterError, "%s must be a sequence of strings" % field_name
+
+		for x in value:
+			if not isinstance(x, basestring):
+				raise ParameterError, "%s must be a sequence of strings" % field_name
