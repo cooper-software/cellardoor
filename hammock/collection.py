@@ -1,9 +1,5 @@
 import types
-from .auth.errors import NotAuthorizedError
-
-
-class ParameterError(Exception):
-	pass
+from .errors import NotAuthorizedError, NotAllowedError, ParameterError
 
 
 class CollectionMeta(type):

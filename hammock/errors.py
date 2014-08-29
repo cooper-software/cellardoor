@@ -4,3 +4,11 @@ class NotAuthenticatedError(Exception):
 
 class NotAuthorizedError(Exception):
 	pass
+	
+	
+class NotAllowedError(Exception):
+	pass
+	
+	
+class ParameterError(Exception):
+	pass

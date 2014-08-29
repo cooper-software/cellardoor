@@ -2,8 +2,7 @@ import unittest
 import mongoengine as me
 from bson.objectid import ObjectId
 from hammock import Collection
-from hammock.collection import ParameterError
-from hammock.auth.errors import NotAuthorizedError
+from hammock.errors import NotAuthorizedError, ParameterError
 
 class TestDoc(me.Document):
 	name = me.StringField()
@@ -339,3 +338,36 @@ class TestCollection(unittest.TestCase):
 		
 		self.assertEquals(results.first().another_field, 1)
 		
+		
+	def test_modify_get_fields(self):
+		class TestDocCollection(Collection):
+			document = TestDoc
+			
+			def modify_get_fields(self, include_fields, exclude_fields):
+				return ('name', ), None
+		
+		doc = TestDoc(name='foo', another_field=23)
+		doc.save()
+		
+		testdocs = TestDocCollection()
+		fetched_doc = testdocs.get(doc.id, include_fields=('another_field',)).to_mongo()
+		self.assertEquals(fetched_doc.get('name'), 'foo')
+		self.assertEquals(fetched_doc.get('another_field'), None)
+		
+		
+	def test_modify_update_fields(self):
+		class TestDocCollection(Collection):
+			document = TestDoc
+			
+			def modify_update_fields(self, fields):
+				fields['another_field'] = 5 + fields.get('another_field', 0)
+				return fields
+		
+		testdocs = TestDocCollection()
+		doc = testdocs.create({'name':'foo'})
+		self.assertEquals(doc.name, 'foo')
+		self.assertEquals(doc.another_field, 5)
+		
+		doc = testdocs.update(doc.id, {'name':'bar', 'another_field':3})
+		self.assertEquals(doc.name, 'bar')
+		self.assertEquals(doc.another_field, 8)
