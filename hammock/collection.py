@@ -173,7 +173,7 @@ class Collection(object):
 		filter = filter if filter else {}
 		modified_filter = self.modify_filter(filter)
 		
-		if not isinstance(filter, (dict, types.NoneType)):
+		if not isinstance(modified_filter, (dict, types.NoneType)):
 			raise ParameterError, "filter must be a dict"
 		
 		return modified_filter

@@ -320,6 +320,20 @@ class TestCollection(unittest.TestCase):
 		self.assertEquals(results.first().another_field, 20)
 		
 		
+	def test_modify_filter_bad_parameter(self):
+		class TestDocCollection(Collection):
+			document = TestDoc
+			default_limit = 20
+			
+			def modify_filter(self, filter):
+				return 72
+				
+		testdocs = TestDocCollection()
+		
+		with self.assertRaises(ParameterError):
+			results = testdocs.list(filter={})
+		
+		
 	def test_modify_sort(self):
 		class TestDocCollection(Collection):
 			document = TestDoc
