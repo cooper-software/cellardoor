@@ -1,2 +1,0 @@
-class BaseView(object):
-	pass

@@ -1,8 +1,7 @@
 import types
-from .errors import NotAuthorizedError, NotAllowedError, ParameterError
 
 
-class CollectionMeta(type):
+class ResourceMeta(type):
 	
 	def __new__(cls, name, bases, dict):
 		singular_name = dict.get('singular_name')
@@ -30,31 +29,27 @@ class CollectionMeta(type):
 		dict['singular_name'] = singular_name
 		dict['plural_name'] = plural_name
 		
-		return super(CollectionMeta, cls).__new__(cls, name, bases, dict)
+		return super(ResourceMeta, cls).__new__(cls, name, bases, dict)
 
 
-class Collection(object):
+class Resource(object):
 	"""
-	A collection is a generic API for managing document instances.
+	A resource provides CRUD and query operations for a model
 	"""
 	
-	__metaclass__ = CollectionMeta
+	__metaclass__ = ResourceMeta
 	
-	# The mongoengine.Document managed by this collection
-	document = None
+	model = None
 	
-	# The methods that are enabled for this collection
-	# Note that this is not the same as methods that are allowed, which may 
-	# change depending on the identity used in the request or other factors.
-	enabled_methods = ('list', 'get', 'create', 'update', 'delete')
-
+	enabled_methods = ()
+	
 	# The default number of objects returned at a time by list()
 	default_limit = 10
 
 	# The maximum number of objects returned at a time by list()
 	max_limit = 20
-
-
+	
+	
 	def __init__(self, identity=None):
 		"""Create a new collection.
 
