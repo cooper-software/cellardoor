@@ -30,7 +30,7 @@ only validate yummy things. Optionally, it will convert to yumminess level::
             super(Yummy, self).__init__(**kwargs)
             
             
-        def validate(self, value):
+        def _validate(self, value):
             if value not in self.yumminess:
                 raise ValidationError('Yumminess not known for "%s"' % value)
             
@@ -44,7 +44,7 @@ It's a convention, but not a requirement, to put error values in the class like 
     class Yummy(Field):
         NOT_YUMMY = "This is not yummy"
         
-        def validate(self, value):
+        def _validate(self, value):
             if not self.is_yummy(value):
                 raise ValidationError(self.NOT_YUMMY)
 
@@ -73,7 +73,7 @@ __all__ = [
     'Text',
     'Email',
     'DateTime',
-    'Bool',
+    'Boolean',
     'BoundingBox',
     'LatLng',
     'Enum',
@@ -131,14 +131,19 @@ class Field(object):
     create your own field.
     """
     
-    def __init__(self, optional=False, default_value=None):
-        self.optional = optional
-        self.default_value = default_value
-    
-    def validate(self, value):
-        raise NotImplementedError
+    def __init__(self, required=False, default=None):
+        self.required = required
+        self.default = default
         
-    def default_value(self):
+    def validate(self, value):
+        if value is None:
+            if self.required:
+                raise ValidationError, "This field is required."
+            value = self.default
+        
+        return self._validate(value)
+        
+    def _validate(self, value):
         raise NotImplementedError
 
 
@@ -155,15 +160,14 @@ class CompoundField(Field):
         v.validate({'foo': 'a', 'goo': 'b', 'bar':17})
         # ok -> {'foo': 'a', 'bar':17}
         
-        # optional fields are, well, optional
-        v = CompoundField(foo=Text(), bar=TypeOf(int, optional=True, default_value=8))
+        # Fields are optional by default
+        v = CompoundField(foo=Text(), bar=TypeOf(int, default=8))
         v.validate({'foo':'ice cream'}) # -> {'foo':'ice cream', 'bar': 8}
     """
     NOT_A_DICT = "Not a dict"
-    MISSING_REQUIRED = "This field is required."
     
     def __init__(self, **kwargs):
-        keys = ['optional', 'default_value']
+        keys = ['required', 'default']
         newkwargs = {}
         
         for k in keys:
@@ -174,7 +178,7 @@ class CompoundField(Field):
         self.fields = kwargs
         
         
-    def validate(self, value):
+    def _validate(self, value):
         if not isinstance(value, dict):
             raise ValidationError(self.NOT_A_DICT)
         
@@ -182,16 +186,10 @@ class CompoundField(Field):
         errors = {}
         
         for k,v in self.fields.items():
-            if k in value and value[k] != "" and value[k] is not None:
-                try:
-                    validated[k] = v.validate(value[k])
-                except ValidationError, e:
-                    errors[k] = e
-            else:
-                if not v.optional:
-                    errors[k] = self.MISSING_REQUIRED
-                    continue
-                validated[k] = v.default_value
+            try:
+                validated[k] = v.validate(value.get(k))
+            except ValidationError, e:
+                errors[k] = e
         
         if errors:
             raise CompoundValidationError(errors)
@@ -218,7 +216,7 @@ class Text(Field):
         self.maxlength = maxlength
         super(Text, self).__init__(**kwargs)
         
-    def validate(self, value):
+    def _validate(self, value):
         if not isinstance(value, basestring):
             raise ValidationError(self.NOT_TEXT)
             
@@ -231,7 +229,7 @@ class Text(Field):
         return value
 
 
-class Email(Field):
+class Email(Text):
     """
     Passes email addresses that meet the guidelines in `RFC 3696 <http://tools.ietf.org/html/rfc3696>`_::
     
@@ -243,7 +241,9 @@ class Email(Field):
     NOT_EMAIL = "Invalid email address"
     pattern = re.compile("^((\".+\")|((\\\.))|([\d\w\!#\$%&'\*\+\-/=\?\^_`\{\|\}~]))((\"[^@]+\")|(\\\.)|([\d\w\!#\$%&'\*\+\-/=\?\^_`\.\{\|\}~]))*@[a-zA-Z0-9]+([a-zA-Z0-9\-][a-zA-Z0-9]+)?(\.[a-zA-Z0-9]+([a-zA-Z0-9\-][a-zA-Z0-9]+)?)+\.?$")
     
-    def validate(self, value):
+    def _validate(self, value):
+        value = super(Email, self)._validate(value)
+        
         if not isinstance(value, basestring):
             raise ValidationError(self.NOT_EMAIL)
         if not self.pattern.match(value):
@@ -289,7 +289,7 @@ class DateTime(Field):
         self.use_dateutil = use_dateutil
         
         
-    def validate(self, value):
+    def _validate(self, value):
         if isinstance(value, datetime):
             return value
         
@@ -320,7 +320,7 @@ class DateTime(Field):
             raise ValidationError(self.NOT_DATE)
             
             
-class Bool(Field):
+class Boolean(Field):
     """
     Passes and converts most representations of True and False::
         
@@ -335,7 +335,7 @@ class Bool(Field):
     NOT_BOOL = "Not a boolean"
     
     
-    def validate(self, value):
+    def _validate(self, value):
         if isinstance(value, basestring):
             v = value.lower()
             if v in ["true", "1", "yes"]:
@@ -369,7 +369,7 @@ class BoundingBox(Field):
     WRONG_SIZE = "A bounding box must have 4 values"
     NOT_STRING_OR_LIST = "Expected a comma-separated list of values or a list or tuple object."
     
-    def validate(self, value):
+    def _validate(self, value):
         if not isinstance(value, (list, tuple)):
             if isinstance(value, basestring):
                 value = [v.strip() for v in value.split(',')]
@@ -404,7 +404,7 @@ class LatLng(Field):
     WRONG_SIZE = "A point must have 2 values"
     NOT_STRING_OR_LIST = "Expected a comma-separated list of values or a list or tuple object."
     
-    def validate(self, value):
+    def _validate(self, value):
         if not isinstance(value, (list, tuple)):
             if not isinstance(value, basestring):
                 raise ValidationError(self.NOT_STRING_OR_LIST)
@@ -440,7 +440,7 @@ class Enum(Field):
         self.values = values
     
     
-    def validate(self, value):
+    def _validate(self, value):
         if value in self.values:
             return value
         raise ValidationError(self.NOT_IN_LIST)
@@ -466,13 +466,13 @@ class TypeOf(Field):
         self.types = types
         
         
-    def validate(self, value):
+    def _validate(self, value):
         if not isinstance(value, self.types):
             raise ValidationError, "Not of type '%s'" % (self.types,)
         return value
         
         
-class URL(Field):
+class URL(Text):
     """
     Passes a URL using guidelines from RFC 3696::
         
@@ -495,9 +495,9 @@ class URL(Field):
         self.pattern = re.compile('((?:[a-z][\w-]+:(?:/{1,3}|[a-z0-9%])|www\d{0,3}[.]|[a-z0-9.\-]+[.][a-z]{2,4}/)(?:[^\s()<>]+|\(([^\s()<>]+|(\([^\s()<>]+\)))*\))+(?:\(([^\s()<>]+|(\([^\s()<>]+\)))*\)|[^\s`!()\[\]{};:\'".,<>?\xc2\xab\xc2\xbb\xe2\x80\x9c\xe2\x80\x9d\xe2\x80\x98\xe2\x80\x99]))')
         
         
-    def validate(self, value):
-        if not isinstance(value, basestring):
-            raise ValidationError(self.NOT_A_URL)
+    def _validate(self, value):
+        value = super(URL, self)._validate(value)
+        
         if not self.pattern.match(value):
             raise ValidationError(self.NOT_A_URL)
         return value
@@ -518,7 +518,7 @@ class OneOf(Field):
         self.fields = fields
         
         
-    def validate(self, value):
+    def _validate(self, value):
         is_valid = False
         
         for v in self.fields:
@@ -566,7 +566,7 @@ class Anything(Field):
     Passes anything
     """
     
-    def validate(self, value):
+    def _validate(self, value):
         return value
         
         

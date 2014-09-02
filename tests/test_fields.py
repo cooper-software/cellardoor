@@ -13,8 +13,8 @@ class TestAbstractField(unittest.TestCase):
         """
         Shouldn't be able to use base Field as a field
         """
-        v = Field()
-        self.assertRaises(NotImplementedError, v.validate, 23)
+        field = Field()
+        self.assertRaises(NotImplementedError, field.validate, 23)
         
         
 class TestText(unittest.TestCase):
@@ -23,17 +23,17 @@ class TestText(unittest.TestCase):
         """
         Should raise ValidationError for anything but a string
         """
-        v = Text()
-        self.assertRaises(ValidationError, v.validate, 23)
+        field = Text()
+        self.assertRaises(ValidationError, field.validate, 23)
         
         
     def test_text(self):
         """
         Should not raise ValidationError for text
         """
-        v = Text()
+        field = Text()
         try:
-            v.validate("foo")
+            field.validate("foo")
         except ValidationError:
             self.fail("Text.validate() raised ValidationError for a string")
             
@@ -43,10 +43,10 @@ class TestText(unittest.TestCase):
         Should not raise ValidationError if a string is longer than minlength.
         """
         test_string = "foofoo"
-        v = Text(minlength=len(test_string)-1)
+        field = Text(minlength=len(test_string)-1)
         
         try:
-            v.validate(test_string)
+            field.validate(test_string)
         except ValidationError:
             self.fail("Text.validate(minlength=%d) raised ValidationError for a string of length %d" %(
                 len(test_string)-1, len(test_string)))
@@ -57,8 +57,8 @@ class TestText(unittest.TestCase):
         Should raise ValidationError if a string is shorter than minlength.
         """
         test_string = "foofoo"
-        v = Text(minlength=len(test_string)+1)
-        self.assertRaises(ValidationError, v.validate, test_string)
+        field = Text(minlength=len(test_string)+1)
+        self.assertRaises(ValidationError, field.validate, test_string)
         
         
     def test_maxlength_success(self):
@@ -67,19 +67,19 @@ class TestText(unittest.TestCase):
         """
         test_string = "foofoo"
         test_string_len = len(test_string)
-        v = Text(maxlength=test_string_len)
+        field = Text(maxlength=test_string_len)
         
         try:
-            v.validate(test_string)
+            field.validate(test_string)
         except ValidationError:
             self.fail("Text.validate(maxlength=%d) raised ValidationError for a string of length %d" %(
                 test_string_len, test_string_len))
             
             
-        v = Text(maxlength=test_string_len+1)
+        field = Text(maxlength=test_string_len+1)
         
         try:
-            v.validate(test_string)
+            field.validate(test_string)
         except ValidationError:
             self.fail("Text.validate(maxlength=%d) raised ValidationError for a string of length %d" %(
                 test_string_len+1, test_string_len))
@@ -90,8 +90,8 @@ class TestText(unittest.TestCase):
         Should raise ValidationError if a string is longer than maxlength
         """
         test_string = "foofoo"
-        v = Text(maxlength=len(test_string)-1)
-        self.assertRaises(ValidationError, v.validate, test_string)
+        field = Text(maxlength=len(test_string)-1)
+        self.assertRaises(ValidationError, field.validate, test_string)
         
         
     def test_return_value(self):
@@ -99,8 +99,9 @@ class TestText(unittest.TestCase):
         Should always return the input value
         """
         string = "foobarbaz"
-        v = Text(minlength=1,maxlength=23)
-        self.assertEqual(string, v.validate(string))
+        field = Text(minlength=1,maxlength=23)
+        self.assertEqual(string, field.validate(string))
+        
         
         
 class TestEmail(unittest.TestCase):
@@ -109,7 +110,7 @@ class TestEmail(unittest.TestCase):
         """
         Should raise ValidationError on things that aren't email addresses
         """
-        v = Email()
+        field = Email()
         not_emails = [
             23,
             "foo",
@@ -117,7 +118,7 @@ class TestEmail(unittest.TestCase):
         ]
         
         for not_email in not_emails:
-            self.assertRaises(ValidationError, v.validate, not_email)
+            self.assertRaises(ValidationError, field.validate, not_email)
         
         
     def test_pass(self):
@@ -135,11 +136,11 @@ class TestEmail(unittest.TestCase):
             '\@fo"   "\//o@example.com'
         ]
         
-        v = Email()
+        field = Email()
         
         for email in emails:
             try:
-                self.assertEquals(email, v.validate(email))
+                self.assertEquals(email, field.validate(email))
             except ValidationError:
                 self.fail('Failed to accept %s' % email)
         
@@ -150,7 +151,7 @@ class TestDateTime(unittest.TestCase):
         """
         Should raise invalid for things that aren't dates and times
         """
-        v = DateTime()
+        field = DateTime()
         not_datetimes = [
             "santa claus",
             "the cure is wednesday",
@@ -158,18 +159,18 @@ class TestDateTime(unittest.TestCase):
         ]
         
         for not_datetime in not_datetimes:
-            self.assertRaises(ValidationError, v.validate, not_datetime)
+            self.assertRaises(ValidationError, field.validate, not_datetime)
         
         
     def test_simple(self):
         """
         Should parse dates in the default format and return them as datetime objects.
         """
-        v = DateTime(default_format="%x")
+        field = DateTime(default_format="%x")
         bday = datetime(1982, 9, 6)
         
         try:
-            self.assertEqual(bday, v.validate('9/6/82'))
+            self.assertEqual(bday, field.validate('9/6/82'))
         except ValidationError:
             self.fail('Failed to validate 9/6/82 with format %x')
         
@@ -184,10 +185,10 @@ class TestDateTime(unittest.TestCase):
             print "timelib is not installed, skipping timelib test for DateTime field"
             return
         
-        v = DateTime(use_timelib=True, use_dateutil=False)
+        field = DateTime(use_timelib=True, use_dateutil=False)
         today = datetime.utcnow().replace(hour=0,minute=0,second=0,microsecond=0)
         
-        self.assertEqual(today, v.validate("today"))
+        self.assertEqual(today, field.validate("today"))
         
         
     def test_dateutil(self):
@@ -200,21 +201,21 @@ class TestDateTime(unittest.TestCase):
             print "dateutil is not installed, skipping dateutil test for DateTime field"
             return
         
-        v = DateTime(default_format="%d", use_timelib=False, use_dateutil=True)
+        field = DateTime(default_format="%d", use_timelib=False, use_dateutil=True)
         bday = datetime(1982,9,6)
         
-        self.assertEqual(bday, v.validate('9/6/82'))
+        self.assertEqual(bday, field.validate('9/6/82'))
             
             
     def test_reflexive(self):
         """
         Should pass and return a datetime.datetime instance.
         """
-        v = DateTime()
+        field = DateTime()
         now = datetime.now()
         
         try:
-            self.assertEquals(now, v.validate(now))
+            self.assertEquals(now, field.validate(now))
         except ValidationError:
             self.fail("Failed to pass a datetime.datetime instance")
             
@@ -223,12 +224,12 @@ class TestDateTime(unittest.TestCase):
         """
         Should pass both int and float timestamps and convert to utc datetime
         """
-        v = DateTime()
+        field = DateTime()
         now = time.time()
         now_date = datetime.utcfromtimestamp(now)
         
         try:
-            self.assertEquals(now_date, v.validate(now))
+            self.assertEquals(now_date, field.validate(now))
         except ValidationError:
             self.fail("Failed to pass a float timestamp")
             
@@ -236,12 +237,12 @@ class TestDateTime(unittest.TestCase):
         now_date = datetime.utcfromtimestamp(now)
         
         try:
-            self.assertEquals(now_date, v.validate(now))
+            self.assertEquals(now_date, field.validate(now))
         except ValidationError:
             self.fail("Failed to pass an int timestamp")
         
         
-class TestBool(unittest.TestCase):
+class TestBoolean(unittest.TestCase):
     
     def test_fail(self):
         """
@@ -253,10 +254,10 @@ class TestBool(unittest.TestCase):
             dict
         ]
         
-        v = Bool()
+        field = Boolean()
         
         for not_bool in not_bools:
-            self.assertRaises(ValidationError, v.validate, not_bool)
+            self.assertRaises(ValidationError, field.validate, not_bool)
         
         
     def test_falses(self):
@@ -274,11 +275,11 @@ class TestBool(unittest.TestCase):
             "No"
         ]
         
-        v = Bool()
+        field = Boolean()
         
         for false in falses:
             try:
-                self.assertEqual(False, v.validate(false))
+                self.assertEqual(False, field.validate(false))
             except ValidationError:
                 self.fail("Didn't pass '%s'" % false)
         
@@ -298,11 +299,11 @@ class TestBool(unittest.TestCase):
             "yEs"
         ]
         
-        v = Bool()
+        field = Boolean()
         
         for true in trues:
             try:
-                self.assertEqual(True, v.validate(true))
+                self.assertEqual(True, field.validate(true))
             except ValidationError:
                 self.fail("Didn't pass '%s'" % true)
         
@@ -321,11 +322,11 @@ class TestBoundingBox(unittest.TestCase):
             (1,181,3,-300),
             348.345
         ]
-        v = BoundingBox()
+        field = BoundingBox()
         
         for not_bbox in not_bboxes:
             try:
-                v.validate(not_bbox)
+                field.validate(not_bbox)
                 self.fail("Passed '%s'" % (not_bbox,))
             except ValidationError:
                 pass
@@ -336,17 +337,17 @@ class TestBoundingBox(unittest.TestCase):
         Should pass a list or tuple
         """
         box = [42.75804,-85.0031, 42.76409, -84.9861]
-        v = BoundingBox()
+        field = BoundingBox()
         
         try:
-            v.validate(box)
+            field.validate(box)
         except ValidationError:
             self.fail("Failed '%s'", box)
             
         box = tuple(box)
         
         try:
-            v.validate(box)
+            field.validate(box)
         except ValidationError:
             self.fail("Failed '%s'", box)
         
@@ -357,10 +358,10 @@ class TestBoundingBox(unittest.TestCase):
         """
         box = (42.75804,-85.0031, 42.76409, -84.9861)
         str_box = ",".join([str(b) for b in box])
-        v = BoundingBox()
+        field = BoundingBox()
         
         try:
-            self.assertEqual(box, v.validate(str_box))
+            self.assertEqual(box, field.validate(str_box))
         except ValidationError:
             self.fail("Failed '%s'", str_box)
         
@@ -378,11 +379,11 @@ class TestLatLng(unittest.TestCase):
             (181,-181)
         ]
         
-        v = LatLng()
+        field = LatLng()
         
         for not_latlng in not_latlngs:
             try:
-                v.validate(not_latlng)
+                field.validate(not_latlng)
                 self.fail("Passed %s" % (not_latlng,))
             except ValidationError:
                 pass
@@ -398,11 +399,11 @@ class TestLatLng(unittest.TestCase):
             [42.76066, -84.9929]
         ]
         
-        v = LatLng()
+        field = LatLng()
         
         for latlng in latlngs:
             try:
-                v.validate(latlng)
+                field.validate(latlng)
             except ValidationError:
                 self.fail("Failed to pass %s" % latlng)
         
@@ -414,10 +415,10 @@ class TestLatLng(unittest.TestCase):
         latlng = (42.76066, -84.9929)
         latlngs = [list(latlng), "%s,%s" % latlng]
         
-        v = LatLng()
+        field = LatLng()
         
         for l in latlngs:
-            self.assertEqual(latlng, v.validate(l))
+            self.assertEqual(latlng, field.validate(l))
         
         
 class TestEnum(unittest.TestCase):
@@ -429,10 +430,10 @@ class TestEnum(unittest.TestCase):
         values = [5, "atilla the hun", unicode]
         wrong = [8, "ivan the terrible", str]
         
-        v = Enum(*values)
+        field = Enum(*values)
         
         for w in wrong:
-            self.assertRaises(ValidationError, v.validate, w)
+            self.assertRaises(ValidationError, field.validate, w)
             
             
     def test_pass(self):
@@ -441,11 +442,11 @@ class TestEnum(unittest.TestCase):
         """
         values = [5, "atilla the hun", unicode]
         
-        v = Enum(*values)
+        field = Enum(*values)
         
         for value in values:
             try:
-                self.assertEqual(value, v.validate(value))
+                self.assertEqual(value, field.validate(value))
             except ValidationError:
                 self.fail("Didn't pass %s" % value)
         
@@ -456,19 +457,19 @@ class TestTypeOf(unittest.TestCase):
         """
         Shouldn't pass values of a type not specified
         """
-        v = TypeOf(int)
-        self.assertRaises(ValidationError, v.validate, "Hi, hungry?")
+        field = TypeOf(int)
+        self.assertRaises(ValidationError, field.validate, "Hi, hungry?")
         
         
     def test_pass(self):
         """
         Should pass values of the specified type
         """
-        v = TypeOf(basestring)
+        field = TypeOf(basestring)
         value = u"foo"
         
         try:
-            self.assertEqual(value, v.validate(value))
+            self.assertEqual(value, field.validate(value))
         except ValidationError:
             self.fail("Didn't pass value of specified type")
         
@@ -480,10 +481,10 @@ class TestURL(unittest.TestCase):
         Don't pass things that aren't URLs.
         """
         not_urls = ["snipe", u'\xe2\x99\xa5', 777]
-        v = URL()
+        field = URL()
         
         for not_url in not_urls:
-            self.assertRaises(ValidationError, v.validate, not_url)
+            self.assertRaises(ValidationError, field.validate, not_url)
         
         
     def test_pass(self):
@@ -499,11 +500,11 @@ class TestURL(unittest.TestCase):
             'http://foo:123/',
             'http://foo:bar@baz:123'
         ]
-        v = URL()
+        field = URL()
         
         for url in urls:
             try:
-                self.assertEqual(url, v.validate(url))
+                self.assertEqual(url, field.validate(url))
             except ValidationError:
                 self.fail("Didn't pass '%s'" % url)
         
@@ -518,10 +519,10 @@ class TestOneOf(unittest.TestCase):
             "snooze button",
             50
         ]
-        v = OneOf(Email(), TypeOf(float))
+        field = OneOf(Email(), TypeOf(float))
         
         for bad in bads:
-            self.assertRaises(ValidationError, v.validate, bad)
+            self.assertRaises(ValidationError, field.validate, bad)
             
             
     def test_pass(self):
@@ -529,11 +530,11 @@ class TestOneOf(unittest.TestCase):
         Should pass anything that matches any of the fields
         """
         goods = [23, 3.1459, "batman", 16]
-        v = OneOf(TypeOf(int), Enum(3.1459, "pie", "batman"))
+        field = OneOf(TypeOf(int), Enum(3.1459, "pie", "batman"))
         
         for good in goods:
             try:
-                self.assertEqual(good, v.validate(good))
+                self.assertEqual(good, field.validate(good))
             except ValidationError:
                 self.fail("Failed to pass '%s'" % good)
         
@@ -546,10 +547,10 @@ class TestListOf(unittest.TestCase):
         that aren't lists.
         """
         bads = [23, [23,24,25]]
-        v = ListOf(TypeOf(basestring))
+        field = ListOf(TypeOf(basestring))
         
         for bad in bads:
-            self.assertRaises(ValidationError, v.validate, bad)
+            self.assertRaises(ValidationError, field.validate, bad)
             
             
     def test_pass(self):
@@ -562,16 +563,16 @@ class TestListOf(unittest.TestCase):
             ['pancakes', 'alpha centauri', 9]
         ]
         
-        v = ListOf(TypeOf(basestring, int))
+        field = ListOf(TypeOf(basestring, int))
         
         for good in goods:
             try:
-                self.assertEqual(good, v.validate(good))
+                self.assertEqual(good, field.validate(good))
             except ValidationError:
                 self.fail("Failed to pass '%s'", good)
         
         
-class TestGroup(unittest.TestCase):
+class TestCompoundField(unittest.TestCase):
     
     def test_fail(self):
         """
@@ -589,15 +590,15 @@ class TestGroup(unittest.TestCase):
             }
         ]
         
-        v = CompoundField(
-            do = Text(),
+        field = CompoundField(
+            do = Text(required=True),
             we = Text()
         )
         
         for bad in bads:
-            self.assertRaises(CompoundValidationError, v.validate, bad)
+            self.assertRaises(CompoundValidationError, field.validate, bad)
             
-        self.assertRaises(ValidationError, v.validate, "not a dict")
+        self.assertRaises(ValidationError, field.validate, "not a dict")
         
         
     def test_pass(self):
@@ -610,24 +611,13 @@ class TestGroup(unittest.TestCase):
             ({'foo':'bar'}, {'foo':'bar', 'baz':5.5})
         ]
         
-        v = CompoundField(foo=Text(), baz=TypeOf(int, float, optional=True, default_value=5.5))
+        field = CompoundField(foo=Text(), baz=TypeOf(int, float, default=5.5))
         
         for good_in, good_out in goods:
             try:
-                self.assertEqual(good_out, v.validate(good_in))
+                self.assertEqual(good_out, field.validate(good_in))
             except ValidationError:
                 self.fail("Failed to pass %s" % good_in)
-                
-                
-    def test_empty_string_optional(self):
-        """
-        Should not raise an error when passing an empty string to an optional field
-        """
-        v = CompoundField(email=Email(optional=True))
-        try:
-            v.validate({'email':''})
-        except ValidationError:
-            self.fail("Raised invalid error on an empty string for an optional field")
         
         
 class TestAnything(unittest.TestCase):
@@ -636,12 +626,12 @@ class TestAnything(unittest.TestCase):
         """
         Should pass anything
         """
-        v = Anything()
+        field = Anything()
         anythings = ["foo", 7, Anything(), unittest]
         
         for anything in anythings:
             try:
-                self.assertEqual(anything, v.validate(anything))
+                self.assertEqual(anything, field.validate(anything))
             except ValidationError:
                 self.fail('Failed something')
         
