@@ -2,7 +2,7 @@
 Unit tests for data fields
 """
 import unittest
-from hammock.fields import *
+from hammock.model import *
 from datetime import datetime
 import time
 
@@ -102,6 +102,15 @@ class TestText(unittest.TestCase):
         field = Text(minlength=1,maxlength=23)
         self.assertEqual(string, field.validate(string))
         
+        
+    def test_required_fail(self):
+        """
+        Should fail if field is required and passed an empty string
+        """
+        field = Text(required=True)
+        
+        with self.assertRaises(ValidationError):
+            field.validate('')
         
         
 class TestEmail(unittest.TestCase):
@@ -570,9 +579,19 @@ class TestListOf(unittest.TestCase):
                 self.assertEqual(good, field.validate(good))
             except ValidationError:
                 self.fail("Failed to pass '%s'", good)
+                
+                
+    def test_required_fail(self):
+        """
+        Should fail if required and passed an empty list
+        """
+        field = ListOf(Anything(), required=True)
+        
+        with self.assertRaises(ValidationError):
+            field.validate([])
         
         
-class TestCompoundField(unittest.TestCase):
+class TestEntity(unittest.TestCase):
     
     def test_fail(self):
         """
@@ -590,7 +609,7 @@ class TestCompoundField(unittest.TestCase):
             }
         ]
         
-        field = CompoundField(
+        field = Entity(
             do = Text(required=True),
             we = Text()
         )
@@ -611,7 +630,7 @@ class TestCompoundField(unittest.TestCase):
             ({'foo':'bar'}, {'foo':'bar', 'baz':5.5})
         ]
         
-        field = CompoundField(foo=Text(), baz=TypeOf(int, float, default=5.5))
+        field = Entity(foo=Text(), baz=TypeOf(int, float, default=5.5))
         
         for good_in, good_out in goods:
             try:
@@ -634,6 +653,191 @@ class TestAnything(unittest.TestCase):
                 self.assertEqual(anything, field.validate(anything))
             except ValidationError:
                 self.fail('Failed something')
+                
+                
+class TestOne(unittest.TestCase):
+    
+    def test_fail_bad_value(self):
+        """
+        Should fail if passed anything but an instance of the specified entity
+        """
+        
+        class Foo(Entity):
+            name = Text()
+        
+        field = One(Foo)
+        
+        with self.assertRaises(ValidationError):
+            field.validate(123)
+            
+            
+    def test_fail_not_ready(self):
+        """
+        Should raise an error if attempting to validate before an entity is set
+        """
+        
+        field = One('Foo')
+        
+        class Foo(Entity):
+            name = Text()
+        
+        with self.assertRaises(Exception):
+            field.validate(Foo())
+            
+            
+    def test_fail_incorrect_entity(self):
+        """
+        Should raise an error if passed an incorrect entity type
+        """
+        
+        class Foo(Entity):
+            pass
+            
+            
+        class Bar(Entity):
+            pass
+            
+        field = One(Foo)
+        
+        with self.assertRaises(ValidationError):
+            field.validate(Bar())
+            
+            
+    def test_pass(self):
+        """
+        Should pass an instance of the specified entity
+        """
+        
+        class Foo(Entity):
+            pass
+        
+        field = One(Foo)
+        foo = Foo()
+        validated_foo = field.validate(foo)
+        self.assertEquals(validated_foo, foo)
+        
+        
+class TestMany(unittest.TestCase):
+    
+    def test_fail_bad_value(self):
+        """
+        Should fail if passed anything but a list of instances of the specified entity
+        """
+        
+        class Foo(Entity):
+            name = Text()
+        
+        field = Many(Foo)
+        
+        with self.assertRaises(ValidationError):
+            field.validate(123)
+            
+            
+    def test_fail_not_ready(self):
+        """
+        Should raise an error if attempting to validate before an entity is set
+        """
+        
+        field = Many('Foo')
+        
+        class Foo(Entity):
+            name = Text()
+        
+        with self.assertRaises(Exception):
+            field.validate([Foo()])
+            
+            
+    def test_fail_incorrect_entity(self):
+        """
+        Should raise an error if passed an incorrect entity type
+        """
+        
+        class Foo(Entity):
+            pass
+            
+            
+        class Bar(Entity):
+            pass
+            
+        field = Many(Foo)
+        
+        with self.assertRaises(ValidationError):
+            field.validate([Bar()])
+            
+            
+    def test_pass(self):
+        """
+        Should pass a list of instances of the specified entity
+        """
+        
+        class Foo(Entity):
+            pass
+        
+        field = Many(Foo)
+        foo = Foo()
+        validated_foo = field.validate([foo])
+        self.assertEquals(validated_foo, [foo])
+        
+        
+class TestModel(unittest.TestCase):
+    
+    def test_unresolvable_link(self):
+        """
+        Should raise an error if a link can't be resolved
+        """
+        
+        class Foo(Entity):
+            bar = One('Bar')
+        
+        with self.assertRaises(Exception):
+            model = Model([Foo])
+            
+            
+    def test_foreign_link(self):
+        """
+        Should raise an error if a link points to an entity that isn't in the model
+        """
+        class Foo(Entity):
+            pass
+            
+        class Bar(Entity):
+            foo = One(Foo)
+            
+        with self.assertRaises(Exception):
+            model = Model([Bar])
+            
+            
+    def test_unresolved_inverse(self):
+        """
+        Should raise an error if a link specifies an inverse link that doesn't exist
+        """
+        class Foo(Entity):
+            pass
+            
+        class Bar(Entity):
+            foo = One(Foo, inverse='bar')
+            
+        with self.assertRaises(Exception):
+            model = Model([Foo, Bar])
+            
+            
+    def test_pass(self):
+        """
+        Should do nothing special when initialized with a well-defined model
+        """
+        
+        class Foo(Entity):
+            bar = One('Bar', inverse="foos")
+            
+            
+        class Bar(Entity):
+            foos = Many(Foo, inverse="bar")
+            
+            
+        model = Model([Foo, Bar])
+        self.assertTrue(model.has_entity(Foo))
+        self.assertTrue(model.has_entity(Bar))
+        
         
         
 if __name__ == "__main__":

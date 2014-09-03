@@ -32,7 +32,10 @@ setup(
     packages=find_packages(exclude=['tests']),
     install_requires=['falcon'],
     extras_require={
-        'MongoDBStorage': ['pymongo']
+        'mongo_storage': ['pymongo'],
+        'timelib_parsing': ['timelib'],
+        'dateutil_parsing': ['dateutil']
     },
+    tests_require=['nose', 'timelib', 'dateutil'],
     test_suite='nose.collector'
 )

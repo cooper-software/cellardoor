@@ -1,67 +1,3 @@
-"""
-This package provides a simple validation system as well as a number of 
-fields and converters. You'll probably find it's usage familiar.
-
-Fields generally perform one task: check that a value meets a certain
-specification. Sometimes they also perform a conversion. For instance, a time
-field might validate that a value is in one of a number of formats and then
-convert the value to, say, a datetime instance or a POSIX timestamp.
-
-This package tries to supply a number of flexible fields but doesn't even
-come close to the kitchen sink. Most applications will have their own validation 
-requirements and the thinking here is to make it as easy as possible to create 
-new fields.
-
-So, creating fields is straightforward. Subclass Field and implement 
-the validate() method. That's all that's required. Here is an example that will 
-only validate yummy things. Optionally, it will convert to yumminess level::
-
-    class Yummy(Field):
-        yumminess = {
-            'Pizza': 1.5,
-            'Pie': 2.75,
-            'Steak': 5.58,
-            'Sushi': 14.62,
-            'Duck Confit': 28.06
-        }
-        
-        def __init__(self, should_convert=False, **kwargs):
-            self.should_convert = should_convert
-            super(Yummy, self).__init__(**kwargs)
-            
-            
-        def _validate(self, value):
-            if value not in self.yumminess:
-                raise ValidationError('Yumminess not known for "%s"' % value)
-            
-            if self.should_convert:
-                return self.yumminess[value]
-            
-            return value
-
-It's a convention, but not a requirement, to put error values in the class like so::
-
-    class Yummy(Field):
-        NOT_YUMMY = "This is not yummy"
-        
-        def _validate(self, value):
-            if not self.is_yummy(value):
-                raise ValidationError(self.NOT_YUMMY)
-
-Then we can do things based on the type of error, if we so desire::
-
-    yummy_field = Yummy()
-    try:
-        yummy_field.validate('Fried Okra')
-        print "Fried Okra is yummy!"
-    except ValidationError, e:
-        if e.message == Yummy.NOT_YUMMY:
-            print "Fried Okra is not yummy"
-        else:
-            print "There is something wront with Fried Okra"
-
-"""
-
 import re
 from datetime import datetime
 
@@ -69,7 +5,7 @@ __all__ = [
     'ValidationError',
     'CompoundValidationError',
     'Field',
-    'CompoundField',
+    'Entity',
     'Text',
     'Email',
     'DateTime',
@@ -81,7 +17,10 @@ __all__ = [
     'URL',
     'OneOf',
     'ListOf',
-    'Anything'
+    'Anything',
+    'One',
+    'Many',
+    'Model'
 ]
 
 class ValidationError(Exception):
@@ -147,11 +86,11 @@ class Field(object):
         raise NotImplementedError
 
 
-class CompoundField(Field):
+class Entity(Field):
     """
     Validates a a dict of `key => field`::
     
-        v = CompoundField(foo=Text(), bar=TypeOf(int))
+        v = Entity(foo=Text(), bar=TypeOf(int))
         v.validate({'foo':'oof', 'bar':23}) # ok
         v.validate(5) # nope
         v.validate('foo':'gobot', 'bar':'pizza') # nope
@@ -161,20 +100,13 @@ class CompoundField(Field):
         # ok -> {'foo': 'a', 'bar':17}
         
         # Fields are optional by default
-        v = CompoundField(foo=Text(), bar=TypeOf(int, default=8))
+        v = Entity(foo=Text(), bar=TypeOf(int, default=8))
         v.validate({'foo':'ice cream'}) # -> {'foo':'ice cream', 'bar': 8}
     """
     NOT_A_DICT = "Not a dict"
     
-    def __init__(self, **kwargs):
-        keys = ['required', 'default']
-        newkwargs = {}
-        
-        for k in keys:
-            if k in kwargs:
-                newkwargs[k] = kwargs.pop(k)
-        
-        Field.__init__(self, **newkwargs)
+    def __init__(self, required=False, default=None, **kwargs):
+        super(Entity, self).__init__(required, default)
         self.fields = kwargs
         
         
@@ -195,6 +127,12 @@ class CompoundField(Field):
             raise CompoundValidationError(errors)
         
         return validated
+        
+        
+    @classmethod
+    def links(cls):
+        return [(k,v) for k,v in cls.__dict__.items() if isinstance(v, Link)]
+                
 
 
 class Text(Field):
@@ -210,6 +148,7 @@ class Text(Field):
     NOT_TEXT = 'Expected some text.'
     TOO_SHORT = 'This text is too short.'
     TOO_LONG = 'This text is too long.'
+    REQUIRED = 'Expected some text.'
     
     def __init__(self, minlength=None, maxlength=None, **kwargs):
         self.minlength = minlength
@@ -219,6 +158,9 @@ class Text(Field):
     def _validate(self, value):
         if not isinstance(value, basestring):
             raise ValidationError(self.NOT_TEXT)
+        
+        if self.required and len(value) == 0:
+            raise ValidationError(self.REQUIRED)
             
         if self.minlength is not None and len(value) < self.minlength:
             raise ValidationError(self.TOO_SHORT)
@@ -244,8 +186,6 @@ class Email(Text):
     def _validate(self, value):
         value = super(Email, self)._validate(value)
         
-        if not isinstance(value, basestring):
-            raise ValidationError(self.NOT_EMAIL)
         if not self.pattern.match(value):
             raise ValidationError(self.NOT_EMAIL)
         return value
@@ -545,6 +485,7 @@ class ListOf(Field):
         v.validate(1) # nope
     """
     NOT_A_LIST = "Not a list"
+    EMPTY_LIST = "This field is required"
     
     def __init__(self, field, **kwargs):
         super(ListOf, self).__init__(**kwargs)
@@ -554,6 +495,9 @@ class ListOf(Field):
     def validate(self, values):
         if not isinstance(values, list):
             raise ValidationError(self.NOT_A_LIST)
+            
+        if len(values) == 0:
+            raise ValidationError(self.EMPTY_LIST)
         
         for v in values:
             self.field.validate(v)
@@ -571,9 +515,91 @@ class Anything(Field):
         
         
         
-class Many(Field):
-    pass
+class Link(Field):
+    
+    NOT_AN_ENTITY = 'Not an instance of the expected entity'
+    UNDEFINED = 'No linked entity defined'
+    
+    def __init__(self, entity, inverse=None, *args, **kwargs):
+        if isinstance(entity, basestring):
+            self.entity_name = entity
+            self.entity = None
+        else:
+            self.entity = entity
+            self.entity_name = entity.__name__
+            
+        self.inverse = inverse
+        
+        super(Link, self).__init__(*args, **kwargs)
+        
+        
+        
+class Many(Link):
+    """A link to a collection of entities"""
+    
+    NOT_A_LIST = "Expected a list of entities"
+    
+    def _validate(self, value):
+        if not self.entity:
+            raise Exception(self.UNDEFINED)
+        
+        if not isinstance(value, (list, tuple)):
+            raise ValidationError(self.NOT_A_LIST)
+        
+        for v in value:
+            if not isinstance(v, self.entity):
+                raise ValidationError(self.NOT_AN_ENTITY)
+            
+        return value
     
     
-class One(Field):
-    pass
+class One(Link):
+    """A link to a single entity"""
+    
+    def _validate(self, value):
+        if not self.entity:
+            raise Exception(self.UNDEFINED)
+            
+        if not isinstance(value, self.entity):
+            raise ValidationError(self.NOT_AN_ENTITY)
+            
+        return value
+
+
+class Model(object):
+    """
+    A collection of linked entities.
+    
+    A Model provides a holistic and consistent view of a collection of entities.
+    """
+    
+    def __init__(self, entities):
+        self.entities = set(entities)
+        self.entities_by_name = dict([(e.__name__, e) for e in entities])
+        self.check_links()
+        
+        
+    def has_entity(self, entity):
+        return entity in self.entities
+        
+        
+    def check_links(self):
+        # First make sure all links have a reference to their entity class
+        for entity in self.entities:
+            for link_name, link in entity.links():
+                if not link.entity:
+                    linked_entity = self.entities_by_name.get(link.entity_name)
+                    if not linked_entity:
+                        raise Exception, "Can't resolve link to entity '%s'" % link.entity_name
+                    link.entity = linked_entity
+        
+        for entity in self.entities:
+            # Disallow links to entities outside the model
+            if not self.has_entity(link.entity):
+                raise Exception, "Attempting to link to an entity '%s' that is outside the model" % link.entity_name
+            
+            # Ensure that inverse links actually exist
+            if link.inverse:
+                if not hasattr(link.entity, link.inverse):
+                    raise Exception, "Can't find inverse link '%s' on entity '%s'" % (link.inverse, link.entity_name)
+                    

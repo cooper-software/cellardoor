@@ -40,10 +40,10 @@ class Post(BaseModel):
 	status = Enum('draft', 'published', default='draft')
 	publish_date = DateTime()
 	slug = Slug(required=True),
-	author = One(Person, inverse='posts', embedded=True, required=True)
+	author = One(Person, inverse='posts', required=True)
 	title = Text(maxlength=200, required=True)
 	content = Text(maxlength=10000)
-	tags = Many('Tag', inverse='posts', embedded=True)
+	tags = Many('Tag', inverse='posts')
 	
 	
 class Tag(Model):
