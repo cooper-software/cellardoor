@@ -111,6 +111,25 @@ class TestText(unittest.TestCase):
         
         with self.assertRaises(ValidationError):
             field.validate('')
+            
+            
+    def test_regex_fail(self):
+        """
+        Should fail if the input value doesn't match the field's regex
+        """
+        field = Text(regex=r'^foo$')
+        
+        with self.assertRaises(ValidationError):
+            field.validate('bar')
+            
+            
+    def test_regex_pass(self):
+        """
+        Should pass if the input value matches the field's regex
+        """
+        field = Text(regex=r'^foo$')
+        validated_value = field.validate('foo')
+        self.assertEquals(validated_value, 'foo')
         
         
 class TestEmail(unittest.TestCase):

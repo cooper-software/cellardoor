@@ -149,10 +149,12 @@ class Text(Field):
     TOO_SHORT = 'This text is too short.'
     TOO_LONG = 'This text is too long.'
     REQUIRED = 'Expected some text.'
+    NO_REGEX_MATCH = 'Does not match regex.'
     
-    def __init__(self, minlength=None, maxlength=None, **kwargs):
+    def __init__(self, minlength=None, maxlength=None, regex=None, **kwargs):
         self.minlength = minlength
         self.maxlength = maxlength
+        self.regex = re.compile(regex) if regex else None
         super(Text, self).__init__(**kwargs)
         
     def _validate(self, value):
@@ -168,6 +170,9 @@ class Text(Field):
         if self.maxlength is not None and len(value) > self.maxlength:
             raise ValidationError(self.TOO_LONG)
             
+        if self.regex is not None and not self.regex.search(value):
+            raise ValidationError(self.NO_REGEX_MATCH)
+            
         return value
 
 
@@ -180,15 +185,12 @@ class Email(Text):
         v.validate("foo.bar_^&!baz@example.com") # ok
         v.validate("@example.com") # oops!
     """
-    NOT_EMAIL = "Invalid email address"
-    pattern = re.compile("^((\".+\")|((\\\.))|([\d\w\!#\$%&'\*\+\-/=\?\^_`\{\|\}~]))((\"[^@]+\")|(\\\.)|([\d\w\!#\$%&'\*\+\-/=\?\^_`\.\{\|\}~]))*@[a-zA-Z0-9]+([a-zA-Z0-9\-][a-zA-Z0-9]+)?(\.[a-zA-Z0-9]+([a-zA-Z0-9\-][a-zA-Z0-9]+)?)+\.?$")
+    NO_REGEX_MATCH = "Invalid email address"
     
-    def _validate(self, value):
-        value = super(Email, self)._validate(value)
-        
-        if not self.pattern.match(value):
-            raise ValidationError(self.NOT_EMAIL)
-        return value
+    def __init__(self, *args, **kwargs):
+        super(Email, self).__init__(
+            regex="^((\".+\")|((\\\.))|([\d\w\!#\$%&'\*\+\-/=\?\^_`\{\|\}~]))((\"[^@]+\")|(\\\.)|([\d\w\!#\$%&'\*\+\-/=\?\^_`\.\{\|\}~]))*@[a-zA-Z0-9]+([a-zA-Z0-9\-][a-zA-Z0-9]+)?(\.[a-zA-Z0-9]+([a-zA-Z0-9\-][a-zA-Z0-9]+)?)+\.?$",
+            *args, **kwargs)
 
 
 try:
