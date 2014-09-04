@@ -34,7 +34,7 @@ setup(
     extras_require={
         'mongo_storage': ['pymongo'],
         'timelib_parsing': ['timelib'],
-        'dateutil_parsing': ['dateutil']
+        'dateutil_parsing': ['python-dateutil']
     },
     tests_require=['nose', 'timelib', 'dateutil'],
     test_suite='nose.collector'
