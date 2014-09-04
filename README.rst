@@ -11,8 +11,8 @@ Example
 .. code:: python
 
 	from hammock import create_api
-	from hammock.storage import MongoDBStorage
-	from hammock.model import Model, One, Many, Text, DateTime, Boolean
+	from hammock.storage.mongodb import MongoDBStorage
+	from hammock.model import Model, One, Link, Text, DateTime, Boolean
 	from hammock.resource import Resource
 	from hammock.methods import ALL
 	from hammock.views import MinimalView, SirenView
@@ -20,14 +20,14 @@ Example
 
 	class Project(Model):
 		name = Text(maxlength=50, required=True)
-		tasks = Many('Task', inverse='project')
+		tasks = Link('Task', field='project')
 		
 		
 	class Task(Model):
 		summary = Text(maxlength=150, required=True)
 		due = DateTime()
 		is_done = Boolean(default=False)
-		project = One(Project, inverse='tasks', embeddable=True)
+		project = One(Project, embeddable=True)
 		
 		
 	class ProjectsResource(Resource):
