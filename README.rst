@@ -187,7 +187,7 @@ Comes with quite a few options:
 
 Acknowledgements
 ~~~~~~~~~~~~~~~~
-This project is basically some sugar on top of `falcon <http://falconframework.org/>`_ and `mongoengine <http://mongoengine.org/>`_. Massive credit to those teams. In additon, `eve <http://python-eve.org/>`_ was a big inspiration. In fact, hammock aspires to produce essentially the same ReST APIs. Why not just use eve? A few reasons: performance, tighter mongoengine integration, simpler API.
+This project makes heavy use of `falcon <http://falconframework.org/>`_. Massive credit to that team. As well, `Eve <http://python-eve.org/>`_ was a big inspiration, philosophically and to a lesser extent `flask-mongorest <https://github.com/elasticsales/flask-mongorest>`_.
 
 .. |Build Status| image:: https://travis-ci.org/cooper-software/hammock.svg
    :target: https://travis-ci.org/cooper-software/hammock
