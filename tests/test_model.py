@@ -809,7 +809,7 @@ class TestModel(unittest.TestCase):
             bar = One('Bar')
         
         with self.assertRaises(Exception):
-            model = Model([Foo])
+            model = Model('test', [Foo])
             
             
     def test_foreign_link(self):
@@ -823,21 +823,7 @@ class TestModel(unittest.TestCase):
             foo = One(Foo)
             
         with self.assertRaises(Exception):
-            model = Model([Bar])
-            
-            
-    def test_unresolved_inverse(self):
-        """
-        Should raise an error if a link specifies an inverse link that doesn't exist
-        """
-        class Foo(Entity):
-            pass
-            
-        class Bar(Entity):
-            foo = One(Foo, inverse='bar')
-            
-        with self.assertRaises(Exception):
-            model = Model([Foo, Bar])
+            model = Model('test', [Bar])
             
             
     def test_pass(self):
@@ -846,14 +832,14 @@ class TestModel(unittest.TestCase):
         """
         
         class Foo(Entity):
-            bar = One('Bar', inverse="foos")
+            bar = One('Bar')
             
             
         class Bar(Entity):
-            foos = Many(Foo, inverse="bar")
+            foos = Many(Foo)
             
             
-        model = Model([Foo, Bar])
+        model = Model('test', [Foo, Bar])
         self.assertTrue(model.has_entity(Foo))
         self.assertTrue(model.has_entity(Bar))
         

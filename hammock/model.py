@@ -522,7 +522,7 @@ class Link(Field):
     NOT_AN_ENTITY = 'Not an instance of the expected entity'
     UNDEFINED = 'No linked entity defined'
     
-    def __init__(self, entity, inverse=None, *args, **kwargs):
+    def __init__(self, entity, embedded=False, *args, **kwargs):
         if isinstance(entity, basestring):
             self.entity_name = entity
             self.entity = None
@@ -530,7 +530,7 @@ class Link(Field):
             self.entity = entity
             self.entity_name = entity.__name__
             
-        self.inverse = inverse
+        self.embedded = embedded
         
         super(Link, self).__init__(*args, **kwargs)
         
@@ -575,7 +575,8 @@ class Model(object):
     A Model provides a holistic and consistent view of a collection of entities.
     """
     
-    def __init__(self, entities):
+    def __init__(self, name, entities):
+        self.name = name
         self.entities = set(entities)
         self.entities_by_name = dict([(e.__name__, e) for e in entities])
         self.check_links()
@@ -597,11 +598,7 @@ class Model(object):
         
         for entity in self.entities:
             # Disallow links to entities outside the model
-            if not self.has_entity(link.entity):
-                raise Exception, "Attempting to link to an entity '%s' that is outside the model" % link.entity_name
-            
-            # Ensure that inverse links actually exist
-            if link.inverse:
-                if not hasattr(link.entity, link.inverse):
-                    raise Exception, "Can't find inverse link '%s' on entity '%s'" % (link.inverse, link.entity_name)
+            for link_name, link in entity.links():
+                if not self.has_entity(link.entity):
+                    raise Exception, "Attempting to link to an entity '%s' that is outside the model" % link.entity_name
                     

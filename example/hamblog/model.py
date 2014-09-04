@@ -29,7 +29,6 @@ class Person(BaseModel):
 	email = Email(required=True, hidden=True)
 	password = Text(maxlength=50, hidden=True)
 	role = Enum('anonymous', 'normal', 'admin', default='anonymous')
-	posts = Many('Post', inverse='author')
 	token = Group(
 		value=Text(maxlength=150, required=True),
 		expires=DateTime(required=True)
@@ -40,14 +39,13 @@ class Post(BaseModel):
 	status = Enum('draft', 'published', default='draft')
 	publish_date = DateTime()
 	slug = Slug(required=True),
-	author = One(Person, inverse='posts', required=True)
+	author = One(Person, required=True)
 	title = Text(maxlength=200, required=True)
 	content = Text(maxlength=10000)
-	tags = Many('Tag', inverse='posts')
+	tags = Many('Tag')
 	
 	
 class Tag(Model):
 	name = Text(maxlength=50, required=True)
 	slug = Slug(required=True)
-	posts = Many(Post, inverse='tags')
 	
