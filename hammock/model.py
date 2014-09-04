@@ -84,54 +84,6 @@ class Field(object):
         
     def _validate(self, value):
         raise NotImplementedError
-
-
-class Entity(Field):
-    """
-    Validates a a dict of `key => field`::
-    
-        v = Entity(foo=Text(), bar=TypeOf(int))
-        v.validate({'foo':'oof', 'bar':23}) # ok
-        v.validate(5) # nope
-        v.validate('foo':'gobot', 'bar':'pizza') # nope
-        
-        # unspecified keys are filtered
-        v.validate({'foo': 'a', 'goo': 'b', 'bar':17})
-        # ok -> {'foo': 'a', 'bar':17}
-        
-        # Fields are optional by default
-        v = Entity(foo=Text(), bar=TypeOf(int, default=8))
-        v.validate({'foo':'ice cream'}) # -> {'foo':'ice cream', 'bar': 8}
-    """
-    NOT_A_DICT = "Not a dict"
-    
-    def __init__(self, required=False, default=None, **kwargs):
-        super(Entity, self).__init__(required, default)
-        self.fields = kwargs
-        
-        
-    def _validate(self, value):
-        if not isinstance(value, dict):
-            raise ValidationError(self.NOT_A_DICT)
-        
-        validated = {}
-        errors = {}
-        
-        for k,v in self.fields.items():
-            try:
-                validated[k] = v.validate(value.get(k))
-            except ValidationError, e:
-                errors[k] = e
-        
-        if errors:
-            raise CompoundValidationError(errors)
-        
-        return validated
-        
-        
-    @classmethod
-    def links(cls):
-        return [(k,v) for k,v in cls.__dict__.items() if isinstance(v, Link)]
                 
 
 
@@ -516,8 +468,55 @@ class Anything(Field):
         return value
         
         
+class Entity(Field):
+    """
+    Validates a a dict of `key => field`::
+    
+        v = Entity(foo=Text(), bar=TypeOf(int))
+        v.validate({'foo':'oof', 'bar':23}) # ok
+        v.validate(5) # nope
+        v.validate('foo':'gobot', 'bar':'pizza') # nope
         
-class Link(Field):
+        # unspecified keys are filtered
+        v.validate({'foo': 'a', 'goo': 'b', 'bar':17})
+        # ok -> {'foo': 'a', 'bar':17}
+        
+        # Fields are optional by default
+        v = Entity(foo=Text(), bar=TypeOf(int, default=8))
+        v.validate({'foo':'ice cream'}) # -> {'foo':'ice cream', 'bar': 8}
+    """
+    NOT_A_DICT = "Not a dict"
+    
+    def __init__(self, required=False, default=None, **kwargs):
+        super(Entity, self).__init__(required, default)
+        self.fields = kwargs
+        
+        
+    def _validate(self, value):
+        if not isinstance(value, dict):
+            raise ValidationError(self.NOT_A_DICT)
+        
+        validated = {}
+        errors = {}
+        
+        for k,v in self.fields.items():
+            try:
+                validated[k] = v.validate(value.get(k))
+            except ValidationError, e:
+                errors[k] = e
+        
+        if errors:
+            raise CompoundValidationError(errors)
+        
+        return validated
+        
+        
+    @classmethod
+    def references(cls):
+        return [(k,v) for k,v in cls.__dict__.items() if isinstance(v, EntityReference)]
+        
+        
+class EntityReference(Field):
     
     NOT_AN_ENTITY = 'Not an instance of the expected entity'
     UNDEFINED = 'No linked entity defined'
@@ -532,11 +531,11 @@ class Link(Field):
             
         self.embedded = embedded
         
-        super(Link, self).__init__(*args, **kwargs)
+        super(EntityReference, self).__init__(*args, **kwargs)
         
         
         
-class Many(Link):
+class Many(EntityReference):
     """A link to a collection of entities"""
     
     NOT_A_LIST = "Expected a list of entities"
@@ -555,7 +554,7 @@ class Many(Link):
         return value
     
     
-class One(Link):
+class One(EntityReference):
     """A link to a single entity"""
     
     def _validate(self, value):
@@ -566,6 +565,14 @@ class One(Link):
             raise ValidationError(self.NOT_AN_ENTITY)
             
         return value
+        
+        
+        
+class Link(EntityReference):
+    
+    def __init__(self, entity, field, embedded=False):
+        super(Link, self).__init__(self, entity, embedded)
+        self.field = field
 
 
 class Model(object):
@@ -579,26 +586,26 @@ class Model(object):
         self.name = name
         self.entities = set(entities)
         self.entities_by_name = dict([(e.__name__, e) for e in entities])
-        self.check_links()
+        self.check_references()
         
         
     def has_entity(self, entity):
         return entity in self.entities
         
         
-    def check_links(self):
-        # First make sure all links have a reference to their entity class
+    def check_references(self):
+        # First make sure all references have a reference to their entity class
         for entity in self.entities:
-            for link_name, link in entity.links():
-                if not link.entity:
-                    linked_entity = self.entities_by_name.get(link.entity_name)
-                    if not linked_entity:
-                        raise Exception, "Can't resolve link to entity '%s'" % link.entity_name
-                    link.entity = linked_entity
+            for reference_name, reference in entity.references():
+                if not reference.entity:
+                    referenced_entity = self.entities_by_name.get(reference.entity_name)
+                    if not referenced_entity:
+                        raise Exception, "Can't resolve reference to entity '%s'" % reference.entity_name
+                    reference.entity = referenced_entity
         
         for entity in self.entities:
-            # Disallow links to entities outside the model
-            for link_name, link in entity.links():
-                if not self.has_entity(link.entity):
-                    raise Exception, "Attempting to link to an entity '%s' that is outside the model" % link.entity_name
+            # Disallow references to entities outside the model
+            for reference_name, reference in entity.references():
+                if not self.has_entity(reference.entity):
+                    raise Exception, "Attempting to reference to an entity '%s' that is outside the model" % reference.entity_name
                     
