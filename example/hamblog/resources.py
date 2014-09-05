@@ -8,7 +8,7 @@ class PeopleResource(Resource):
 	plural_name = 'people'
 	
 	model = model.Person
-	model_links = {
+	link_resources = {
 		'posts': 'PostResource'
 	}
 	

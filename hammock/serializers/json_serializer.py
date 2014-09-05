@@ -1,6 +1,8 @@
 import json
 from datetime import datetime
 
+from . import Serializer
+
 
 class HammockJSONEncoder(json.JSONEncoder):
 	
@@ -16,11 +18,16 @@ class HammockJSONEncoder(json.JSONEncoder):
 			return obj.isoformat()
 		
 		return super(HammockJSONEncoder, self).default(obj)
+		
 
 
-def serialize(obj):
-	return json.dumps(obj, cls=HammockJSONEncoder)
+class JSONSerializer(Serializer):
 	
+	mimetype = 'application/json'
 	
-def unserialize(data):
-	return json.loads(data)
+	def serialize(self, obj):
+		return json.dumps(obj, cls=HammockJSONEncoder)
+		
+		
+	def unserialize(self, stream):
+		return json.load(stream)
