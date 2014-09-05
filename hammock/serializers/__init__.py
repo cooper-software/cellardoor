@@ -4,3 +4,4 @@ class Serializer(object):
 
 
 from json_serializer import JSONSerializer
+from msgpack_serializer import MsgPackSerializer
