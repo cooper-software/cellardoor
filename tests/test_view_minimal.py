@@ -8,6 +8,9 @@ from . import create_fake_request
 class TestMinimalView(unittest.TestCase):
 	
 	def test_collection_response(self):
+		"""
+		Should return a simple list for collection get methods
+		"""
 		view = MinimalView()
 		objs = [{'foo':123}, {'foo':456}]
 		
@@ -23,6 +26,9 @@ class TestMinimalView(unittest.TestCase):
 		
 		
 	def test_individual_response(self):
+		"""
+		Should return a single object for individual get methods
+		"""
 		view = MinimalView()
 		obj = {'foo':123}
 		
