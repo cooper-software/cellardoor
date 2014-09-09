@@ -40,10 +40,15 @@ class MongoDBStorage(Storage):
 		return str(obj_id)
 		
 		
-	def update(self, entity, id, fields):
+	def update(self, entity, id, fields, replace=False):
 		collection = self.collection_for_entity(entity)
 		obj_id = ObjectId(id)
-		doc = collection.find_and_modify({ '_id': obj_id }, { '$set': fields })
+		if replace:
+			doc = fields.copy()
+			doc['_id'] = obj_id
+			collection.save(doc)
+		else:
+			doc = collection.find_and_modify({ '_id': obj_id }, { '$set': fields }, new=True)
 		return self.document_to_dict(doc)
 		
 		

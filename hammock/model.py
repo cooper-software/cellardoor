@@ -6,6 +6,7 @@ __all__ = [
     'CompoundValidationError',
     'Field',
     'Entity',
+    'Compound',
     'Text',
     'Email',
     'DateTime',
@@ -78,7 +79,7 @@ class Field(object):
         if value is None:
             if self.required:
                 raise ValidationError, "This field is required."
-            value = self.default
+            return self.default
         
         return self._validate(value)
         
@@ -468,7 +469,7 @@ class Anything(Field):
         return value
         
         
-class Entity(Field):
+class Compound(Field):
     """
     Validates a a dict of `key => field`::
     
@@ -488,8 +489,14 @@ class Entity(Field):
     NOT_A_DICT = "Not a dict"
     
     def __init__(self, required=False, default=None, **kwargs):
-        super(Entity, self).__init__(required, default)
+        super(Compound, self).__init__(required, default)
         self.fields = kwargs
+        self.enforce_required = True
+        
+        
+    def validate(self, value, enforce_required=True):
+        self.enforce_required = enforce_required
+        return super(Compound, self).validate(value)
         
         
     def _validate(self, value):
@@ -501,16 +508,40 @@ class Entity(Field):
         
         for k,v in self.fields.items():
             try:
-                validated[k] = v.validate(value.get(k))
+                unvalidated_value = value.get(k)
+                if v.required and unvalidated_value is None and not self.enforce_required:
+                    validated_value = None
+                else:
+                    validated_value = v.validate(unvalidated_value)
             except ValidationError, e:
                 errors[k] = e
+            else:
+                if validated_value is not None:
+                    validated[k] = validated_value
         
         if errors:
             raise CompoundValidationError(errors)
         
         return validated
+    
+    
+    
+class EntityMeta(type):
+    
+    def __new__(cls, name, bases, attrs):
+        fields = dict([(k,v) for k,v in attrs.items() if isinstance(v, Field)])
+        attrs['compound_field'] = Compound(**fields)
+        return super(EntityMeta, cls).__new__(cls, name, bases, attrs)
         
         
+class Entity(object):
+    
+    __metaclass__ = EntityMeta
+    
+    @classmethod
+    def validate(cls, fields, enforce_required=True):
+        return cls.compound_field.validate(fields, enforce_required=enforce_required)
+    
     @classmethod
     def references(cls):
         return [(k,v) for k,v in cls.__dict__.items() if isinstance(v, EntityReference)]

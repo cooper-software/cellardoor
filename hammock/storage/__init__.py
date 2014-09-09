@@ -16,7 +16,7 @@ class Storage(object):
 		raise NotImplementedError
 		
 		
-	def update(self, entity, id, fields):
+	def update(self, entity, id, fields, replace=False):
 		raise NotImplementedError
 		
 		

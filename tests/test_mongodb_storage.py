@@ -34,6 +34,16 @@ class TestMongoDBStorage(unittest.TestCase):
 		self.assertEquals(results[0], {'id':foo_id, 'a':'cat', 'b':123})
 		
 		
+	def test_replace(self):
+		"""
+		Should be able to replace an existing document
+		"""
+		foo_id = storage.create(Foo, {'a':'cat', 'b':123})
+		storage.update(Foo, foo_id, {'a':'dog'}, replace=True)
+		results = list(storage.get(Foo))
+		self.assertEquals(results[0], {'id':foo_id, 'a':'dog'})
+		
+		
 	def test_update(self):
 		"""
 		Should modify an existing document and return the modified version.

@@ -16,15 +16,19 @@ class View(object):
 		
 		
 	def get_serializer(self, req):
+		return self.choose(req, self.serializers)
+		
+		
+	@classmethod
+	def choose(cls, req, views):
 		raw_accept = req.get_header('Accept')
 		if raw_accept:
 			accept = raw_accept.split(';')[0].split(',')
 			for a in accept:
-				for k,v in self.serializers:
+				for k,v in views:
 					if a == k:
 						return k, v
-		return self.serializers[0]
-		
+		return views[0]
 		
 		
 from minimal import MinimalView

@@ -8,15 +8,17 @@ __all__ = (
 LIST = 'list'
 GET = 'get'
 CREATE = 'create'
+REPLACE = 'replace'
 UPDATE = 'update'
 DELETE = 'delete'
-ALL = (LIST, GET, CREATE, UPDATE, DELETE)
+ALL = (LIST, GET, CREATE, UPDATE, REPLACE, DELETE)
 
 _http_methods = {
 	LIST: ('get',),
 	GET: ('get',),
 	CREATE: ('post',),
-	UPDATE: ('patch', 'put'),
+	REPLACE: ('put',),
+	UPDATE: ('patch',),
 	DELETE: ('delete',)
 }
 

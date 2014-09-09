@@ -37,6 +37,12 @@ setup(
         'dateutil_parsing': ['python-dateutil'],
         'msgpack': ['msgpack-python']
     },
-    tests_require=['nose', 'timelib', 'dateutil'],
+    tests_require=[
+        'mock',
+        'nose', 
+        'timelib', 
+        'python-dateutil', 
+        'msgpack-python', 
+        'pymongo'],
     test_suite='nose.collector'
 )

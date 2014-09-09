@@ -610,7 +610,7 @@ class TestListOf(unittest.TestCase):
             field.validate([])
         
         
-class TestEntity(unittest.TestCase):
+class TestCompoundField(unittest.TestCase):
     
     def test_fail(self):
         """
@@ -628,7 +628,7 @@ class TestEntity(unittest.TestCase):
             }
         ]
         
-        field = Entity(
+        field = Compound(
             do = Text(required=True),
             we = Text()
         )
@@ -649,13 +649,33 @@ class TestEntity(unittest.TestCase):
             ({'foo':'bar'}, {'foo':'bar', 'baz':5.5})
         ]
         
-        field = Entity(foo=Text(), baz=TypeOf(int, float, default=5.5))
+        field = Compound(foo=Text(), baz=TypeOf(int, float, default=5.5))
         
         for good_in, good_out in goods:
             try:
                 self.assertEqual(good_out, field.validate(good_in))
             except ValidationError:
                 self.fail("Failed to pass %s" % good_in)
+                
+                
+    def test_leave_optionals_out(self):
+        """
+        Should not set optional values if they are not present in the provided fields.
+        """
+        field = Compound(foo=Text(), bar=Text())
+        result = field.validate({'foo':'123'})
+        self.assertEquals(result, {'foo':'123'})
+        
+        
+    def test_can_turn_off_required(self):
+        """
+        Should be able to turn off enforcement of required fields
+        """
+        field = Compound(bar=Text(required=True), baz=Text())
+        obj = {'baz':'y'}
+        result = field.validate(obj, enforce_required=False)
+        self.assertEquals(result, obj)
+        
         
         
 class TestAnything(unittest.TestCase):
@@ -796,6 +816,38 @@ class TestMany(unittest.TestCase):
         foo = Foo()
         validated_foo = field.validate([foo])
         self.assertEquals(validated_foo, [foo])
+
+
+class TestEntity(unittest.TestCase):
+    
+    def test_can_validate(self):
+        """
+        Should validate against a compound validator of its field attributes.
+        """
+        class Foo(Entity):
+            bar = Text(required=True)
+            baz = Text(maxlength=10)
+        
+        with self.assertRaises(CompoundValidationError):
+            Foo.validate({'baz':'x'*11})
+        
+        obj = {'bar':'x', 'baz':'y'}
+        result = Foo.validate(obj)
+        self.assertEquals(result, obj)
+        
+        
+    def test_can_turn_off_required(self):
+        """
+        Should be able to turn off enforcement of required fields
+        """
+        #class Foo(Entity):
+        #    bar = Text(required=True)
+        #    baz = Text()
+        #
+        #obj = {'baz':'y'}
+        #result = Foo.validate(obj, enforce_required=False)
+        #self.assertEquals(result, obj)
+        
         
         
 class TestModel(unittest.TestCase):
