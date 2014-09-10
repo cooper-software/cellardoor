@@ -442,6 +442,9 @@ class ResourceTest(TestBase):
 		
 		
 	def test_single_link(self):
+		"""
+		Can resolve a single link the same way as a reference.
+		"""
 		Hammock(self.api, resources=(FoosResource,BarsResource,BazesResource), storage=storage, views=(MinimalView(),))
 		
 		bazes = []
@@ -476,3 +479,40 @@ class ResourceTest(TestBase):
 		linked_foo = json.loads(data)
 		self.assertEquals(linked_foo, foo)
 		
+		
+	def test_multiple_link(self):
+		"""
+		Can resolve a multiple link the same way as a reference.
+		"""
+		Hammock(self.api, resources=(FoosResource,BarsResource,BazesResource), storage=storage, views=(MinimalView(),))
+		result = self.simulate_request('/foos', 
+			                           method='POST', 
+			                           headers={
+			                           	  'content-type':'application/json',
+			                           	  'accept': 'application/json'
+			                           }, 
+			                           body=json.dumps({'stuff':'foo'}))
+		self.assertEquals(self.srmock.status, '201 Created')
+		data = ''.join(result)
+		foo = json.loads(data)
+		
+		bar_ids = []
+		for i in range(0,3):
+			result = self.simulate_request('/bars', 
+				                           method='POST', 
+				                           headers={
+				                           	  'content-type':'application/json',
+				                           	  'accept': 'application/json'
+				                           }, 
+				                           body=json.dumps({'foo':foo['id']}))
+			data = ''.join(result)
+			bar = json.loads(data)
+			bar_ids.append(bar['id'])
+		
+		bars = [{'foo':foo['id'], 'id':bar_id} for bar_id in bar_ids]
+		
+		result = self.simulate_request('/foos/%s' % foo['id'], headers={'accept': 'application/json'})
+		self.assertEquals(self.srmock.status, '200 OK')
+		data = ''.join(result)
+		new_foo = json.loads(data)
+		self.assertEquals(new_foo, {'stuff':'foo', 'bars':bars, 'id':foo['id']})
