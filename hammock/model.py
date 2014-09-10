@@ -20,6 +20,7 @@ __all__ = [
     'ListOf',
     'Anything',
     'Reference',
+    'Link',
     'Model'
 ]
 
@@ -556,7 +557,7 @@ class Entity(object):
         
 class Reference(Text):
     
-    UNKNOWN = 'Not item found with this ID.'
+    UNKNOWN = 'No item found with this ID.'
     
     def __init__(self, entity, embedded=False, storage=None, *args, **kwargs):
         if isinstance(entity, basestring):
@@ -578,7 +579,7 @@ class Reference(Text):
         if value is None:
             return None
         
-        reference = self.storage.get_by_id(value, fields={})
+        reference = self.storage.get_by_id(self.entity, value, fields={})
         if not reference:
             raise ValidationError(self.UNKNOWN)
         return value
@@ -589,12 +590,10 @@ class Link(object):
     Links define a foreign key relationship. They are not fields as they are read-only.
     """
     
-    def __init__(self, entity, field, embeddable=False):
+    def __init__(self, entity, field, embedded=False):
         self.entity = entity
         self.field = field
-        self.embeddable = embeddable
-        assert hasattr(entity, field), "%s is not a field of %s" % (field, entity.__name__)
-        assert isinstance(getattr(entity, field), Field), "%s.%s is not an instance of Field" % (entity.__name__, field)
+        self.embedded = embedded
 
 
 class Model(object):
@@ -604,8 +603,7 @@ class Model(object):
     A Model provides a holistic and consistent view of a collection of entities.
     """
     
-    def __init__(self, name, entities):
-        self.name = name
+    def __init__(self, *entities):
         self.entities = set(entities)
         self.entities_by_name = dict([(e.__name__, e) for e in entities])
         self.check_references()

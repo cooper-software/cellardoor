@@ -741,7 +741,7 @@ class TestModel(unittest.TestCase):
             bar = Reference('Bar')
         
         with self.assertRaises(Exception):
-            model = Model('test', [Foo])
+            model = Model(Foo)
             
             
     def test_foreign_link(self):
@@ -755,7 +755,7 @@ class TestModel(unittest.TestCase):
             foo = Reference(Foo)
             
         with self.assertRaises(Exception):
-            model = Model('test', [Bar])
+            model = Model(Bar)
             
             
     def test_pass(self):
@@ -771,7 +771,7 @@ class TestModel(unittest.TestCase):
             foos = ListOf(Reference(Foo))
             
             
-        model = Model('test', [Foo, Bar])
+        model = Model(Foo, Bar)
         self.assertTrue(model.has_entity(Foo))
         self.assertTrue(model.has_entity(Bar))
         

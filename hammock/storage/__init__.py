@@ -12,6 +12,10 @@ class Storage(object):
 		raise NotImplementedError
 		
 		
+	def get_by_ids(self, entity, ids, filter=None, fields=None, sort=None, offset=0, limit=0):
+		raise NotImplementedError
+		
+		
 	def create(self, entity, fields):
 		raise NotImplementedError
 		
@@ -37,4 +41,4 @@ class Storage(object):
 		results = list(self.get(entity, filter={'id':id}, fields=fields, limit=1))
 		if len(results) == 0:
 			return None
-		return results
+		return results[0]

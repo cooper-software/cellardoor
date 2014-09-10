@@ -7,8 +7,8 @@ class Foo(Entity):
 	a = Text()
 	b = TypeOf(int)
 
-model = Model('foo', [Foo])
-storage = MongoDBStorage()
+model = Model(Foo)
+storage = MongoDBStorage('test')
 storage.set_model(model)
 
 class TestMongoDBStorage(unittest.TestCase):
@@ -177,3 +177,15 @@ class TestMongoDBStorage(unittest.TestCase):
 		results = list(storage.get(Foo, offset=1, limit=2))
 		self.assertEquals(results, docs[1:3])
 		
+		
+	def test_get_multiple_by_ids(self):
+		"""
+		Can get a list of documents by id.
+		"""
+		ids = []
+		for i in range(0,10):
+			ids.append(storage.create(Foo, {'b':i}))
+		
+		subset_of_ids = ids[0:5]
+		results = list(storage.get_by_ids(Foo, subset_of_ids, fields={}))
+		self.assertEquals([r['id'] for r in results], subset_of_ids)

@@ -5,14 +5,9 @@ from . import Storage
 
 class MongoDBStorage(Storage):
 	
-	def __init__(self, *args, **kwargs):
+	def __init__(self, db=None, *args, **kwargs):
 		self.client = pymongo.MongoClient(*args, **kwargs)
-		self.db = None
-		self.resolvers = None
-		
-		
-	def setup(self, model):
-		self.db = self.client[model.name]
+		self.db = self.client[db]
 		
 	
 	def get(self, entity, filter=None, fields=None, sort=None, offset=0, limit=0):
@@ -32,6 +27,13 @@ class MongoDBStorage(Storage):
 			
 		for result in results:
 			yield self.document_to_dict(result)
+			
+			
+	def get_by_ids(self, entity, ids, filter=None, fields=None, sort=None, offset=0, limit=0):
+		if not filter:
+			filter = {}
+		filter['_id'] = {'$in':map(ObjectId, ids)}
+		return self.get(entity, filter=filter, fields=fields, sort=sort, offset=offset, limit=limit)
 		
 		
 	def create(self, entity, fields):

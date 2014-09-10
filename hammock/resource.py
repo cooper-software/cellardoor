@@ -1,7 +1,7 @@
 import falcon
 from .methods import LIST, CREATE, GET, REPLACE, UPDATE, DELETE, get_http_methods
 from .serializers import JSONSerializer, MsgPackSerializer
-from .model import CompoundValidationError
+from .model import CompoundValidationError, ListOf, Reference
 from .views import View
 
 __all__ = ['Resource']
@@ -53,7 +53,7 @@ class Resource(object):
 	# This is a dictionary where the keys are the name of a reference 
 	# field on the entity and the values are a resource or the name 
 	# of a resource.
-	reference_resources = None
+	link_resources = None
 	
 	# A list or tuple of `hammock.methods` that are enabled through this resource.
 	#
@@ -102,38 +102,41 @@ class Resource(object):
 		if individual_methods:
 			api.add_route('/%s/{id}' % self.plural_name, IndividualEndpoint(self, individual_methods))
 		
-		if self.reference_resources:
+		if self.link_resources:
 			for reference_name, reference in self.entity.references():
-				if reference_name in self.reference_resources:
+				if reference_name in self.link_resources:
 					api.add_route('/%s/{id}/%s' % (self.plural_name, reference_name), 
 						ReferenceEndpoint(self, reference_name))
 			
 			
-	def list(self, req, resp):
-		return self.send_collection(req, resp, self.storage.get(self.entity))
+	def list(self, req, resp, referenced_ids=None):
+		if referenced_ids:
+			items = self.storage.get_by_ids(self.entity, ids=referenced_ids)
+		else:
+			items = self.storage.get(self.entity)
+		return self.send_collection(req, resp, items)
 		
 		
 	def create(self, req, resp):
-		fields = self.get_validated_fields_from_request(req)
-		id = self.storage.create(self.entity, fields)
-		fields['id'] = id
+		item = self.get_validated_fields_from_request(req, resp)
+		id = self.storage.create(self.entity, item)
+		item['id'] = id
 		resp.status = falcon.HTTP_201
-		return self.send_individual(req, resp, fields)
+		return self.send_individual(req, resp, item)
 		
 	
 	def get(self, req, resp, id):
-		try:
-			obj = next(iter(self.storage.get(self.entity, filter={'id':id})))
-		except StopIteration:
-			raise falcon.HTTPNotFound
+		item = self.storage.get_by_id(self.entity, id)
+		if item is None:
+			raise falcon.HTTPNotFound()
 		else:
-			return self.send_individual(req, resp, obj)
+			return self.send_individual(req, resp, item)
 		
 		
 	def update(self, req, resp, id, replace=False):
-		fields = self.get_validated_fields_from_request(req, enforce_required=replace)
-		obj = self.storage.update(self.entity, id, fields, replace=replace)
-		return self.send_individual(req, resp, obj)
+		fields = self.get_validated_fields_from_request(req, resp, enforce_required=replace)
+		item = self.storage.update(self.entity, id, fields, replace=replace)
+		return self.send_individual(req, resp, item)
 		
 		
 	def replace(self, req, resp, id):
@@ -144,26 +147,46 @@ class Resource(object):
 		self.storage.delete(self.entity, id)
 		
 		
-	def get_reference(req, resp, id, reference_name):
-		pass
+	def get_reference(self, req, resp, id, reference_name):
+		item = self.storage.get_by_id(self.entity, id)
+		
+		if item is None:
+			raise falcon.HTTPNotFound()
+		
+		reference_field = getattr(self.entity, reference_name)
+		reference_value = item.get(reference_name)
+		
+		if reference_value is None:
+			raise falcon.HTTPNotFound()
+		
+		if isinstance(reference_field, ListOf):
+			return self.link_resources[reference_name].list(req, resp, referenced_ids=reference_value)
+		else:
+			return self.link_resources[reference_name].get(req, resp, reference_value)
 		
 		
-	def send_collection(self, req, resp, objs):
+	def send_collection(self, req, resp, items):
+		items = map(self.prepare_item, items)
 		view = self.get_view(req)
-		resp.content_type, resp.body = view.get_collection_response(req, objs)
+		resp.content_type, resp.body = view.get_collection_response(req, items)
+		return items
 		
 		
-	def send_individual(self, req, resp, obj):
+	def send_individual(self, req, resp, item):
+		item = self.prepare_item(item)
 		view = self.get_view(req)
-		resp.content_type, resp.body = view.get_individual_response(req, obj)
+		resp.content_type, resp.body = view.get_individual_response(req, item)
+		return item
 		
 		
-	def get_validated_fields_from_request(self, req, enforce_required=True):
+	def get_validated_fields_from_request(self, req, resp, enforce_required=True):
 		fields = self.unserialize_request_body(req)
 		try:
 			return self.entity.validate(fields, enforce_required=enforce_required)
 		except CompoundValidationError, e:
-			raise falcon.HTTPBadRequest("Bad Request", "Invalid fields")
+			view = self.get_view(req)
+			resp.content_type, content = view.serialize(req, e.errors)
+			raise falcon.HTTPBadRequest("Bad Request", content)
 		
 		
 	def unserialize_request_body(self, req):
@@ -177,6 +200,28 @@ class Resource(object):
 	def get_view(self, req):
 		_, view = View.choose(req, self.views)
 		return view
+		
+		
+	def prepare_item(self, item):
+		item = item.copy()
+		self.resolve_references(item)
+		return item
+		
+		
+	def resolve_references(self, item):
+		for reference_name, reference_field in self.entity.references():
+			if not reference_field.embedded:
+				continue
+			reference_value = item.get(reference_name)
+			if reference_value is not None:
+				referenced_resource = self.link_resources[reference_name]
+				if isinstance(getattr(self.entity, reference_name), ListOf):
+					referenced_items = referenced_resource.storage.get_by_ids(referenced_resource.entity, reference_value)
+					item[reference_name] = map(referenced_resource.prepare_item, referenced_items)
+				else:
+					referenced_item = referenced_resource.storage.get_by_id(referenced_resource.entity, reference_value)
+					item[reference_name] = referenced_resource.prepare_item(referenced_item)
+		return item
 			
 			
 class Endpoint(object):
@@ -228,5 +273,5 @@ class ReferenceEndpoint(object):
 		
 		
 	def on_get(self, req, resp, id):
-		return self.get_reference(req, resp, id, reference_name)
+		return self.resource.get_reference(req, resp, id, self.reference_name)
 		
