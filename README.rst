@@ -12,11 +12,12 @@ Example
 
 	from hammock import create_api
 	from hammock.storage.mongodb import MongoDBStorage
-	from hammock.model import Model, One, Link, Text, DateTime, Boolean
+	from hammock.model import Model, Reference, Link, ListOf, Text, DateTime, Boolean
 	from hammock.resource import Resource
 	from hammock.methods import ALL
 	from hammock.views import MinimalView, SirenView
-
+	
+	storage = MongoDBStorage()
 
 	class Project(Model):
 		name = Text(maxlength=50, required=True)
@@ -27,7 +28,7 @@ Example
 		summary = Text(maxlength=150, required=True)
 		due = DateTime()
 		is_done = Boolean(default=False)
-		project = One(Project, embeddable=True)
+		project = Reference(Project, embeddable=True, storage=storage)
 		
 		
 	class ProjectsResource(Resource):
@@ -53,7 +54,7 @@ Example
 		
 		
 	app = create_api(
-		storage=MongoDBStorage(),
+		storage=storage,
 		resources=(ProjectsResource, TasksResource),
 		views=(MinimalView, SirenView)
 	)

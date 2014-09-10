@@ -1,6 +1,7 @@
 import re
 from datetime import datetime
 from hammock.model import *
+from .storage import storage
 
 
 class Slug(Text):
@@ -29,7 +30,7 @@ class Person(BaseModel):
 	email = Email(required=True, hidden=True)
 	password = Text(maxlength=50, hidden=True)
 	role = Enum('anonymous', 'normal', 'admin', default='anonymous')
-	token = Group(
+	token = Compound(
 		value=Text(maxlength=150, required=True),
 		expires=DateTime(required=True)
 	)
@@ -39,10 +40,10 @@ class Post(BaseModel):
 	status = Enum('draft', 'published', default='draft')
 	publish_date = DateTime()
 	slug = Slug(required=True),
-	author = One(Person, required=True)
+	author = Reference(Person, required=True, storage=storage)
 	title = Text(maxlength=200, required=True)
 	content = Text(maxlength=10000)
-	tags = Many('Tag')
+	tags = ListOf(Reference('Tag', storage=storage))
 	
 	
 class Tag(Model):

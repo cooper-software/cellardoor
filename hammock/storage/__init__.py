@@ -32,3 +32,9 @@ class Storage(object):
 		self.model = model
 		self.setup(model)
 		
+		
+	def get_by_id(self, entity, id, fields=None):
+		results = list(self.get(entity, filter={'id':id}, fields=fields, limit=1))
+		if len(results) == 0:
+			return None
+		return results

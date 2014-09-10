@@ -19,8 +19,7 @@ __all__ = [
     'OneOf',
     'ListOf',
     'Anything',
-    'One',
-    'Many',
+    'Reference',
     'Model'
 ]
 
@@ -507,17 +506,18 @@ class Compound(Field):
         errors = {}
         
         for k,v in self.fields.items():
-            try:
-                unvalidated_value = value.get(k)
-                if v.required and unvalidated_value is None and not self.enforce_required:
-                    validated_value = None
+            unvalidated_value = value.get(k)
+            if unvalidated_value is None:
+                if v.required and self.enforce_required:
+                    errors[k] = 'This field is required.'
+                    continue
                 else:
-                    validated_value = v.validate(unvalidated_value)
-            except ValidationError, e:
-                errors[k] = e
-            else:
-                if validated_value is not None:
-                    validated[k] = validated_value
+                    unvalidated_value = v.default
+            if unvalidated_value is not None:
+                try:
+                    validated[k] = v.validate(unvalidated_value)
+                except ValidationError, e:
+                    errors[k] = e
         
         if errors:
             raise CompoundValidationError(errors)
@@ -544,15 +544,21 @@ class Entity(object):
     
     @classmethod
     def references(cls):
-        return [(k,v) for k,v in cls.__dict__.items() if isinstance(v, EntityReference)]
+        refs = []
+        for k,v in cls.__dict__.items():
+            if isinstance(v, Reference):
+                refs.append((k,v))
+            elif isinstance(v, ListOf) and isinstance(v.field, Reference):
+                refs.append((k, v.field))
+        return refs
+                
         
         
-class EntityReference(Field):
+class Reference(Text):
     
-    NOT_AN_ENTITY = 'Not an instance of the expected entity'
-    UNDEFINED = 'No linked entity defined'
+    UNKNOWN = 'Not item found with this ID.'
     
-    def __init__(self, entity, embedded=False, *args, **kwargs):
+    def __init__(self, entity, embedded=False, storage=None, *args, **kwargs):
         if isinstance(entity, basestring):
             self.entity_name = entity
             self.entity = None
@@ -561,49 +567,34 @@ class EntityReference(Field):
             self.entity_name = entity.__name__
             
         self.embedded = embedded
+        self.storage = storage
         
-        super(EntityReference, self).__init__(*args, **kwargs)
+        super(Reference, self).__init__(*args, **kwargs)
         
         
+    def validate(self, value):
+        value = super(Reference, self).validate(value)
         
-class Many(EntityReference):
-    """A link to a collection of entities"""
-    
-    NOT_A_LIST = "Expected a list of entities"
-    
-    def _validate(self, value):
-        if not self.entity:
-            raise Exception(self.UNDEFINED)
+        if value is None:
+            return None
         
-        if not isinstance(value, (list, tuple)):
-            raise ValidationError(self.NOT_A_LIST)
-        
-        for v in value:
-            if not isinstance(v, self.entity):
-                raise ValidationError(self.NOT_AN_ENTITY)
-            
-        return value
-    
-    
-class One(EntityReference):
-    """A link to a single entity"""
-    
-    def _validate(self, value):
-        if not self.entity:
-            raise Exception(self.UNDEFINED)
-            
-        if not isinstance(value, self.entity):
-            raise ValidationError(self.NOT_AN_ENTITY)
-            
+        reference = self.storage.get_by_id(value, fields={})
+        if not reference:
+            raise ValidationError(self.UNKNOWN)
         return value
         
         
-        
-class Link(EntityReference):
+class Link(object):
+    """
+    Links define a foreign key relationship. They are not fields as they are read-only.
+    """
     
-    def __init__(self, entity, field, embedded=False):
-        super(Link, self).__init__(self, entity, embedded)
+    def __init__(self, entity, field, embeddable=False):
+        self.entity = entity
         self.field = field
+        self.embeddable = embeddable
+        assert hasattr(entity, field), "%s is not a field of %s" % (field, entity.__name__)
+        assert isinstance(getattr(entity, field), Field), "%s.%s is not an instance of Field" % (entity.__name__, field)
 
 
 class Model(object):

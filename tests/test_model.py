@@ -694,128 +694,8 @@ class TestAnything(unittest.TestCase):
                 self.fail('Failed something')
                 
                 
-class TestOne(unittest.TestCase):
-    
-    def test_fail_bad_value(self):
-        """
-        Should fail if passed anything but an instance of the specified entity
-        """
-        
-        class Foo(Entity):
-            name = Text()
-        
-        field = One(Foo)
-        
-        with self.assertRaises(ValidationError):
-            field.validate(123)
-            
-            
-    def test_fail_not_ready(self):
-        """
-        Should raise an error if attempting to validate before an entity is set
-        """
-        
-        field = One('Foo')
-        
-        class Foo(Entity):
-            name = Text()
-        
-        with self.assertRaises(Exception):
-            field.validate(Foo())
-            
-            
-    def test_fail_incorrect_entity(self):
-        """
-        Should raise an error if passed an incorrect entity type
-        """
-        
-        class Foo(Entity):
-            pass
-            
-            
-        class Bar(Entity):
-            pass
-            
-        field = One(Foo)
-        
-        with self.assertRaises(ValidationError):
-            field.validate(Bar())
-            
-            
-    def test_pass(self):
-        """
-        Should pass an instance of the specified entity
-        """
-        
-        class Foo(Entity):
-            pass
-        
-        field = One(Foo)
-        foo = Foo()
-        validated_foo = field.validate(foo)
-        self.assertEquals(validated_foo, foo)
-        
-        
-class TestMany(unittest.TestCase):
-    
-    def test_fail_bad_value(self):
-        """
-        Should fail if passed anything but a list of instances of the specified entity
-        """
-        
-        class Foo(Entity):
-            name = Text()
-        
-        field = Many(Foo)
-        
-        with self.assertRaises(ValidationError):
-            field.validate(123)
-            
-            
-    def test_fail_not_ready(self):
-        """
-        Should raise an error if attempting to validate before an entity is set
-        """
-        
-        field = Many('Foo')
-        
-        class Foo(Entity):
-            name = Text()
-        
-        with self.assertRaises(Exception):
-            field.validate([Foo()])
-            
-            
-    def test_fail_incorrect_entity(self):
-        """
-        Should raise an error if passed an incorrect entity type
-        """
-        
-        class Foo(Entity):
-            pass
-            
-            
-        class Bar(Entity):
-            pass
-            
-        field = Many(Foo)
-        
-        with self.assertRaises(ValidationError):
-            field.validate([Bar()])
-            
-            
-    def test_pass(self):
-        """
-        Should pass a list of instances of the specified entity
-        """
-        
-        class Foo(Entity):
-            pass
-        
-        field = Many(Foo)
-        foo = Foo()
-        validated_foo = field.validate([foo])
-        self.assertEquals(validated_foo, [foo])
+class TestReference(unittest.TestCase):
+    pass
 
 
 class TestEntity(unittest.TestCase):
@@ -840,13 +720,13 @@ class TestEntity(unittest.TestCase):
         """
         Should be able to turn off enforcement of required fields
         """
-        #class Foo(Entity):
-        #    bar = Text(required=True)
-        #    baz = Text()
-        #
-        #obj = {'baz':'y'}
-        #result = Foo.validate(obj, enforce_required=False)
-        #self.assertEquals(result, obj)
+        class Foo(Entity):
+            bar = Text(required=True)
+            baz = Text()
+        
+        obj = {'baz':'y'}
+        result = Foo.validate(obj, enforce_required=False)
+        self.assertEquals(result, obj)
         
         
         
@@ -858,7 +738,7 @@ class TestModel(unittest.TestCase):
         """
         
         class Foo(Entity):
-            bar = One('Bar')
+            bar = Reference('Bar')
         
         with self.assertRaises(Exception):
             model = Model('test', [Foo])
@@ -872,7 +752,7 @@ class TestModel(unittest.TestCase):
             pass
             
         class Bar(Entity):
-            foo = One(Foo)
+            foo = Reference(Foo)
             
         with self.assertRaises(Exception):
             model = Model('test', [Bar])
@@ -884,11 +764,11 @@ class TestModel(unittest.TestCase):
         """
         
         class Foo(Entity):
-            bar = One('Bar')
+            bar = Reference('Bar')
             
             
         class Bar(Entity):
-            foos = Many(Foo)
+            foos = ListOf(Reference(Foo))
             
             
         model = Model('test', [Foo, Bar])
