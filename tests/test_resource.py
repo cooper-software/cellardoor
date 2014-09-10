@@ -10,19 +10,16 @@ from hammock import Hammock
 from bson.objectid import ObjectId
 
 
-storage = MongoDBStorage('test')
-
-
 class Foo(Entity):
 	stuff = Text(required=True)
 	optional_stuff = Text()
-	bars = Link('Bar', 'foo')
-	bazes = ListOf(Reference('Baz', storage=storage))
+	bars = Link('Bar', 'foo', embedded=True)
+	bazes = ListOf(Reference('Baz'))
 	
 	
 class Bar(Entity):
-	foo = Reference(Foo, storage=storage, embedded=True)
-	bazes = ListOf(Reference('Baz', storage=storage, embedded=True))
+	foo = Reference(Foo, embedded=True)
+	bazes = ListOf(Reference('Baz', embedded=True))
 	
 	
 class Baz(Entity):
@@ -57,8 +54,8 @@ class BazesResource(Resource):
 	}
 	
 
-model = Model(Foo, Bar, Baz)
-storage.set_model(model)
+storage = MongoDBStorage('test')
+model = Model(storage, (Foo, Bar, Baz))
 
 class ResourceTest(TestBase):
 	
@@ -310,6 +307,7 @@ class ResourceTest(TestBase):
 		result = self.simulate_request('/bars/%s/foo' % bar['id'], headers={'accept': 'application/json'})
 		data = ''.join(result)
 		linked_foo = json.loads(data)
+		foo['bars'] = [{'id':bar['id'], 'foo':foo['id']}]
 		self.assertEquals(linked_foo, foo)
 		
 		

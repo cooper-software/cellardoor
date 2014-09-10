@@ -32,8 +32,7 @@ class Storage(object):
 		
 		
 		
-	def set_model(self, model):
-		self.model = model
+	def setup_with_model(self, model):
 		self.setup(model)
 		
 		

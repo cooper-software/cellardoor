@@ -579,10 +579,10 @@ class Reference(Text):
     
     UNKNOWN = 'No item found with this ID.'
     
-    def __init__(self, entity, embedded=False, storage=None, *args, **kwargs):
+    def __init__(self, entity, embedded=False, *args, **kwargs):
         self.entity = entity
         self.embedded = embedded
-        self.storage = storage
+        self.storage = None
         
         super(Reference, self).__init__(*args, **kwargs)
         
@@ -609,6 +609,7 @@ class Link(object):
         self.field = field
         self.embedded = embedded
         self.multiple = multiple
+        self.storage = None
 
 
 class Model(object):
@@ -618,9 +619,12 @@ class Model(object):
     A Model provides a holistic and consistent view of a collection of entities.
     """
     
-    def __init__(self, *entities):
+    def __init__(self, storage, entities):
         self.entities = set(entities)
         self.entities_by_name = dict([(e.__name__, e) for e in entities])
+        self.storage = storage
+        if self.storage is not None:
+            self.storage.setup_with_model(self)
         self.check_references()
         
         
@@ -642,5 +646,5 @@ class Model(object):
             # Disallow references to entities outside the model
             for reference_name, reference in entity.links_and_references():
                 if not self.has_entity(reference.entity):
-                    raise Exception, "Attempting to reference to an entity '%s' that is outside the model" % reference.entity_name
-                    
+                    raise Exception, "Attempting to reference to an entity '%s' that is outside the model" % reference.entity.__name__
+                reference.storage = self.storage

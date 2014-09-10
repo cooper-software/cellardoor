@@ -14,8 +14,7 @@ class Hammock(object):
 			resource.add_to_api(api)
 			resource_instances[resource_cls.__name__] = resource
 			
-		model = Model(*entities)
-		storage.set_model(model)
+		model = Model(storage, entities)
 		
 		for resource in resource_instances.values():
 			new_link_resources = {}

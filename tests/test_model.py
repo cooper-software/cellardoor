@@ -771,7 +771,7 @@ class TestModel(unittest.TestCase):
             foos = ListOf(Reference(Foo))
             
             
-        model = Model(Foo, Bar)
+        model = Model(None, (Foo, Bar))
         self.assertTrue(model.has_entity(Foo))
         self.assertTrue(model.has_entity(Bar))
         

@@ -7,9 +7,8 @@ class Foo(Entity):
 	a = Text()
 	b = TypeOf(int)
 
-model = Model(Foo)
 storage = MongoDBStorage('test')
-storage.set_model(model)
+model = Model(storage, (Foo,))
 
 class TestMongoDBStorage(unittest.TestCase):
 	

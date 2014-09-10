@@ -152,43 +152,22 @@ class Resource(object):
 		
 		if item is None:
 			raise falcon.HTTPNotFound()
+			
+		target_resource = self.link_resources.get(reference_name)
 		
-		reference_field = getattr(self.entity, reference_name)
-		
-		if isinstance(reference_field, Link):
-			return self.get_link(req, resp, item, reference_name, reference_field)
-		else:
-			return self.get_reference(req, resp, item, reference_name, reference_field)
-		
-		
-	def get_link(self, req, resp, item, link_name, link_field):
-		target_field = getattr(link_field.entity, link_field.field)
-		filter = {}
-		filter[link_field.field] = item['id']
-		target_resource = self.link_resources[link_name]
-		
-		if link_field.multiple:
-			targets = list(target_resource.storage.get(target_resource.entity, filter=filter))
-			return target_resource.send_collection(req, resp, targets)
-		else:
-			try:
-				target_item = next(iter(target_resource.storage.get(target_resource.entity, filter=filter, limit=1)))
-			except StopIteration:
-				raise falcon.HTTPNotFound()
-			else:
-				return target_resource.send_individual(req, resp, target_item)
-		
-	
-	def get_reference(self, req, resp, item, reference_name, reference_field):
-		reference_value = item.get(reference_name)
-		
-		if reference_value is None:
+		if target_resource is None:
 			raise falcon.HTTPNotFound()
 		
-		if isinstance(reference_field, ListOf):
-			return self.link_resources[reference_name].list(req, resp, referenced_ids=reference_value)
+		reference_field = getattr(self.entity, reference_name)
+		results = target_resource.resolve_link_or_reference(item, reference_name, reference_field)
+		
+		if not results:
+			raise falcon.HTTPNotFound()
+		
+		if isinstance(results, (list, tuple, set)):
+			return target_resource.send_collection(req, resp, results)
 		else:
-			return self.link_resources[reference_name].get(req, resp, reference_value)
+			return target_resource.send_individual(req, resp, results)
 		
 		
 	def send_collection(self, req, resp, items):
@@ -228,26 +207,74 @@ class Resource(object):
 		return view
 		
 		
-	def prepare_item(self, item):
-		item = item.copy()
-		self.resolve_references(item)
-		return item
-		
-		
-	def resolve_references(self, item):
-		for reference_name, reference_field in self.entity.references():
+	def add_embedded_references(self, item):
+		for reference_name, reference_field in self.entity.links_and_references():
 			if not reference_field.embedded:
 				continue
-			reference_value = item.get(reference_name)
-			if reference_value is not None:
-				referenced_resource = self.link_resources[reference_name]
-				if isinstance(getattr(self.entity, reference_name), ListOf):
-					referenced_items = referenced_resource.storage.get_by_ids(referenced_resource.entity, reference_value)
-					item[reference_name] = map(referenced_resource.prepare_item, referenced_items)
-				else:
-					referenced_item = referenced_resource.storage.get_by_id(referenced_resource.entity, reference_value)
-					item[reference_name] = referenced_resource.prepare_item(referenced_item)
+				
+			referenced_resource = self.link_resources.get(reference_name)
+			if not referenced_resource:
+				raise falcon.HTTPNotFound()
+				
+			result = referenced_resource.resolve_link_or_reference(item, reference_name, getattr(self.entity, reference_name))
+			if result:
+				item[reference_name] = result
+				
 		return item
+		
+		
+	def resolve_link_or_reference(self, source_item, reference_name, reference_field):
+		if isinstance(reference_field, Link):
+			return self.resolve_link(source_item, reference_field)
+		else:
+			return self.resolve_reference(source_item, reference_name, reference_field)
+		
+		
+	def resolve_link(self, source_item, link_field):
+		filter = {}
+		filter[link_field.field] = source_item['id']
+		
+		if link_field.multiple:
+			results = list(self.storage.get(self.entity, filter=filter))
+		else:
+			try:
+				results = next(iter(self.storage.get(self.entity, filter=filter, limit=1)))
+			except StopIteration:
+				return None
+		
+		return self.prepare_items(results, embed=False)
+		
+	
+	def resolve_reference(self, source_item, reference_name, reference_field):
+		reference_value = source_item.get(reference_name)
+		
+		if reference_value is None:
+			return None
+		
+		if isinstance(reference_field, ListOf):
+			results = list(self.storage.get_by_ids(self.entity, reference_value))
+		else:
+			results = self.storage.get_by_id(self.entity, reference_value)
+		
+		return self.prepare_items(results, embed=False)
+		
+		
+	def prepare_items(self, items, embed=True):
+		if isinstance(items, (list, tuple, set)):
+			prepared_items = []
+			for item in items:
+				prepared_items.append(self.prepare_item(item, embed=embed))
+			return prepared_items
+		else:
+			return self.prepare_item(items, embed=embed)
+		
+		
+	def prepare_item(self, item, embed=True):
+		if embed:
+			item = item.copy()
+			self.add_embedded_references(item)
+		return item
+			
 			
 			
 class Endpoint(object):
