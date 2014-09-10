@@ -1,7 +1,7 @@
 import falcon
 from .methods import LIST, CREATE, GET, REPLACE, UPDATE, DELETE, get_http_methods
 from .serializers import JSONSerializer, MsgPackSerializer
-from .model import CompoundValidationError, ListOf, Reference
+from .model import CompoundValidationError, ListOf, Reference, Link
 from .views import View
 
 __all__ = ['Resource']
@@ -103,7 +103,7 @@ class Resource(object):
 			api.add_route('/%s/{id}' % self.plural_name, IndividualEndpoint(self, individual_methods))
 		
 		if self.link_resources:
-			for reference_name, reference in self.entity.references():
+			for reference_name, reference in self.entity.links_and_references():
 				if reference_name in self.link_resources:
 					api.add_route('/%s/{id}/%s' % (self.plural_name, reference_name), 
 						ReferenceEndpoint(self, reference_name))
@@ -147,13 +147,39 @@ class Resource(object):
 		self.storage.delete(self.entity, id)
 		
 		
-	def get_reference(self, req, resp, id, reference_name):
+	def get_link_or_reference(self, req, resp, id, reference_name):
 		item = self.storage.get_by_id(self.entity, id)
 		
 		if item is None:
 			raise falcon.HTTPNotFound()
 		
 		reference_field = getattr(self.entity, reference_name)
+		
+		if isinstance(reference_field, Link):
+			return self.get_link(req, resp, item, reference_name, reference_field)
+		else:
+			return self.get_reference(req, resp, item, reference_name, reference_field)
+		
+		
+	def get_link(self, req, resp, item, link_name, link_field):
+		target_field = getattr(link_field.entity, link_field.field)
+		filter = {}
+		filter[link_field.field] = item['id']
+		target_resource = self.link_resources[link_name]
+		
+		if link_field.multiple:
+			targets = list(target_resource.storage.get(target_resource.entity, filter=filter))
+			return target_resource.send_collection(req, resp, targets)
+		else:
+			try:
+				target_item = next(iter(target_resource.storage.get(target_resource.entity, filter=filter, limit=1)))
+			except StopIteration:
+				raise falcon.HTTPNotFound()
+			else:
+				return target_resource.send_individual(req, resp, target_item)
+		
+	
+	def get_reference(self, req, resp, item, reference_name, reference_field):
 		reference_value = item.get(reference_name)
 		
 		if reference_value is None:
@@ -273,5 +299,5 @@ class ReferenceEndpoint(object):
 		
 		
 	def on_get(self, req, resp, id):
-		return self.resource.get_reference(req, resp, id, self.reference_name)
+		return self.resource.get_link_or_reference(req, resp, id, self.reference_name)
 		

@@ -27,7 +27,7 @@ class Bar(Entity):
 	
 class Baz(Entity):
 	name = Text(required=True)
-	foo = Link(Foo, 'bazes')
+	foo = Link(Foo, 'bazes', multiple=False)
 	
 
 class FoosResource(Resource):
@@ -441,4 +441,40 @@ class ResourceTest(TestBase):
 		data = ''.join(result)
 		bar = json.loads(data)
 		self.assertEquals(bar, {'bazes':bazes, 'id':bar['id']})
+		
+		
+	def test_single_link(self):
+		Hammock(self.api, resources=(FoosResource,BarsResource,BazesResource), storage=storage, views=(MinimalView(),))
+		
+		bazes = []
+		
+		for i in range(0,3):
+			result = self.simulate_request('/bazes', 
+				                           method='POST', 
+				                           headers={
+				                           	  'content-type':'application/json',
+				                           	  'accept': 'application/json'
+				                           }, 
+				                           body=json.dumps({'name':'Baz#%d' % i}))
+			data = ''.join(result)
+			obj = json.loads(data)
+			bazes.append(obj)
+			
+		baz_ids = [x['id'] for x in bazes]
+		result = self.simulate_request('/foos', 
+			                           method='POST', 
+			                           headers={
+			                           	  'content-type':'application/json',
+			                           	  'accept': 'application/json'
+			                           }, 
+			                           body=json.dumps({'stuff': 'things', 'bazes':baz_ids}))
+		
+		data = ''.join(result)
+		foo = json.loads(data)
+		
+		result = self.simulate_request('/bazes/%s/foo' % baz_ids[0], headers={'accept': 'application/json'})
+		self.assertEquals(self.srmock.status, '200 OK')
+		data = ''.join(result)
+		linked_foo = json.loads(data)
+		self.assertEquals(linked_foo, foo)
 		

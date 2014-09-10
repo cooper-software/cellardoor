@@ -543,6 +543,7 @@ class Entity(object):
     def validate(cls, fields, enforce_required=True):
         return cls.compound_field.validate(fields, enforce_required=enforce_required)
     
+    
     @classmethod
     def references(cls):
         refs = []
@@ -552,7 +553,26 @@ class Entity(object):
             elif isinstance(v, ListOf) and isinstance(v.field, Reference):
                 refs.append((k, v.field))
         return refs
-                
+        
+        
+    @classmethod
+    def links(cls):
+        links = []
+        for k,v in cls.__dict__.items():
+            if isinstance(v, Link):
+                links.append((k,v))
+        return links
+        
+        
+    @classmethod
+    def links_and_references(cls):
+        refs_and_links = []
+        for k,v in cls.__dict__.items():
+            if isinstance(v, (Link, Reference)):
+                refs_and_links.append((k,v))
+            elif isinstance(v, ListOf) and isinstance(v.field, Reference):
+                refs_and_links.append((k, v.field))
+        return refs_and_links
         
         
 class Reference(Text):
@@ -560,13 +580,7 @@ class Reference(Text):
     UNKNOWN = 'No item found with this ID.'
     
     def __init__(self, entity, embedded=False, storage=None, *args, **kwargs):
-        if isinstance(entity, basestring):
-            self.entity_name = entity
-            self.entity = None
-        else:
-            self.entity = entity
-            self.entity_name = entity.__name__
-            
+        self.entity = entity
         self.embedded = embedded
         self.storage = storage
         
@@ -590,10 +604,11 @@ class Link(object):
     Links define a foreign key relationship. They are not fields as they are read-only.
     """
     
-    def __init__(self, entity, field, embedded=False):
+    def __init__(self, entity, field, embedded=False, multiple=True):
         self.entity = entity
         self.field = field
         self.embedded = embedded
+        self.multiple = multiple
 
 
 class Model(object):
@@ -616,16 +631,16 @@ class Model(object):
     def check_references(self):
         # First make sure all references have a reference to their entity class
         for entity in self.entities:
-            for reference_name, reference in entity.references():
-                if not reference.entity:
-                    referenced_entity = self.entities_by_name.get(reference.entity_name)
+            for reference_name, reference in entity.links_and_references():
+                if isinstance(reference.entity, basestring):
+                    referenced_entity = self.entities_by_name.get(reference.entity)
                     if not referenced_entity:
-                        raise Exception, "Can't resolve reference to entity '%s'" % reference.entity_name
+                        raise Exception, "Can't resolve reference to entity '%s'" % reference.entity
                     reference.entity = referenced_entity
         
         for entity in self.entities:
             # Disallow references to entities outside the model
-            for reference_name, reference in entity.references():
+            for reference_name, reference in entity.links_and_references():
                 if not self.has_entity(reference.entity):
                     raise Exception, "Attempting to reference to an entity '%s' that is outside the model" % reference.entity_name
                     
