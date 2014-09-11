@@ -69,3 +69,38 @@ class MongoDBStorage(Storage):
 	def collection_for_entity(self, entity):
 		return self.db[entity.__name__]
 		
+		
+	def clean_filter(self, filter, allowed_fields):
+		allowed_fields = set(allowed_fields)
+		return self._clean_filter(filter, allowed_fields)
+		
+	def _clean_filter(self, filter, allowed_fields):
+		new_filter = {}
+		for k,v in filter.items():
+			
+			if k.startswith('$'):
+				if k == '$where':
+					continue
+			elif k not in allowed_fields:
+				continue
+				
+			if isinstance(v, (list, tuple)):
+				new_v = []
+				for x in v:
+					new_x = self._clean_filter(x, allowed_fields)
+					if new_x is not None and new_x != []:
+						new_v.append(new_x)
+			elif isinstance(v, dict):
+				new_v = self._clean_filter(v, allowed_fields)
+			else:
+				new_v = v
+			
+			if new_v is not None and new_v != [] and new_v != {}:
+				new_filter[k] = new_v
+		
+		if new_filter == {}:
+			return None
+		else:
+			return new_filter
+				
+				

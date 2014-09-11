@@ -28,6 +28,10 @@ class Storage(object):
 		raise NotImplementedError
 		
 		
+	def clean_filter(self, filter, allowed_fields):
+		raise NotImplementedError
+		
+		
 	# End abstract methods
 		
 		

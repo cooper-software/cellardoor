@@ -71,9 +71,10 @@ class Field(object):
     create your own field.
     """
     
-    def __init__(self, required=False, default=None):
+    def __init__(self, required=False, default=None, hidden=False):
         self.required = required
         self.default = default
+        self.hidden = hidden
         
     def validate(self, value):
         if value is None:
@@ -601,7 +602,7 @@ class Reference(Text):
         
 class Link(object):
     """
-    Links define a foreign key relationship. They are not fields as they are read-only.
+    Links define a foreign key relationship. They are read-only.
     """
     
     def __init__(self, entity, field, embedded=False, multiple=True):
@@ -615,8 +616,6 @@ class Link(object):
 class Model(object):
     """
     A collection of linked entities.
-    
-    A Model provides a holistic and consistent view of a collection of entities.
     """
     
     def __init__(self, storage, entities):

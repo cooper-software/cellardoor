@@ -188,3 +188,26 @@ class TestMongoDBStorage(unittest.TestCase):
 		subset_of_ids = ids[0:5]
 		results = list(storage.get_by_ids(Foo, subset_of_ids, fields={}))
 		self.assertEquals([r['id'] for r in results], subset_of_ids)
+		
+		
+	def test_clean_filter(self):
+		"""
+		Removes fields from a filter that aren't in the list of allowed fields.
+		"""
+		filter = {
+			'a': 'foo',
+			'b': 'bar',
+			'$or': [{'c':'foo'}, {'d':'bar'}],
+			'e': {'$gt':23},
+			'f': {'$where':'alert("OK")', '$lt': 23},
+			'g': {'$where':'foo()'}
+		}
+		cleaned_filter = storage.clean_filter(filter, ('a','c', 'e', 'f', 'g'))
+		self.assertEquals(cleaned_filter,
+			{
+				'a': 'foo',
+				'$or': [{'c':'foo'}],
+				'e': {'$gt':23},
+				'f': {'$lt':23}
+			}
+		)
