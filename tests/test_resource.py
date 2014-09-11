@@ -653,7 +653,8 @@ class ResourceTest(TestBase):
 		result = self.simulate_request('/foos', headers={'accept':'application/json'}, query_string=query_string)
 		data = ''.join(result)
 		items = json.loads(data)
-		self.assertEquals(items, {'items':list(reversed(foos))})
+		foos.reverse()
+		self.assertEquals(items, {'items':foos})
 		
 		
 	def test_sorted_reference(self):
@@ -734,4 +735,109 @@ class ResourceTest(TestBase):
 		items = json.loads(data)
 		bars.reverse()
 		self.assertEquals(items, {'items':bars})
+		
+		
+	def test_offset_and_limit(self):
+		"""
+		Can skip some items and limit the number of items
+		"""
+		Hammock(self.api, resources=(FoosResource,BarsResource,BazesResource), storage=storage, views=(MinimalView(),))
+		
+		foos = []
+		for i in range(0,5):
+			result = self.simulate_request('/foos', 
+				                           method='POST', 
+				                           headers={
+				                           	  'content-type':'application/json',
+				                           	  'accept': 'application/json'
+				                           }, 
+				                           body=json.dumps({'stuff':'Foo#%d' % i}))
+			data = ''.join(result)
+			obj = json.loads(data)
+			foos.append(obj)
+			
+		query_string = 'offset=1&limit=1'
+		
+		result = self.simulate_request('/foos', headers={'accept':'application/json'}, query_string=query_string)
+		data = ''.join(result)
+		items = json.loads(data)
+		self.assertEquals(items, {'items':[foos[1]]})
+		
+		
+	def test_offset_and_limit_reference(self):
+		"""
+		Can skip and limit referenced items.
+		"""
+		Hammock(self.api, resources=(FoosResource,BarsResource,BazesResource), storage=storage, views=(MinimalView(),))
+		
+		bazes = []
+		for i in range(0,3):
+			result = self.simulate_request('/bazes', 
+				                           method='POST', 
+				                           headers={
+				                           	  'content-type':'application/json',
+				                           	  'accept': 'application/json'
+				                           }, 
+				                           body=json.dumps({'name':'Baz#%d' % i}))
+			data = ''.join(result)
+			baz = json.loads(data)
+			bazes.append(baz)
+		
+		result = self.simulate_request('/foos', 
+			                           method='POST', 
+			                           headers={
+			                           	  'content-type':'application/json',
+			                           	  'accept': 'application/json'
+			                           }, 
+			                           body=json.dumps({'stuff':'foo', 'bazes':[x['id'] for x in bazes]}))
+		data = ''.join(result)
+		foo = json.loads(data)
+		
+		query_string = 'offset=1&limit=1'
+		
+		result = self.simulate_request('/foos/%s/bazes' % foo['id'], headers={'accept':'application/json'}, query_string=query_string)
+		self.assertEquals(self.srmock.status, '200 OK')
+		data = ''.join(result)
+		items = json.loads(data)
+		bazes.reverse()
+		self.assertEquals(items, {'items':[bazes[1]]})
+		
+		
+	def test_offset_and_limit_link(self):
+		"""
+		Can skip and limit linked items.
+		"""
+		Hammock(self.api, resources=(FoosResource,BarsResource,BazesResource), storage=storage, views=(MinimalView(),))
+		
+		result = self.simulate_request('/foos', 
+			                           method='POST', 
+			                           headers={
+			                           	  'content-type':'application/json',
+			                           	  'accept': 'application/json'
+			                           }, 
+			                           body=json.dumps({'stuff':'foo'}))
+		data = ''.join(result)
+		foo = json.loads(data)
+		
+		bars = []
+		for i in range(0,3):
+			result = self.simulate_request('/bars', 
+				                           method='POST', 
+				                           headers={
+				                           	  'content-type':'application/json',
+				                           	  'accept': 'application/json'
+				                           }, 
+				                           body=json.dumps({'foo':foo['id'], 'number':i}))
+			data = ''.join(result)
+			bar = json.loads(data)
+			bars.append(bar)
+			
+		query_string = 'offset=1&limit=1'
+		
+		result = self.simulate_request('/foos/%s/bars' % foo['id'], headers={'accept':'application/json'}, query_string=query_string)
+		self.assertEquals(self.srmock.status, '200 OK')
+		data = ''.join(result)
+		items = json.loads(data)
+		bars.reverse()
+		self.assertEquals(items, {'items':[bars[1]]})
 			
