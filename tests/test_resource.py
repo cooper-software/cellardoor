@@ -1,13 +1,14 @@
 import unittest
 import json
+from bson.objectid import ObjectId
 from falcon.testing import TestBase
-from hammock.model import Model, Entity, Reference, Link, Text, ListOf
+from falcon.util import uri
+from hammock.model import Model, Entity, Reference, Link, Text, ListOf, TypeOf
 from hammock.resource import Resource
 from hammock.methods import ALL
 from hammock.storage.mongodb import MongoDBStorage
 from hammock.views.minimal import MinimalView
 from hammock import Hammock
-from bson.objectid import ObjectId
 
 
 class Foo(Entity):
@@ -20,6 +21,7 @@ class Foo(Entity):
 class Bar(Entity):
 	foo = Reference(Foo, embedded=True)
 	bazes = ListOf(Reference('Baz', embedded=True))
+	number = TypeOf(int)
 	
 	
 class Baz(Entity):
@@ -34,6 +36,7 @@ class FoosResource(Resource):
 		'bars': 'BarsResource',
 		'bazes': 'BazesResource'
 	}
+	enabled_filters = ('stuff',)
 	
 	
 class BarsResource(Resource):
@@ -43,6 +46,7 @@ class BarsResource(Resource):
 		'foo': FoosResource,
 		'bazes': 'BazesResource'
 	}
+	enabled_filters = ('number',)
 	
 	
 class BazesResource(Resource):
@@ -516,3 +520,110 @@ class ResourceTest(TestBase):
 		data = ''.join(result)
 		new_foo = json.loads(data)
 		self.assertEquals(new_foo, {'stuff':'foo', 'bars':bars, 'id':foo['id']})
+		
+		
+	def test_filter(self):
+		"""
+		Only returns results matching the filter.
+		"""
+		Hammock(self.api, resources=(FoosResource,BarsResource,BazesResource), storage=storage, views=(MinimalView(),))
+		
+		foo_ids = []
+		for i in range(0,5):
+			result = self.simulate_request('/foos', 
+				                           method='POST', 
+				                           headers={
+				                           	  'content-type':'application/json',
+				                           	  'accept': 'application/json'
+				                           }, 
+				                           body=json.dumps({'stuff':'Foo#%d' % i}))
+			data = ''.join(result)
+			obj = json.loads(data)
+			foo_ids.append(obj['id'])
+			
+		filter = {'stuff':'Foo#1'}
+		query_string = 'filter=%s' % uri.encode(json.dumps(filter))
+		
+		result = self.simulate_request('/foos', headers={'accept':'application/json'}, query_string=query_string)
+		data = ''.join(result)
+		items = json.loads(data)
+		self.assertEquals(items, {'items':[{'id':foo_ids[1], 'stuff':'Foo#1'}]})
+		
+		
+	def test_filtered_reference(self):
+		"""
+		Can filter referenced items.
+		"""
+		Hammock(self.api, resources=(FoosResource,BarsResource,BazesResource), storage=storage, views=(MinimalView(),))
+		
+		baz_ids = []
+		for i in range(0,3):
+			result = self.simulate_request('/bazes', 
+				                           method='POST', 
+				                           headers={
+				                           	  'content-type':'application/json',
+				                           	  'accept': 'application/json'
+				                           }, 
+				                           body=json.dumps({'name':'Baz#%d' % i}))
+			data = ''.join(result)
+			baz = json.loads(data)
+			baz_ids.append(baz['id'])
+		
+		result = self.simulate_request('/foos', 
+			                           method='POST', 
+			                           headers={
+			                           	  'content-type':'application/json',
+			                           	  'accept': 'application/json'
+			                           }, 
+			                           body=json.dumps({'stuff':'foo', 'bazes':baz_ids}))
+		data = ''.join(result)
+		foo = json.loads(data)
+		
+		filter = {'name':{'$in':['Baz#1', 'Baz#2']}}
+		query_string = 'filter=%s' % uri.encode(json.dumps(filter))
+		
+		result = self.simulate_request('/foos/%s/bazes' % foo['id'], headers={'accept':'application/json'}, query_string=query_string)
+		self.assertEquals(self.srmock.status, '200 OK')
+		data = ''.join(result)
+		items = json.loads(data)
+		self.assertEquals([x['id'] for x in items['items']], baz_ids[1:])
+		
+		
+	def test_filtered_link(self):
+		"""
+		Can filter linked items.
+		"""
+		Hammock(self.api, resources=(FoosResource,BarsResource,BazesResource), storage=storage, views=(MinimalView(),))
+		
+		result = self.simulate_request('/foos', 
+			                           method='POST', 
+			                           headers={
+			                           	  'content-type':'application/json',
+			                           	  'accept': 'application/json'
+			                           }, 
+			                           body=json.dumps({'stuff':'foo'}))
+		data = ''.join(result)
+		foo = json.loads(data)
+		
+		bar_ids = []
+		for i in range(0,3):
+			result = self.simulate_request('/bars', 
+				                           method='POST', 
+				                           headers={
+				                           	  'content-type':'application/json',
+				                           	  'accept': 'application/json'
+				                           }, 
+				                           body=json.dumps({'foo':foo['id'], 'number':i}))
+			data = ''.join(result)
+			bar = json.loads(data)
+			bar_ids.append(bar['id'])
+			
+		filter = {'number':{'$gt':0}}
+		query_string = 'filter=%s' % uri.encode(json.dumps(filter))
+		
+		result = self.simulate_request('/foos/%s/bars' % foo['id'], headers={'accept':'application/json'}, query_string=query_string)
+		self.assertEquals(self.srmock.status, '200 OK')
+		data = ''.join(result)
+		items = json.loads(data)
+		self.assertEquals([x['id'] for x in items['items']], bar_ids[1:])
+		

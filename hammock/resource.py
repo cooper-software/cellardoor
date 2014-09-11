@@ -1,4 +1,5 @@
 import falcon
+import json
 from .methods import LIST, CREATE, GET, REPLACE, UPDATE, DELETE, get_http_methods
 from .serializers import JSONSerializer, MsgPackSerializer
 from .model import CompoundValidationError, ListOf, Reference, Link
@@ -89,6 +90,7 @@ class Resource(object):
 		
 		
 	def add_to_api(self, api):
+		"""Adds routes to a falcon api for enabled methods"""
 		methods = set(self.enabled_methods)
 		collection_methods = methods.intersection((LIST, CREATE))
 		individual_methods = methods.intersection((GET, REPLACE, UPDATE, DELETE))
@@ -110,10 +112,11 @@ class Resource(object):
 			
 			
 	def list(self, req, resp, referenced_ids=None):
+		filter = self.get_filter_from_request(req)
 		if referenced_ids:
-			items = self.storage.get_by_ids(self.entity, ids=referenced_ids)
+			items = self.storage.get_by_ids(self.entity, ids=referenced_ids, filter=filter)
 		else:
-			items = self.storage.get(self.entity)
+			items = self.storage.get(self.entity, filter=filter)
 		return self.send_collection(req, resp, items)
 		
 		
@@ -158,8 +161,9 @@ class Resource(object):
 		if target_resource is None:
 			raise falcon.HTTPNotFound()
 		
+		filter = self.get_filter_from_request(req)
 		reference_field = getattr(self.entity, reference_name)
-		results = target_resource.resolve_link_or_reference(item, reference_name, reference_field)
+		results = target_resource.resolve_link_or_reference(item, reference_name, reference_field, filter=filter)
 		
 		if not results:
 			raise falcon.HTTPNotFound()
@@ -171,6 +175,7 @@ class Resource(object):
 		
 		
 	def send_collection(self, req, resp, items):
+		"""Sends a list of items in the response"""
 		items = map(self.prepare_item, items)
 		view = self.get_view(req)
 		resp.content_type, resp.body = view.get_collection_response(req, items)
@@ -178,6 +183,7 @@ class Resource(object):
 		
 		
 	def send_individual(self, req, resp, item):
+		"""Sends a single item in the response"""
 		item = self.prepare_item(item)
 		view = self.get_view(req)
 		resp.content_type, resp.body = view.get_individual_response(req, item)
@@ -185,6 +191,12 @@ class Resource(object):
 		
 		
 	def get_validated_fields_from_request(self, req, resp, enforce_required=True):
+		"""Gets a fields dict from the request body and validates it.
+		
+		:param req: a falcon.Request
+		:param req: a falcon.Response
+		:param enforce_required: If True (default), enforces that required fields be present
+		"""
 		fields = self.unserialize_request_body(req)
 		try:
 			return self.entity.validate(fields, enforce_required=enforce_required)
@@ -195,6 +207,7 @@ class Resource(object):
 		
 		
 	def unserialize_request_body(self, req):
+		"""Unserializes the request body based on the request's content type"""
 		for serializer in self.accept_serializers:
 			if serializer.mimetype == req.content_type:
 				return serializer.unserialize(req.stream)
@@ -203,11 +216,13 @@ class Resource(object):
 		
 		
 	def get_view(self, req):
+		"""Get the correct view based on the Accept header"""
 		_, view = View.choose(req, self.views)
 		return view
 		
 		
 	def add_embedded_references(self, item):
+		"""Given an item, add its embedded references and links"""
 		for reference_name, reference_field in self.entity.links_and_references():
 			if not reference_field.embedded:
 				continue
@@ -223,36 +238,47 @@ class Resource(object):
 		return item
 		
 		
-	def resolve_link_or_reference(self, source_item, reference_name, reference_field):
+	def resolve_link_or_reference(self, source_item, reference_name, reference_field, filter=None):
+		"""Get the item(s) pointed to by a link or reference
+		
+		:param source_item: The item with the reference or link
+		:param reference_name: The name of the reference or link field
+		:param reference_field: The Field object for the link or reference
+		:param filter: A filter to narrow the results (only used if the result is a list)
+		"""
 		if isinstance(reference_field, Link):
-			return self.resolve_link(source_item, reference_field)
+			return self.resolve_link(source_item, reference_field, filter=filter)
 		else:
-			return self.resolve_reference(source_item, reference_name, reference_field)
+			return self.resolve_reference(source_item, reference_name, reference_field, filter=filter)
 		
 		
-	def resolve_link(self, source_item, link_field):
-		filter = {}
+	def resolve_link(self, source_item, link_field, filter=None):
+		"""
+		Get the items for a single or multiple link
+		"""
+		filter = filter if filter else {}
 		filter[link_field.field] = source_item['id']
 		
 		if link_field.multiple:
 			results = list(self.storage.get(self.entity, filter=filter))
 		else:
 			try:
-				results = next(iter(self.storage.get(self.entity, filter=filter, limit=1)))
+				results = next(iter(self.storage.get(self.entity, limit=1)))
 			except StopIteration:
 				return None
 		
 		return self.prepare_items(results, embed=False)
 		
 	
-	def resolve_reference(self, source_item, reference_name, reference_field):
+	def resolve_reference(self, source_item, reference_name, reference_field, filter=None):
+		"""Get the items for a single or multiple reference"""
 		reference_value = source_item.get(reference_name)
 		
 		if reference_value is None:
 			return None
 		
 		if isinstance(reference_field, ListOf):
-			results = list(self.storage.get_by_ids(self.entity, reference_value))
+			results = list(self.storage.get_by_ids(self.entity, reference_value, filter=filter))
 		else:
 			results = self.storage.get_by_id(self.entity, reference_value)
 		
@@ -260,6 +286,13 @@ class Resource(object):
 		
 		
 	def prepare_items(self, items, embed=True):
+		"""Do any post-processing that must be done before sending an item to a CollectionEndpoint
+		
+		For example, adding embedded references, removing hidden fields, etc.
+		
+		:param items: A list of items or a single item to prepare.
+		:returns: A list of prepared items or a single prepared item.
+		"""
 		if isinstance(items, (list, tuple, set)):
 			prepared_items = []
 			for item in items:
@@ -274,6 +307,17 @@ class Resource(object):
 			item = item.copy()
 			self.add_embedded_references(item)
 		return item
+		
+		
+	def get_filter_from_request(self, req):
+		"""Parse a filter object out of the request"""
+		filter = req.get_param('filter')
+		if not filter:
+			return None
+		try:
+			return json.loads(filter)
+		except ValueError:
+			raise falcon.HTTPBadRequest("Bad Request", "Could not parse filter parameter")
 			
 			
 			
