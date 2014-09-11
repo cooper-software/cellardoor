@@ -112,11 +112,12 @@ class Resource(object):
 			
 			
 	def list(self, req, resp, referenced_ids=None):
-		filter = self.get_filter_from_request(req)
+		filter, sort, offset, limit = self.get_list_params(req)
 		if referenced_ids:
-			items = self.storage.get_by_ids(self.entity, ids=referenced_ids, filter=filter)
+			items = self.storage.get_by_ids(self.entity, ids=referenced_ids, 
+				filter=filter, sort=sort, offset=offset, limit=limit)
 		else:
-			items = self.storage.get(self.entity, filter=filter)
+			items = self.storage.get(self.entity, filter=filter, sort=sort, offset=offset, limit=limit)
 		return self.send_collection(req, resp, items)
 		
 		
@@ -161,9 +162,10 @@ class Resource(object):
 		if target_resource is None:
 			raise falcon.HTTPNotFound()
 		
-		filter = self.get_filter_from_request(req)
+		filter, sort, offset, limit = self.get_list_params(req)
 		reference_field = getattr(self.entity, reference_name)
-		results = target_resource.resolve_link_or_reference(item, reference_name, reference_field, filter=filter)
+		results = target_resource.resolve_link_or_reference(item, reference_name, reference_field,
+						filter=filter, sort=sort, offset=offset, limit=limit)
 		
 		if not results:
 			raise falcon.HTTPNotFound()
@@ -238,7 +240,7 @@ class Resource(object):
 		return item
 		
 		
-	def resolve_link_or_reference(self, source_item, reference_name, reference_field, filter=None):
+	def resolve_link_or_reference(self, source_item, reference_name, reference_field, filter=None, sort=None, offset=0, limit=0):
 		"""Get the item(s) pointed to by a link or reference
 		
 		:param source_item: The item with the reference or link
@@ -247,12 +249,14 @@ class Resource(object):
 		:param filter: A filter to narrow the results (only used if the result is a list)
 		"""
 		if isinstance(reference_field, Link):
-			return self.resolve_link(source_item, reference_field, filter=filter)
+			return self.resolve_link(source_item, reference_field,
+						filter=filter, sort=sort, offset=offset, limit=limit)
 		else:
-			return self.resolve_reference(source_item, reference_name, reference_field, filter=filter)
+			return self.resolve_reference(source_item, reference_name, reference_field,
+							filter=filter, sort=sort, offset=offset, limit=limit)
 		
 		
-	def resolve_link(self, source_item, link_field, filter=None):
+	def resolve_link(self, source_item, link_field, filter=None, sort=None, offset=0, limit=0):
 		"""
 		Get the items for a single or multiple link
 		"""
@@ -260,7 +264,7 @@ class Resource(object):
 		filter[link_field.field] = source_item['id']
 		
 		if link_field.multiple:
-			results = list(self.storage.get(self.entity, filter=filter))
+			results = list(self.storage.get(self.entity, filter=filter, sort=sort, offset=offset, limit=limit))
 		else:
 			try:
 				results = next(iter(self.storage.get(self.entity, limit=1)))
@@ -270,7 +274,7 @@ class Resource(object):
 		return self.prepare_items(results, embed=False)
 		
 	
-	def resolve_reference(self, source_item, reference_name, reference_field, filter=None):
+	def resolve_reference(self, source_item, reference_name, reference_field, filter=None, sort=None, offset=0, limit=0):
 		"""Get the items for a single or multiple reference"""
 		reference_value = source_item.get(reference_name)
 		
@@ -278,7 +282,8 @@ class Resource(object):
 			return None
 		
 		if isinstance(reference_field, ListOf):
-			results = list(self.storage.get_by_ids(self.entity, reference_value, filter=filter))
+			results = list(self.storage.get_by_ids(self.entity, reference_value,
+						filter=filter, sort=sort, offset=offset, limit=limit))
 		else:
 			results = self.storage.get_by_id(self.entity, reference_value)
 		
@@ -309,15 +314,28 @@ class Resource(object):
 		return item
 		
 		
-	def get_filter_from_request(self, req):
-		"""Parse a filter object out of the request"""
-		filter = req.get_param('filter')
-		if not filter:
-			return None
+	def get_list_params(self, req):
+		"""Parse out the filter, sort, offset and limit parameters from a request"""
+		return (
+			self.get_param(req, 'filter', json.loads),
+			self.get_param(req, 'sort', json.loads),
+			self.get_param(req, 'offset', int, default=0),
+			self.get_param(req, 'limit', int, default=0)
+		)
+		
+		
+	def get_param(self, req, param_name, parsing_fn, required=False, default=None):
+		"""Get a parsed query param"""
+		param = req.get_param(param_name)
+		if not param:
+			if required:
+				raise falcon.HTTPBadRequest("Bad Request", "Missing required %s parameter" % param_name)
+			return default
 		try:
-			return json.loads(filter)
-		except ValueError:
-			raise falcon.HTTPBadRequest("Bad Request", "Could not parse filter parameter")
+			return parsing_fn(param)
+		except:
+			raise falcon.HTTPBadRequest("Bad Request", "Could not parse %s parameter" % param_name)
+		
 			
 			
 			
