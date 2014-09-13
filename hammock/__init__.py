@@ -1,27 +1,26 @@
 from version import __version__
 from .model import Model
-from .resource import Resource
 
 class Hammock(object):
 	
-	def __init__(self, api, resources=(), views=(), authenticators=(), storage=None):
+	def __init__(self, collections=(), views=(), authenticators=(), storage=None):
 		entities = set()
-		resource_instances = {}
+		self.collections_by_class_name = {}
 		
-		for resource_cls in resources:
-			entities.add(resource_cls.entity)
-			resource = resource_cls(storage, views)
-			resource.add_to_api(api)
-			resource_instances[resource_cls.__name__] = resource
+		for collection_cls in collections:
+			entities.add(collection_cls.entity)
+			collection = collection_cls(storage)
+			self.collections_by_class_name[collection_cls.__name__] = collection
+			setattr(self, collection_cls.plural_name, collection)
 			
 		model = Model(storage, entities)
 		
-		for resource in resource_instances.values():
-			new_link_resources = {}
-			if resource.link_resources:
-				for k, v in resource.link_resources.items():
+		for collection in self.collections_by_class_name.values():
+			new_links = {}
+			if collection.links:
+				for k, v in collection.links.items():
 					if not isinstance(v, basestring):
 						v = v.__name__
-					referenced_resource = resource_instances.get(v)
-					new_link_resources[k] = referenced_resource
-			resource.link_resources = new_link_resources
+					referenced_collection = self.collections_by_class_name.get(v)
+					new_links[k] = referenced_collection
+			collection.links = new_links

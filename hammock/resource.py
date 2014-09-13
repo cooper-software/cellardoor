@@ -65,7 +65,7 @@ class Resource(object):
 	# A list or tuple of fields that are allowed to be used in filters.
 	enabled_filters = ()
 	
-	# A list or tuple of fields that can be used in sorting
+	# A list or tuple of fields that can be used in sorting.
 	enabled_sort = ()
 	
 	# A list or tuple of fields that is a subset of `enabled_sort` that will be
@@ -73,10 +73,13 @@ class Resource(object):
 	default_sort = ()
 	
 	# A list or tuple of authorization rules. An authorization rule is a 2-tuple. The first item is a tuple
-	# of `hammock.methods` that the rule applies to. The second item is a `hammock.auth.Expression`
-	authorization = ()
+	# of `hammock.methods` that the rule applies to. The second item is a `hammock.auth.Expression`.
+	method_authorization = ()
 	
-	# The types of content that are accepted
+	# A list or tuple of authorization rules that allow hidden fields to be shown.
+	hidden_field_authorization = ()
+	
+	# The types of content that are accepted.
 	accept_serializers = (JSONSerializer(), MsgPackSerializer())
 	
 	
@@ -110,7 +113,7 @@ class Resource(object):
 					api.add_route('/%s/{id}/%s' % (self.plural_name, reference_name), 
 						ReferenceEndpoint(self, reference_name))
 			
-			
+	
 	def list(self, req, resp, referenced_ids=None):
 		filter, sort, offset, limit = self.get_list_params(req)
 		if referenced_ids:
@@ -373,8 +376,10 @@ class IndividualEndpoint(Endpoint):
 	def update(self, req, resp, id):
 		return self.resource.update(req, resp, id)
 		
+		
 	def replace(self, req, resp, id):
 		return self.resource.replace(req, resp, id)
+		
 		
 	def delete(self, req, resp, id):
 		return self.resource.delete(req, resp, id)

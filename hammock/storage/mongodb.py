@@ -51,6 +51,8 @@ class MongoDBStorage(Storage):
 			collection.save(doc)
 		else:
 			doc = collection.find_and_modify({ '_id': obj_id }, { '$set': fields }, new=True)
+			if not doc:
+				return None
 		return self.document_to_dict(doc)
 		
 		
