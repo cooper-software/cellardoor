@@ -155,6 +155,20 @@ class TestResource(TestBase):
 		self.assertEquals(self.srmock.status, '405 Method Not Allowed')
 		
 		
+	def test_forbidden(self):
+		"""If authorization fails a 403 status is returned"""
+		self.hammock.foos.get = Mock(side_effect=errors.NotAuthorizedError)
+		self.simulate_request('/foos/123', method='GET')
+		self.assertEquals(self.srmock.status, '403 Forbidden')
+		
+		
+	def test_unauthenticated(self):
+		"""If a method is enabled but requires authentication, a 401 status is returned"""
+		self.hammock.foos.get = Mock(side_effect=errors.NotAuthenticatedError)
+		self.simulate_request('/foos/123', method='GET')
+		self.assertEquals(self.srmock.status, '401 Unauthorized')
+		
+		
 	def test_list(self):
 		"""Will return a list of items structured by the view"""
 		foos = [{'name':'foo'}, {'name':'bar'}]

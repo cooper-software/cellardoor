@@ -231,11 +231,11 @@ def not_found_handler(exc, req, resp, params):
 
 
 def not_authenticated_handler(exc, req, resp, params):
-	raise falcon.HTTPForbidden()
+	raise falcon.HTTPUnauthorized('Unauthorized', 'You must authenticate to access this resource.')
 	
 	
 def not_authorized_handler(exc, req, resp, params):
-	raise falcon.HTTPForbidden()
+	raise falcon.HTTPForbidden('Forbidden', 'You are not allowed to access this resource.')
 	
 	
 def validation_error_handler(views, exc, req, resp, params):
