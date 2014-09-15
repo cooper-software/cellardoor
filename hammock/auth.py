@@ -26,8 +26,19 @@ class AuthenticationExpression(object):
 			raise TypeError, "Type '%s' is incompatible with type '%s'" % (type(self).__name__, type(other).__name__)
 			
 			
+	def uses(self, key):
+		raise NotImplementedError
 			
-class AndExpression(AuthenticationExpression):
+			
+			
+class BinaryExpression(AuthenticationExpression):
+	
+	def uses(self, key):
+		return self.a.uses(key) or self.b.uses(key)
+		
+		
+			
+class AndExpression(BinaryExpression):
 	
 	def __init__(self, a, b):
 		self.a = a
@@ -39,7 +50,7 @@ class AndExpression(AuthenticationExpression):
 		
 		
 		
-class OrExpression(AuthenticationExpression):
+class OrExpression(BinaryExpression):
 	
 	def __init__(self, a, b):
 		self.a = a
@@ -77,6 +88,10 @@ class ObjectProxy(AuthenticationExpression):
 		return self
 		
 		
+	def uses(self, key):
+		return self.name == key
+		
+		
 		
 class ObjectProxyMatch(AuthenticationExpression):
 	
@@ -88,6 +103,10 @@ class ObjectProxyMatch(AuthenticationExpression):
 	def __call__(self, context):
 		obj = context.get(self.proxy.name)
 		return self.fn(obj)
+		
+		
+	def uses(self, key):
+		return self.proxy.uses(key)
 		
 		
 		
@@ -106,6 +125,10 @@ class ObjectProxyValue(AuthenticationExpression):
 		
 	def exists(self):
 		return self
+		
+		
+	def uses(self, key):
+		return self.proxy.uses(key)
 		
 		
 	def __call__(self, context):
@@ -158,6 +181,13 @@ class ObjectProxyValueComparison(AuthenticationExpression):
 		raise NotImplementedError
 		
 		
+	def uses(self, key):
+		if isinstance(self.other, AuthenticationExpression):
+			return self.proxy.uses(key) or self.other.uses(key)
+		else:
+			return self.proxy.uses(key)
+		
+		
 		
 class EqualsComparison(ObjectProxyValueComparison):
 	
@@ -196,4 +226,4 @@ class GreaterThanEqualComparison(ObjectProxyValueComparison):
 		
 		
 identity = ObjectProxy('identity')
-item = ObjectProxy('item')
+result = ObjectProxy('result')

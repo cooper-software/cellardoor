@@ -1,10 +1,12 @@
 import unittest
+from mock import Mock
 from bson.objectid import ObjectId
 from hammock.model import Model, Entity, Reference, Link, Text, ListOf, TypeOf
 from hammock.collection import Collection
-from hammock.methods import ALL
+from hammock.methods import ALL, LIST, GET, CREATE
 from hammock.storage.mongodb import MongoDBStorage
 from hammock import errors, Hammock
+from hammock import auth
 
 
 class Foo(Entity):
@@ -26,6 +28,10 @@ class Baz(Entity):
 	name = Text(required=True)
 	foo = Link(Foo, 'bazes', multiple=False)
 	embedded_foo = Link(Foo, 'bazes', multiple=False, embedded=True)
+	
+	
+class Hidden(Entity):
+	name = Text(hidden=True)
 	
 
 class FoosCollection(Collection):
@@ -59,19 +65,29 @@ class BazesCollection(Collection):
 		'embedded_foo': FoosCollection
 	}
 	
+	
+class HiddenCollection(Collection):
+	entity = Hidden
+	enabled_methods = ALL
+	method_authorization = (
+		((LIST,), auth.identity.exists()),
+		((CREATE,), auth.identity.role == 'admin'),
+		((GET,), auth.result.foo == 23)
+	)
+	
 
-storage = MongoDBStorage('test')
-model = Model(storage, (Foo, Bar, Baz))
+model = Model(None, (Foo, Bar, Baz))
 
 class CollectionTest(unittest.TestCase):
 	
 	def setUp(self):
-		for c in storage.db.collection_names():
+		self.storage = MongoDBStorage('test')
+		for c in self.storage.db.collection_names():
 			if not c.startswith('system.'):
-				storage.db[c].drop()
+				self.storage.db[c].drop()
 		super(CollectionTest, self).setUp()
-		self.api = Hammock(collections=(FoosCollection, BarsCollection, BazesCollection),
-						   storage=storage)
+		self.api = Hammock(collections=(FoosCollection, BarsCollection, BazesCollection, HiddenCollection),
+						   storage=self.storage)
 		
 		
 	def test_create_fail_validation(self):
@@ -419,4 +435,43 @@ class CollectionTest(unittest.TestCase):
 		items = self.api.foos.link(foo['id'], 'bars', offset=1, limit=1)
 		bars.reverse()
 		self.assertEquals(items, [bars[1]])
+		
+		
+	def test_auth_required_not_present(self):
+		"""Raise NotAuthenticatedError if authorization requires authentication and it is not present."""
+		with self.assertRaises(errors.NotAuthenticatedError):
+			self.api.hiddens.list()
+			
+			
+	def test_auth_required_present(self):
+		"""Don't raise NotAuthenticatedError if authentication is required and present."""
+		self.api.hiddens.list(context={'identity':{}})
+		
+		
+	def test_auth_failed(self):
+		"""Raises NotAuthorizedError if the authorization rule fails"""
+		with self.assertRaises(errors.NotAuthorizedError):
+			self.api.hiddens.create({}, context={'identity':{}})
+			
+		with self.assertRaises(errors.NotAuthorizedError):
+			self.api.hiddens.create({}, context={'identity':{'role':'foo'}})
+			
+			
+	def test_auth_pass(self):
+		"""Does not raise NotAuthorizedError if the authorization rule passes"""
+		obj = self.api.hiddens.create({}, context={'identity':{'role':'admin'}})
+		self.assertIn('id', obj)
+		
+		
+	def test_auth_result_fail(self):
+		"""Raises NotAuthorizedError if a result rule doesn't pass."""
+		self.api.hiddens.storage.get_by_id = Mock(return_value={'foo':700})
+		with self.assertRaises(errors.NotAuthorizedError):
+			self.api.hiddens.get(123)
+		
+		
+	def test_auth_result_pass(self):
+		"""Does not raise NotAuthorizedError if a result rule passes."""
+		self.api.hiddens.storage.get_by_id = Mock(return_value={'foo':23})
+		self.api.hiddens.get(123)
 		

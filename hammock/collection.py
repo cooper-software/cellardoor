@@ -80,12 +80,14 @@ class Collection(object):
 		
 		for methods, rule in self.method_authorization:
 			for method in methods:
-				self.authorization[method] = rule
+				if method not in self.authorization:
+					self.authorization[method] = []
+				self.authorization[method].append(rule)
 		
 		if self.hidden_field_authorization:
 			assert not auth.uses(self.hidden_field_authorization, 'item'), \
 				"Hidden field authorization rules must not use `auth.item`"
-			self.authorization['allow_hidden'] = self.hidden_field_authorization
+			self.authorization['allow_hidden'] = [self.hidden_field_authorization]
 			
 			
 	def list(self, filter=None, sort=None, offset=0, limit=0, show_hidden=False, context={}):
@@ -248,11 +250,32 @@ class Collection(object):
 		
 		
 	def pre(self, method, context):
-		"""Perform pre-method hooks, including authorization that does not require access to fetched items"""
+		"""Perform pre-method hooks, including authorization that does not require access to fetched items."""
+		context = context if context else {}
+		auth_rules = self.authorization.get(method)
+		does_not_have_identity = 'identity' not in context
+		if auth_rules:
+			for rule in auth_rules:
+				if not rule.uses('result'):
+					if rule.uses('identity') and does_not_have_identity:
+						raise errors.NotAuthenticatedError()
+					elif not rule(context):
+						raise errors.NotAuthorizedError()
 		
 		
 	def post(self, method, result, context, embed=True, show_hidden=False):
-		"""Perform post-method hooks including authentication that requires fetched items. Returns."""
+		"""Perform post-method hooks including authentication that requires fetched items."""
+		context = context if context else {}
+		auth_rules = self.authorization.get(method)
+		does_not_have_identity = 'identity' not in context
+		context['result'] = result
+		if auth_rules:
+			for rule in auth_rules:
+				if rule.uses('identity') and does_not_have_identity:
+					raise errors.NotAuthenticatedError()
+				elif not rule(context):
+					raise errors.NotAuthorizedError()
+						
 		if result is None:
 			return
 		if method == LIST:

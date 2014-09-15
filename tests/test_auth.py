@@ -148,6 +148,16 @@ class TestAuth(unittest.TestCase):
 		self.assertEquals(result, 23)
 		
 		
+	def test_uses(self):
+		"""True if a particular context object is used by thge auth expr"""
+		foo = ObjectProxy('foo')
+		bar = ObjectProxy('bar')
+		expr = (foo.x >= 32) & (bar.x != foo.x)
+		self.assertTrue(expr.uses('foo'))
+		self.assertTrue(expr.uses('bar'))
+		self.assertFalse(expr.uses('baz'))
+		
+		
 	def test_proxy_equals(self):
 		a = ObjectProxy('foo').bar
 		b = ObjectProxy('foo').baz
