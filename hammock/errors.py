@@ -2,8 +2,12 @@ class NotFoundError(Exception):
 	pass
 	
 	
-class AuthenticationError(Exception):
+class NotAuthorizedError(Exception):
 	pass
 	
 	
-from model import ValidationError, CompoundValidationError
+class NotAuthenticatedError(Exception):
+	pass
+	
+	
+from model import CompoundValidationError

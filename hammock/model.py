@@ -99,10 +99,10 @@ class Text(Field):
         v.validate("apron hats") # oops
         v.validate("f") # oops
     """
-    NOT_TEXT = 'Expected some text.'
+    NOT_TEXT = 'Expected a text value.'
     TOO_SHORT = 'This text is too short.'
     TOO_LONG = 'This text is too long.'
-    REQUIRED = 'Expected some text.'
+    REQUIRED = 'Expected a text value.'
     NO_REGEX_MATCH = 'Does not match regex.'
     
     def __init__(self, minlength=None, maxlength=None, regex=None, **kwargs):
@@ -519,7 +519,7 @@ class Compound(Field):
                 try:
                     validated[k] = v.validate(unvalidated_value)
                 except ValidationError, e:
-                    errors[k] = e
+                    errors[k] = e.message
         
         if errors:
             raise CompoundValidationError(errors)

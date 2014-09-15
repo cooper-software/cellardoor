@@ -1,9 +1,10 @@
 from version import __version__
 from .model import Model
 
+
 class Hammock(object):
 	
-	def __init__(self, collections=(), views=(), authenticators=(), storage=None):
+	def __init__(self, collections=(), authenticators=(), storage=None):
 		entities = set()
 		self.collections_by_class_name = {}
 		
@@ -13,7 +14,7 @@ class Hammock(object):
 			self.collections_by_class_name[collection_cls.__name__] = collection
 			setattr(self, collection_cls.plural_name, collection)
 			
-		model = Model(storage, entities)
+		self.model = Model(storage, entities)
 		
 		for collection in self.collections_by_class_name.values():
 			new_links = {}
