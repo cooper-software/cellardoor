@@ -51,7 +51,7 @@ class OrExpression(AuthenticationExpression):
 		
 
 
-class ObjectProxy(object):
+class ObjectProxy(AuthenticationExpression):
 	
 	def __init__(self, name):
 		self.name = name
@@ -65,8 +65,16 @@ class ObjectProxy(object):
 		return self.__getattr__(key)
 		
 		
+	def __call__(self, context):
+		return self.name in context
+		
+		
 	def match(self, fn):
 		return ObjectProxyMatch(self, fn)
+		
+		
+	def exists(self):
+		return self
 		
 		
 		
@@ -83,7 +91,7 @@ class ObjectProxyMatch(AuthenticationExpression):
 		
 		
 		
-class ObjectProxyValue(object):
+class ObjectProxyValue(AuthenticationExpression):
 	
 	def __init__(self, proxy, key):
 		self.proxy = proxy
@@ -94,6 +102,14 @@ class ObjectProxyValue(object):
 		obj = context.get(self.proxy.name, {})
 		val = obj.get(self.key)
 		return val
+		
+		
+	def exists(self):
+		return self
+		
+		
+	def __call__(self, context):
+		return self.proxy(context) and self.key in context[self.proxy.name]
 		
 		
 	def __eq__(self, other):

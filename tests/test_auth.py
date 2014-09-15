@@ -89,6 +89,14 @@ class TestAuth(unittest.TestCase):
 		self.assertEquals(not_expr({}), False)
 		
 		
+	def test_object_proxy_exists(self):
+		"""An object proxy is also an auth expr that checks the existence of the given name in the context"""
+		proxy = ObjectProxy('foo')
+		self.assertEquals(proxy.exists(), proxy)
+		self.assertTrue(proxy({'foo':123}))
+		self.assertFalse(proxy({'bar':123}))
+		
+		
 	def test_object_proxy_match(self):
 		"""A match operation evaluates against an item in the context"""
 		proxy = ObjectProxy('foo')
@@ -113,6 +121,15 @@ class TestAuth(unittest.TestCase):
 		proxy_value = proxy.bar
 		result = proxy_value.get_value({})
 		self.assertEquals(result, None)
+		
+		
+	def test_object_proxy_value_exists(self):
+		"""An object proxy value is an auth expr that checks the existence of the given key in the context object"""
+		proxy = ObjectProxy('foo')
+		proxy_value = proxy.bar
+		self.assertEquals(proxy_value.exists(), proxy_value)
+		self.assertTrue(proxy_value({'foo':{'bar':123}}))
+		self.assertFalse(proxy_value({'bar':{'foo':123}}))
 		
 		
 	def test_object_proxy_value_nonexistent(self):
