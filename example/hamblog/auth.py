@@ -37,7 +37,7 @@ def create_token(person):
 	random_string = binascii.b2a_hex(os.urandom(10))
 	return {
 		'expires': datetime.utcnow() + token_life,
-		'value': hashlib.sha1('%s:%s' % (person['id'], random_string)).hexdigest()
+		'value': hashlib.sha1('%s:%s' % (person['_id'], random_string)).hexdigest()
 	}
 	
 	

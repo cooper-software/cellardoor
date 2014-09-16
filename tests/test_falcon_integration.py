@@ -106,7 +106,7 @@ class TestResource(TestBase):
 		
 	def test_create_succeed(self):
 		"""If the body matches the content type and the data passes validation, an item is created."""
-		foo = {'id':'123', 'name':'foo'}
+		foo = {'_id':'123', 'name':'foo'}
 		self.hammock.foos.create = Mock(return_value=foo)
 		result = self.simulate_request(
 			'/foos',
@@ -124,7 +124,7 @@ class TestResource(TestBase):
 		
 		
 	def test_create_msgpack(self):
-		foo = {'id':'123', 'name':'foo'}
+		foo = {'_id':'123', 'name':'foo'}
 		self.hammock.foos.create = Mock(return_value=foo)
 		result = self.simulate_request(
 			'/foos',
@@ -196,11 +196,11 @@ class TestResource(TestBase):
 		
 	def test_get(self):
 		"""A GET with a path to /collection/{id} calls colleciton.get"""
-		self.hammock.foos.get = Mock(return_value={'id':'123', 'name':'foo'})
+		self.hammock.foos.get = Mock(return_value={'_id':'123', 'name':'foo'})
 		data = self.simulate_request('/foos/123', method='GET', headers={'accept':'application/json'})
 		result = json.loads(''.join(data))
 		self.assertEquals(self.srmock.status, '200 OK')
-		self.assertEquals(result, {'name':'foo', 'id':'123'})
+		self.assertEquals(result, {'name':'foo', '_id':'123'})
 		self.hammock.foos.get.assert_called_with('123', show_hidden=False)
 		
 		
@@ -224,7 +224,7 @@ class TestResource(TestBase):
 		
 	def test_update(self):
 		"""A PATCH with a path to /collection/{id} calls colleciton.update"""
-		self.hammock.foos.update = Mock(return_value={'id':'123', 'name':'bar'})
+		self.hammock.foos.update = Mock(return_value={'_id':'123', 'name':'bar'})
 		data = self.simulate_request(
 			'/foos/123', 
 			method='PATCH', 
@@ -236,13 +236,13 @@ class TestResource(TestBase):
 			)
 		result = json.loads(''.join(data))
 		self.assertEquals(self.srmock.status, '200 OK')
-		self.assertEquals(result, {'name':'bar', 'id':'123'})
+		self.assertEquals(result, {'name':'bar', '_id':'123'})
 		self.hammock.foos.update.assert_called_with('123', {'name':'bar'}, show_hidden=False)
 		
 		
 	def test_replace(self):
 		"""A PUT with a path to /collection/{id} calls colleciton.replace"""
-		self.hammock.foos.replace = Mock(return_value={'id':'123', 'name':'bar'})
+		self.hammock.foos.replace = Mock(return_value={'_id':'123', 'name':'bar'})
 		data = self.simulate_request(
 			'/foos/123', 
 			method='PUT', 
@@ -254,7 +254,7 @@ class TestResource(TestBase):
 			)
 		result = json.loads(''.join(data))
 		self.assertEquals(self.srmock.status, '200 OK')
-		self.assertEquals(result, {'name':'bar', 'id':'123'})
+		self.assertEquals(result, {'name':'bar', '_id':'123'})
 		self.hammock.foos.replace.assert_called_with('123', {'name':'bar'}, show_hidden=False)
 		
 		
@@ -268,17 +268,17 @@ class TestResource(TestBase):
 		
 	def test_get_single_link(self):
 		"""A GET with a path to /collection/{id}/link calls collection.link"""
-		self.hammock.foos.link = Mock(return_value={'id':'123'})
+		self.hammock.foos.link = Mock(return_value={'_id':'123'})
 		data = self.simulate_request('/foos/123/bar', method='GET', headers={'accept':'application/json'})
 		result = json.loads(''.join(data))
 		self.assertEquals(self.srmock.status, '200 OK')
-		self.assertEquals(result, {'id':'123'})
+		self.assertEquals(result, {'_id':'123'})
 		self.hammock.foos.link.assert_called_with('123', 'bar', filter=None, sort=None, offset=0, limit=0, show_hidden=False)
 		
 		
 	def test_get_multiple_link(self):
 		"""A GET with a path to /collection/{id}/link calls collection.link"""
-		self.hammock.foos.link = Mock(return_value={'id':'123'})
+		self.hammock.foos.link = Mock(return_value={'_id':'123'})
 		data = self.simulate_request(
 			'/foos/123/bazes', 
 			method='GET', 
@@ -293,6 +293,6 @@ class TestResource(TestBase):
 		)
 		result = json.loads(''.join(data))
 		self.assertEquals(self.srmock.status, '200 OK')
-		self.assertEquals(result, {'id':'123'})
+		self.assertEquals(result, {'_id':'123'})
 		self.hammock.foos.link.assert_called_with('123', 'bazes', sort=['+name'], filter={'foo':23}, offset=7, limit=10, show_hidden=True)
 		

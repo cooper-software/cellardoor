@@ -103,9 +103,9 @@ class CollectionTest(unittest.TestCase):
 		Creates a new item in persistent storage if we pass validation.
 		"""
 		foo = self.api.foos.create({'stuff':'foo'})
-		self.assertIn('id', foo)
-		foo_id = foo['id']
-		del foo['id']
+		self.assertIn('_id', foo)
+		foo_id = foo['_id']
+		del foo['_id']
 		self.assertEquals(foo, {'stuff':'foo'})
 		
 		
@@ -129,7 +129,7 @@ class CollectionTest(unittest.TestCase):
 		Can get a single item
 		"""
 		foo = self.api.foos.create({'stuff':'123'})
-		fetched_foo = self.api.foos.get(foo['id'])
+		fetched_foo = self.api.foos.get(foo['_id'])
 		self.assertEquals(fetched_foo, foo)
 		
 		
@@ -146,10 +146,10 @@ class CollectionTest(unittest.TestCase):
 		Can update a subset of fields
 		"""
 		foo = self.api.foos.create({'stuff':'foo'})
-		new_foo = self.api.foos.update(foo['id'], {'stuff':'baz'})
-		self.assertEquals(foo['id'], new_foo['id'])
+		new_foo = self.api.foos.update(foo['_id'], {'stuff':'baz'})
+		self.assertEquals(foo['_id'], new_foo['_id'])
 		self.assertEquals(new_foo['stuff'], 'baz')
-		fetched_foo = self.api.foos.get(foo['id'])
+		fetched_foo = self.api.foos.get(foo['_id'])
 		self.assertEquals(new_foo, fetched_foo)
 		
 		
@@ -166,19 +166,18 @@ class CollectionTest(unittest.TestCase):
 		Can replace a whole existing item
 		"""
 		foo = self.api.foos.create({'stuff':'foo', 'optional_stuff':'bar'})
-		self.api.foos.replace(foo['id'], {'stuff':'baz'})
-		new_foo = self.api.foos.get(foo['id'])
-		self.assertEquals(new_foo, {'stuff': 'baz', 'id':foo['id']})
+		self.api.foos.replace(foo['_id'], {'stuff':'baz'})
+		new_foo = self.api.foos.get(foo['_id'])
+		self.assertEquals(new_foo, {'stuff': 'baz', '_id':foo['_id']})
 		
 		
 	def test_replace_nonexistent(self):
 		"""
-		Trying to replace a nonexistent item creates it.
+		Trying to replace a nonexistent item does nothing.
 		"""
 		foo_id = str(ObjectId())
-		self.api.foos.replace(foo_id, {'stuff':'things'})
-		foo = self.api.foos.get(foo_id)
-		self.assertEquals(foo, {'stuff':'things', 'id':foo_id})
+		result = self.api.foos.replace(foo_id, {'stuff':'things'})
+		self.assertEquals(result, None)
 		
 		
 	def test_delete(self):
@@ -186,9 +185,9 @@ class CollectionTest(unittest.TestCase):
 		Can remove an existing item
 		"""
 		foo = self.api.foos.create({'stuff':'123'})
-		self.api.foos.delete(foo['id'])
+		self.api.foos.delete(foo['_id'])
 		with self.assertRaises(errors.NotFoundError):
-			self.api.foos.get(foo['id'])
+			self.api.foos.get(foo['_id'])
 		
 		
 	def test_single_reference_validation_fail(self):
@@ -204,9 +203,9 @@ class CollectionTest(unittest.TestCase):
 		Can get a reference through a link.
 		"""
 		foo = self.api.foos.create({'stuff':'foo', 'optional_stuff':'bar'})
-		bar = self.api.bars.create({'foo':foo['id']})
+		bar = self.api.bars.create({'foo':foo['_id']})
 		
-		linked_foo = self.api.bars.link(bar['id'], 'foo')
+		linked_foo = self.api.bars.link(bar['_id'], 'foo')
 		self.assertEquals(linked_foo, foo)
 		
 		
@@ -215,7 +214,7 @@ class CollectionTest(unittest.TestCase):
 		Embedded references are included when fetching the referencing item.
 		"""
 		foo = self.api.foos.create({'stuff':'foo', 'optional_stuff':'bar'})
-		bar = self.api.bars.create({'embedded_foo':foo['id']})
+		bar = self.api.bars.create({'embedded_foo':foo['_id']})
 		self.assertEquals(bar['embedded_foo'], foo)
 		
 		
@@ -229,8 +228,8 @@ class CollectionTest(unittest.TestCase):
 				self.api.bazes.create({'name':'Baz#%d' % i})
 			)
 		
-		foo = self.api.foos.create({'stuff':'things', 'bazes':[x['id'] for x in created_bazes]})
-		linked_bazes = self.api.foos.link(foo['id'], 'bazes')
+		foo = self.api.foos.create({'stuff':'things', 'bazes':[x['_id'] for x in created_bazes]})
+		linked_bazes = self.api.foos.link(foo['_id'], 'bazes')
 		self.assertEquals(linked_bazes, created_bazes)
 		
 		
@@ -244,7 +243,7 @@ class CollectionTest(unittest.TestCase):
 				self.api.bazes.create({'name':'Baz#%d' % i})
 			)
 		
-		foo = self.api.foos.create({'stuff':'things', 'embedded_bazes':[x['id'] for x in created_bazes]})
+		foo = self.api.foos.create({'stuff':'things', 'embedded_bazes':[x['_id'] for x in created_bazes]})
 		self.assertEquals(foo['embedded_bazes'], created_bazes)
 		
 		
@@ -257,7 +256,7 @@ class CollectionTest(unittest.TestCase):
 		for i in range(0,3):
 			bazes.append(self.api.bazes.create({'name':'Baz#%d' % i}))
 		
-		baz_ids = [x['id'] for x in bazes]
+		baz_ids = [x['_id'] for x in bazes]
 		foo = self.api.foos.create({'stuff': 'things', 'bazes':baz_ids})
 		linked_foo = self.api.bazes.link(baz_ids[0], 'foo')
 		self.assertEquals(linked_foo, foo)
@@ -271,7 +270,7 @@ class CollectionTest(unittest.TestCase):
 		
 		for i in range(0,3):
 			baz = self.api.bazes.create({'name':'Baz#%d' % i})
-			baz_ids.append(baz['id'])
+			baz_ids.append(baz['_id'])
 		
 		foo = self.api.foos.create({'stuff': 'things', 'bazes':baz_ids})
 		baz = self.api.bazes.get(baz_ids[0])
@@ -287,10 +286,10 @@ class CollectionTest(unittest.TestCase):
 		bars = []
 		for i in range(0,3):
 			bars.append(
-				self.api.bars.create({'foo':foo['id']})
+				self.api.bars.create({'foo':foo['_id']})
 			)
 			
-		linked_bars = self.api.foos.link(foo['id'], 'bars')
+		linked_bars = self.api.foos.link(foo['_id'], 'bars')
 		self.assertEquals(linked_bars, bars)
 		
 		
@@ -318,11 +317,11 @@ class CollectionTest(unittest.TestCase):
 			)
 		
 		foo = self.api.foos.create(
-			{'stuff':'foo', 'bazes':[x['id'] for x in bazes]}
+			{'stuff':'foo', 'bazes':[x['_id'] for x in bazes]}
 		)
 		
-		items = self.api.foos.link(foo['id'], 'bazes', filter={'name':{'$in':['Baz#1', 'Baz#2']}})
-		self.assertEquals([x['id'] for x in items], [x['id'] for x in bazes[1:]])
+		items = self.api.foos.link(foo['_id'], 'bazes', filter={'name':{'$in':['Baz#1', 'Baz#2']}})
+		self.assertEquals([x['_id'] for x in items], [x['_id'] for x in bazes[1:]])
 		
 		
 	def test_filtered_link(self):
@@ -334,11 +333,11 @@ class CollectionTest(unittest.TestCase):
 		bars = []
 		for i in range(0,3):
 			bars.append(
-				self.api.bars.create({'foo':foo['id'], 'number':i})
+				self.api.bars.create({'foo':foo['_id'], 'number':i})
 			)
 		
-		items = self.api.foos.link(foo['id'], 'bars', filter={'number':{'$gt':0}})
-		self.assertEquals([x['id'] for x in items], [x['id'] for x in bars[1:]])
+		items = self.api.foos.link(foo['_id'], 'bars', filter={'number':{'$gt':0}})
+		self.assertEquals([x['_id'] for x in items], [x['_id'] for x in bars[1:]])
 		
 		
 	def test_sort(self):
@@ -366,8 +365,8 @@ class CollectionTest(unittest.TestCase):
 				self.api.bazes.create({'name':'Baz#%d' % i})
 			)
 		
-		foo = self.api.foos.create({'stuff':'foo', 'bazes':[x['id'] for x in bazes]})
-		items = self.api.foos.link(foo['id'], 'bazes', sort=('-name',))
+		foo = self.api.foos.create({'stuff':'foo', 'bazes':[x['_id'] for x in bazes]})
+		items = self.api.foos.link(foo['_id'], 'bazes', sort=('-name',))
 		bazes.reverse()
 		self.assertEquals(items, bazes)
 		
@@ -381,10 +380,10 @@ class CollectionTest(unittest.TestCase):
 		bars = []
 		for i in range(0,3):
 			bars.append(
-				self.api.bars.create({'foo':foo['id'], 'number':i})
+				self.api.bars.create({'foo':foo['_id'], 'number':i})
 			)
 			
-		items = self.api.foos.link(foo['id'], 'bars', sort=('-number',))
+		items = self.api.foos.link(foo['_id'], 'bars', sort=('-number',))
 		bars.reverse()
 		self.assertEquals(items, bars)
 		
@@ -413,9 +412,9 @@ class CollectionTest(unittest.TestCase):
 				self.api.bazes.create({'name':'Baz#%d' % i})
 			)
 		
-		foo = self.api.foos.create({'stuff':'foo', 'bazes':[x['id'] for x in bazes]})
+		foo = self.api.foos.create({'stuff':'foo', 'bazes':[x['_id'] for x in bazes]})
 		
-		items = self.api.foos.link(foo['id'], 'bazes', offset=1, limit=1)
+		items = self.api.foos.link(foo['_id'], 'bazes', offset=1, limit=1)
 		bazes.reverse()
 		self.assertEquals(items, [bazes[1]])
 		
@@ -429,10 +428,10 @@ class CollectionTest(unittest.TestCase):
 		bars = []
 		for i in range(0,3):
 			bars.append(
-				self.api.bars.create({'foo':foo['id'], 'number':i})
+				self.api.bars.create({'foo':foo['_id'], 'number':i})
 			)
 		
-		items = self.api.foos.link(foo['id'], 'bars', offset=1, limit=1)
+		items = self.api.foos.link(foo['_id'], 'bars', offset=1, limit=1)
 		bars.reverse()
 		self.assertEquals(items, [bars[1]])
 		
@@ -460,7 +459,7 @@ class CollectionTest(unittest.TestCase):
 	def test_auth_pass(self):
 		"""Does not raise NotAuthorizedError if the authorization rule passes"""
 		obj = self.api.hiddens.create({}, context={'identity':{'role':'admin'}})
-		self.assertIn('id', obj)
+		self.assertIn('_id', obj)
 		
 		
 	def test_auth_result_fail(self):

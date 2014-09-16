@@ -159,6 +159,10 @@ class ObjectProxyValue(AuthenticationExpression):
 		return GreaterThanEqualComparison(self, other)
 		
 		
+	def __contains__(self, other):
+		return ContainsComparison(self, other)
+		
+		
 class ObjectProxyValueComparison(AuthenticationExpression):
 	
 	def __init__(self, proxy, other):
@@ -223,6 +227,12 @@ class GreaterThanEqualComparison(ObjectProxyValueComparison):
 	
 	def compare(self, a, b):
 		return a >= b
+		
+		
+class ContainsComparison(ObjectProxyValueComparison):
+	
+	def compare(self, a, b):
+		return a in b
 		
 		
 identity = ObjectProxy('identity')

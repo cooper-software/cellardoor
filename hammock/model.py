@@ -6,6 +6,8 @@ __all__ = [
     'CompoundValidationError',
     'Field',
     'Entity',
+    'Versioned',
+    'Timestamped',
     'Compound',
     'Text',
     'Email',
@@ -527,12 +529,21 @@ class Compound(Field):
         return validated
     
     
+class Timestamped(object):
+    created = DateTime()
+    modified = DateTime()
+    
+    
+class Versioned(object):
+    version = TypeOf(int)
+    
     
 class EntityMeta(type):
     
     def __new__(cls, name, bases, attrs):
         fields = dict([(k,v) for k,v in attrs.items() if isinstance(v, Field)])
         attrs['compound_field'] = Compound(**fields)
+        attrs['versioned'] = Versioned in bases
         return super(EntityMeta, cls).__new__(cls, name, bases, attrs)
         
         
@@ -624,7 +635,7 @@ class Model(object):
         self.entities_by_name = dict([(e.__name__, e) for e in entities])
         self.storage = storage
         if self.storage is not None:
-            self.storage.setup_with_model(self)
+            self.storage.setup(self)
         self.check_references()
         
         

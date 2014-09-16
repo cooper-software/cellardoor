@@ -99,7 +99,7 @@ class Collection(object):
 	def create(self, fields, show_hidden=False, context={}):
 		self.pre(CREATE, context)
 		item = self.entity.validate(fields)
-		item['id'] = self.storage.create(self.entity, item)
+		item['_id'] = self.storage.create(self.entity, item)
 		return self.post(CREATE, item, context, show_hidden=show_hidden)
 		
 		
@@ -172,7 +172,7 @@ class Collection(object):
 		Get the items for a single or multiple link
 		"""
 		filter = filter if filter else {}
-		filter[link_field.field] = source_item['id']
+		filter[link_field.field] = source_item['_id']
 		
 		if link_field.multiple:
 			self.pre(LIST, context)

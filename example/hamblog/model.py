@@ -10,21 +10,7 @@ class Slug(Text):
 		super(Slug, self).__init__(maxlength=50, regex=re.compile('^[\w\-]+$', re.UNICODE))
 
 
-class BaseModel(Model):
-	created = DateTime(required=True)
-	modified = DateTime(required=True)
-	
-	def before_create(self):
-		self.modified = self.created = datetime.utcnow()
-		super(BaseModel, self).before_create()
-		
-		
-	def before_update(self):
-		self.modified = datetime.utcnow()
-		super(BaseModel, self).before_update()
-
-
-class Person(BaseModel):
+class Person(Entity, Timestamped):
 	first_name = Text(maxlength=50, required=True)
 	last_name = Text(maxlength=50, required=True)
 	email = Email(required=True, hidden=True)
@@ -36,7 +22,7 @@ class Person(BaseModel):
 	)
 	
 	
-class Post(BaseModel):
+class Post(Entity, Timestamped, Versioned):
 	status = Enum('draft', 'published', default='draft')
 	publish_date = DateTime()
 	slug = Slug(required=True),
@@ -46,7 +32,7 @@ class Post(BaseModel):
 	tags = ListOf(Reference('Tag', storage=storage))
 	
 	
-class Tag(Model):
+class Tag(Entity):
 	name = Text(maxlength=50, required=True)
 	slug = Slug(required=True)
 	
