@@ -709,10 +709,10 @@ class TestEntity(unittest.TestCase):
             baz = Text(maxlength=10)
         
         with self.assertRaises(CompoundValidationError):
-            Foo.validate({'baz':'x'*11})
+            Foo.validator.validate({'baz':'x'*11})
         
         obj = {'bar':'x', 'baz':'y'}
-        result = Foo.validate(obj)
+        result = Foo.validator.validate(obj)
         self.assertEquals(result, obj)
         
         
@@ -725,9 +725,84 @@ class TestEntity(unittest.TestCase):
             baz = Text()
         
         obj = {'baz':'y'}
-        result = Foo.validate(obj, enforce_required=False)
+        result = Foo.validator.validate(obj, enforce_required=False)
         self.assertEquals(result, obj)
         
+        
+    def test_mixin_setup(self):
+        """
+        All mixins extending EntityMixin should have their setup() methods called
+        when an entity is instantiated.
+        """
+        class FooMixin(EntityMixin):
+            
+            def setup(self):
+                self.foo = 'foo'
+                
+        class BarMixin(EntityMixin):
+            
+            def setup(self):
+                self.bar = 'bar'
+        
+        class Baz(Entity, FooMixin, BarMixin):
+            pass
+            
+        baz = Baz()
+        self.assertEquals(baz.foo, 'foo')
+        self.assertEquals(baz.bar, 'bar')
+        
+        
+    def test_mixin_hooks(self):
+        """
+        Mixins can set hooks during setup.
+        """
+        class FooMixin(EntityMixin):
+            
+            def setup(self):
+                self.pre_hook('create', self.before_create)
+                self.post_hook('create', self.after_create)
+                
+            def before_create(self, fields):
+                fields['foo'] = 'before'
+                
+            def after_create(self, fields):
+                fields['foo'] = 'after'
+                
+                
+        class Bar(Entity, FooMixin):
+            pass
+            
+        b = Bar()
+        fields = {'foo':None}
+        b.trigger_pre('create', fields)
+        self.assertEquals(fields['foo'], 'before')
+        b.trigger_post('create', fields)
+        self.assertEquals(fields['foo'], 'after')
+        
+        
+    def test_hooks(self):
+        """
+        Can set hooks when defining entity.
+        """
+        class Foo(Entity):
+            
+            def __init__(self, *args, **kwargs):
+                super(Foo, self).__init__(*args, **kwargs)
+                self.pre_hook('update', self.pre_update)
+                self.post_hook('update', self.post_update)
+                
+            def pre_update(self, fields):
+                fields['foo'] = 'pre'
+                
+            def post_update(self):
+                fields['foo'] = 'post'
+                
+        f = Foo()
+        fields = {'foo':None}
+        f.trigger_pre('update', fields)
+        self.assertEquals(fields['foo'], 'pre')
+        f.trigger_post('update')
+        self.assertEquals(fields['foo'], 'post')
         
         
 class TestModel(unittest.TestCase):

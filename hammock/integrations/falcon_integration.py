@@ -40,7 +40,7 @@ class Resource(object):
 			app.add_route('/%s/{id}' % self.collection.plural_name, IndividualEndpoint(self, individual_methods))
 		
 		if self.collection.links:
-			for reference_name, reference in self.collection.entity.links_and_references():
+			for reference_name, reference in self.collection.entity.links_and_references:
 				if reference_name in self.collection.links:
 					app.add_route('/%s/{id}/%s' % (self.collection.plural_name, reference_name), 
 						ReferenceEndpoint(self, reference_name))

@@ -22,7 +22,8 @@ class Person(Entity, Timestamped):
 	)
 	
 	
-class Post(Entity, Timestamped, Versioned):
+class Post(Entity, Timestamped):
+	versioned = True
 	status = Enum('draft', 'published', default='draft')
 	publish_date = DateTime()
 	slug = Slug(required=True),

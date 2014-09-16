@@ -77,6 +77,7 @@ class Collection(object):
 	def __init__(self, storage):
 		self.storage = storage
 		self.authorization = {}
+		self.entity = self.entity()
 		
 		for methods, rule in self.method_authorization:
 			for method in methods:
@@ -92,20 +93,20 @@ class Collection(object):
 			
 	def list(self, filter=None, sort=None, offset=0, limit=0, show_hidden=False, context={}):
 		self.pre(LIST, context)
-		items = self.storage.get(self.entity, filter=filter, sort=sort, offset=offset, limit=limit)
+		items = self.storage.get(self.entity.__class__, filter=filter, sort=sort, offset=offset, limit=limit)
 		return self.post(LIST, items, context, show_hidden=show_hidden)
 		
 		
 	def create(self, fields, show_hidden=False, context={}):
 		self.pre(CREATE, context)
-		item = self.entity.validate(fields)
-		item['_id'] = self.storage.create(self.entity, item)
+		item = self.entity.validator.validate(fields)
+		item['_id'] = self.storage.create(self.entity.__class__, item)
 		return self.post(CREATE, item, context, show_hidden=show_hidden)
 		
 		
 	def get(self, id, show_hidden=False, context=None):
 		self.pre(GET, context)
-		item = self.storage.get_by_id(self.entity, id)
+		item = self.storage.get_by_id(self.entity.__class__, id)
 		if item is None:
 			raise errors.NotFoundError("No %s with id '%s' was found" % (self.singular_name, id))
 		else:
@@ -114,8 +115,8 @@ class Collection(object):
 		
 	def update(self, id, fields, show_hidden=False, context=None):
 		self.pre(UPDATE, context)
-		fields = self.entity.validate(fields, enforce_required=False)
-		item = self.storage.update(self.entity, id, fields)
+		fields = self.entity.validator.validate(fields, enforce_required=False)
+		item = self.storage.update(self.entity.__class__, id, fields)
 		if item is None:
 			raise errors.NotFoundError("No %s with id '%s' was found" % (self.singular_name, id))
 		return self.post(UPDATE, item, context, show_hidden=show_hidden)
@@ -123,21 +124,21 @@ class Collection(object):
 		
 	def replace(self, id, fields, show_hidden=False, context=None):
 		self.pre(REPLACE, context)
-		fields = self.entity.validate(fields)
-		item = self.storage.update(self.entity, id, fields, replace=True)
+		fields = self.entity.validator.validate(fields)
+		item = self.storage.update(self.entity.__class__, id, fields, replace=True)
 		return self.post(REPLACE, item, context, show_hidden=show_hidden)
 		
 		
 	def delete(self, id, context=None):
 		self.pre(DELETE, context)
-		self.storage.delete(self.entity, id)
+		self.storage.delete(self.entity.__class__, id)
 		self.post(DELETE, None, context)
 		
 		
 	def link(self, id, reference_name, filter=None, sort=None, offset=0, limit=0, show_hidden=False, context=None):
 		self.pre(GET, context)
 		
-		item = self.storage.get_by_id(self.entity, id)
+		item = self.storage.get_by_id(self.entity.__class__, id)
 		
 		if item is None:
 			raise errors.NotFoundError("No %s with id '%s' was found" % (self.singular_name, id))
@@ -149,7 +150,7 @@ class Collection(object):
 		if target_collection is None:
 			raise errors.NotFoundError("The %s collection has no link '%s' defined" % (self.plural_name, reference_name))
 		
-		reference_field = getattr(self.entity, reference_name)
+		reference_field = getattr(self.entity.__class__, reference_name)
 		
 		return target_collection.resolve_link_or_reference(item, reference_name, reference_field,
 						filter=filter, sort=sort, offset=offset, limit=limit, show_hidden=show_hidden, context=context)
@@ -176,12 +177,12 @@ class Collection(object):
 		
 		if link_field.multiple:
 			self.pre(LIST, context)
-			items = list(self.storage.get(self.entity, filter=filter, sort=sort, offset=offset, limit=limit))
+			items = list(self.storage.get(self.entity.__class__, filter=filter, sort=sort, offset=offset, limit=limit))
 			return self.post(LIST, items, context, embed=False, show_hidden=show_hidden)
 		else:
 			try:
 				self.pre(GET, context)
-				item = next(iter(self.storage.get(self.entity, filter=filter, limit=1)))
+				item = next(iter(self.storage.get(self.entity.__class__, filter=filter, limit=1)))
 				return self.post(GET, item, context, embed=False, show_hidden=show_hidden)
 			except StopIteration:
 				pass
@@ -197,12 +198,12 @@ class Collection(object):
 		
 		if isinstance(reference_field, ListOf):
 			self.pre(LIST, context)
-			items = list(self.storage.get_by_ids(self.entity, reference_value,
+			items = list(self.storage.get_by_ids(self.entity.__class__, reference_value,
 						filter=filter, sort=sort, offset=offset, limit=limit))
 			return self.post(LIST, items, context, embed=False, show_hidden=show_hidden)
 		else:
 			self.pre(GET, context)
-			item = self.storage.get_by_id(self.entity, reference_value)
+			item = self.storage.get_by_id(self.entity.__class__, reference_value)
 			return self.post(GET, item, context, embed=False, show_hidden=show_hidden)
 		
 		
@@ -230,7 +231,7 @@ class Collection(object):
 		
 	def add_embedded_references(self, item, show_hidden=False, context=None):
 		"""Add embedded references and links to an item"""
-		for reference_name, reference_field in self.entity.links_and_references():
+		for reference_name, reference_field in self.entity.links_and_references:
 			if not reference_field.embedded:
 				continue
 				
@@ -241,7 +242,7 @@ class Collection(object):
 			if not referenced_collection:
 				raise Exception, "No link defined in '%s' collection for embedded reference '%s'" % (self.plural_name, reference_name)
 				
-			result = referenced_collection.resolve_link_or_reference(item, reference_name, getattr(self.entity, reference_name), context=context)
+			result = referenced_collection.resolve_link_or_reference(item, reference_name, getattr(self.entity.__class__, reference_name), context=context)
 			
 			if result:
 				item[reference_name] = result

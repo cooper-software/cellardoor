@@ -2,15 +2,13 @@ import falcon
 from hammock import Hammock
 from hammock.falcon import add_to_falcon
 from hammock.views import MinimalView, SirenView
-from hammock.auth import TokenAuthenticator
 from .collections import PeopleCollection, TagsCollection, PostsCollection
-from .auth import token_auth, LoginResource
+from .auth import LoginResource
 from .storage import storage
 
 
 hammock_api = Hammock(
 		PeopleCollection, TagsCollection, PostsCollection,
-		authenticators=(token_auth,),
 		storage=storage)
 
 falcon_api = falcon.API()

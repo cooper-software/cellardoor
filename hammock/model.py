@@ -6,7 +6,7 @@ __all__ = [
     'CompoundValidationError',
     'Field',
     'Entity',
-    'Versioned',
+    'EntityMixin',
     'Timestamped',
     'Compound',
     'Text',
@@ -529,62 +529,29 @@ class Compound(Field):
         return validated
     
     
-class Timestamped(object):
+class EntityMixin(object):
+    
+    def setup(cls):
+        pass
+    
+    
+class Timestamped(EntityMixin):
     created = DateTime()
     modified = DateTime()
     
-    
-class Versioned(object):
-    version = TypeOf(int)
-    
-    
-class EntityMeta(type):
-    
-    def __new__(cls, name, bases, attrs):
-        fields = dict([(k,v) for k,v in attrs.items() if isinstance(v, Field)])
-        attrs['compound_field'] = Compound(**fields)
-        attrs['versioned'] = Versioned in bases
-        return super(EntityMeta, cls).__new__(cls, name, bases, attrs)
+    def setup(self):
+        self.pre_hook('create', cls.on_create)
+        self.pre_hook('update', cls.on_modify)
         
         
-class Entity(object):
-    
-    __metaclass__ = EntityMeta
-    
-    @classmethod
-    def validate(cls, fields, enforce_required=True):
-        return cls.compound_field.validate(fields, enforce_required=enforce_required)
-    
-    
-    @classmethod
-    def references(cls):
-        refs = []
-        for k,v in cls.__dict__.items():
-            if isinstance(v, Reference):
-                refs.append((k,v))
-            elif isinstance(v, ListOf) and isinstance(v.field, Reference):
-                refs.append((k, v.field))
-        return refs
+    def on_create(self, fields):
+        now = datetime.utcnow()
+        fields['created'] = now
+        fields['modified'] = now
         
         
-    @classmethod
-    def links(cls):
-        links = []
-        for k,v in cls.__dict__.items():
-            if isinstance(v, Link):
-                links.append((k,v))
-        return links
-        
-        
-    @classmethod
-    def links_and_references(cls):
-        refs_and_links = []
-        for k,v in cls.__dict__.items():
-            if isinstance(v, (Link, Reference)):
-                refs_and_links.append((k,v))
-            elif isinstance(v, ListOf) and isinstance(v.field, Reference):
-                refs_and_links.append((k, v.field))
-        return refs_and_links
+    def on_modify(self, fields):
+        fields['modified'] = datetime.utcnow()
         
         
 class Reference(Text):
@@ -623,6 +590,60 @@ class Link(object):
         self.multiple = multiple
         self.hidden = hidden
         self.storage = None
+    
+    
+class EntityMeta(type):
+    
+    def __new__(cls, name, bases, attrs):
+        fields = {}
+        links = []
+        references = []
+        for k,v in attrs.items():
+            if isinstance(v, Field):
+                fields[k] = v
+            if isinstance(v, Reference):
+                references.append((k,v))
+            elif isinstance(v, ListOf) and isinstance(v.field, Reference):
+                references.append((k, v.field))
+            elif isinstance(v, Link):
+                links.append((k,v))
+                
+        attrs['validator'] = Compound(**fields)
+        attrs['references'] = references
+        attrs['links'] = links
+        attrs['links_and_references'] = links + references
+        return super(EntityMeta, cls).__new__(cls, name, bases, attrs)
+        
+        
+class Entity(object):
+    
+    __metaclass__ = EntityMeta
+    
+    versioned = False
+    
+    def __init__(self):
+        self.pre_hooks = {'create':[], 'update':[], 'delete':[]}
+        self.post_hooks = {'create':[], 'update':[], 'delete':[]}
+        for base in self.__class__.__bases__:
+            if issubclass(base, EntityMixin):
+                base.setup(self)
+                
+    def pre_hook(self, name, fn):
+        self.pre_hooks[name].append(fn)
+        
+        
+    def post_hook(self, name, fn):
+        self.post_hooks[name].append(fn)
+        
+        
+    def trigger_pre(self, name, *args, **kwargs):
+        for fn in self.pre_hooks[name]:
+            fn(*args, **kwargs)
+            
+            
+    def trigger_post(self, name, *args, **kwargs):
+        for fn in self.post_hooks[name]:
+            fn(*args, **kwargs)
 
 
 class Model(object):
@@ -646,7 +667,7 @@ class Model(object):
     def check_references(self):
         # First make sure all references have a reference to their entity class
         for entity in self.entities:
-            for reference_name, reference in entity.links_and_references():
+            for reference_name, reference in entity.links_and_references:
                 if isinstance(reference.entity, basestring):
                     referenced_entity = self.entities_by_name.get(reference.entity)
                     if not referenced_entity:
@@ -655,7 +676,7 @@ class Model(object):
         
         for entity in self.entities:
             # Disallow references to entities outside the model
-            for reference_name, reference in entity.links_and_references():
+            for reference_name, reference in entity.links_and_references:
                 if not self.has_entity(reference.entity):
                     raise Exception, "Attempting to reference to an entity '%s' that is outside the model" % reference.entity.__name__
                 reference.storage = self.storage

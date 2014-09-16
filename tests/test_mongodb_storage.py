@@ -10,7 +10,8 @@ class Foo(Entity):
 	b = TypeOf(int)
 
 
-class Bar(Entity, Versioned):
+class Bar(Entity):
+	versioned = True
 	a = Text()
 	b = TypeOf(int)
 	
