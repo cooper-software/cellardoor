@@ -595,6 +595,20 @@ class Link(object):
 class EntityMeta(type):
     
     def __new__(cls, name, bases, attrs):
+        if name == 'Entity':
+            return super(EntityMeta, cls).__new__(cls, name, bases, attrs)
+        
+        hierarchy = []
+        entity_base_found = False
+        for b in bases:
+            if issubclass(b, Entity):
+                if entity_base_found:
+                    raise Exception, "Cannot extend more than one Entity"
+                entity_base_found = True
+                if b != Entity:
+                    hierarchy = list(b.hierarchy)
+        attrs['hierarchy'] = hierarchy
+        
         fields = {}
         links = []
         references = []
@@ -612,7 +626,9 @@ class EntityMeta(type):
         attrs['references'] = references
         attrs['links'] = links
         attrs['links_and_references'] = links + references
-        return super(EntityMeta, cls).__new__(cls, name, bases, attrs)
+        new_cls = super(EntityMeta, cls).__new__(cls, name, bases, attrs)
+        new_cls.hierarchy.append(new_cls)
+        return new_cls
         
         
 class Entity(object):

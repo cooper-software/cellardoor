@@ -15,6 +15,18 @@ class Bar(Entity):
 	a = Text()
 	b = TypeOf(int)
 	
+	
+class Primate(Entity):
+	pass
+	
+	
+class Human(Primate):
+	name = Text()
+	
+	
+class Scotsman(Human):
+	pass
+
 
 storage = MongoDBStorage('test')
 model = Model(storage, (Foo, Bar))
@@ -316,4 +328,43 @@ class TestMongoDBStorage(unittest.TestCase):
 		self.assertIsInstance(delete_record['_deleted_on'], datetime)
 		del delete_record['_deleted_on']
 		self.assertEquals(delete_record, {'_id':bar_id, '_version':2, '_deleted_by':'The Grinch'})
+		
+		
+	def test_inheritance_type_name(self):
+		"""
+		Entities that extend other entities get a _type field
+		"""
+		sean_id = storage.create(Scotsman, {'name':'Sean Connery'})
+		sean = storage.get_by_id(Scotsman, sean_id)
+		self.assertEquals(sean['_type'], 'Primate.Human.Scotsman')
+		
+		
+	def test_inheritance_polymorphism(self):
+		"""
+		Can get subclass items by querying the base class
+		"""
+		sean_id = storage.create(Scotsman, {'name':'Sean Connery'})
+		sean = storage.get_by_id(Scotsman, sean_id)
+		base_sean = storage.get_by_id(Human, sean_id)
+		self.assertEquals(base_sean, sean)
+		humans = list(storage.get(Human))
+		self.assertEquals(humans, [sean])
+		
+		
+	def test_inheritance_filtering(self):
+		"""
+		When fetching items for a subclass, no base class items are returned.
+		"""
+		bobo_id = storage.create(Primate, {})
+		bobo = storage.get_by_id(Primate, bobo_id)
+		not_bobo = storage.get_by_id(Human, bobo_id)
+		self.assertEquals(not_bobo, None)
+		
+		sean_id = storage.create(Scotsman, {'name':'Sean Connery'})
+		sean = storage.get_by_id(Scotsman, sean_id)
+		
+		primate_results = list(storage.get(Primate))
+		human_results = list(storage.get(Human))
+		self.assertEquals(primate_results, [bobo, sean])
+		self.assertEquals(human_results, [sean])
 		

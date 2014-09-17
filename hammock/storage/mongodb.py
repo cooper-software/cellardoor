@@ -1,3 +1,4 @@
+import re
 import pymongo
 from datetime import datetime
 from bson.objectid import ObjectId
@@ -35,6 +36,14 @@ class MongoDBStorage(Storage):
 			sort = [(field[1:], 1) if field[0] == '+' else (field[1:], -1) for field in sort]
 		
 		collection = self.get_collection(entity, shadow=versions)
+		
+		type_filter = self.get_type_filter(entity)
+		if type_filter:
+			if not filter:
+				filter = type_filter
+			else:
+				filter.update(type_filter)
+			
 		results = collection.find(spec=filter, 
 								  fields=fields, 
 								  sort=sort, 
@@ -57,7 +66,11 @@ class MongoDBStorage(Storage):
 		
 	def get_by_id(self, entity, id, fields=None):
 		collection = self.get_collection(entity)
-		result = collection.find_one({'_id':ObjectId(id)})
+		filter = {'_id':ObjectId(id)}
+		type_filter = self.get_type_filter(entity)
+		if type_filter:
+			filter.update(type_filter)
+		result = collection.find_one(filter)
 		
 		if result is None:
 			return None
@@ -69,11 +82,17 @@ class MongoDBStorage(Storage):
 		if entity.versioned:
 			fields['_version'] = 1
 		collection = self.get_collection(entity)
+		type_name = self.get_type_name(entity)
+		if type_name:
+			fields['_type'] = type_name
 		obj_id = collection.insert(fields.copy())
 		return str(obj_id)
 		
 		
 	def update(self, entity, id, fields, replace=False):
+		type_name = self.get_type_name(entity)
+		if type_name:
+			fields['_type'] = type_name
 		if entity.versioned:
 			return self._versioned_update(entity, id, fields, replace=replace)
 		else:
@@ -168,15 +187,34 @@ class MongoDBStorage(Storage):
 		
 		
 	def get_collection(self, entity, shadow=False):
-		if shadow:
-			return self.db[entity.__name__+'.vermongo']
+		if len(entity.hierarchy) > 1:
+			collection_name = entity.hierarchy[0].__name__
 		else:
-			return self.db[entity.__name__]
-		
+			collection_name = entity.__name__
+			
+		if shadow:
+			return self.db[collection_name+'.vermongo']
+		else:
+			return self.db[collection_name]
+			
+			
+	def get_type_name(self, entity):
+		if len(entity.hierarchy) > 1:
+			return '.'.join([x.__name__ for x in entity.hierarchy])
+		else:
+			return None
+			
+			
+	def get_type_filter(self, entity):
+		type_name = self.get_type_name(entity)
+		if type_name:
+			return {'_type':{'$regex':'^%s' % re.escape(type_name)}}
+			
 		
 	def clean_filter(self, filter, allowed_fields):
 		allowed_fields = set(allowed_fields)
 		return self._clean_filter(filter, allowed_fields)
+		
 		
 	def _clean_filter(self, filter, allowed_fields):
 		new_filter = {}

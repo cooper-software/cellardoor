@@ -805,6 +805,39 @@ class TestEntity(unittest.TestCase):
         self.assertEquals(fields['foo'], 'post')
         
         
+    def test_multiple_inheritance_fail(self):
+        """
+        Raises an error when extending more than one Entity
+        """
+        class Foo(Entity):
+            pass
+            
+        class Bar(Entity):
+            pass
+            
+        with self.assertRaises(Exception) as cm:
+            class Baz(Foo, Bar):
+                pass
+                
+        self.assertEquals(cm.exception.message, "Cannot extend more than one Entity")
+        
+        
+    def test_get_entity_hierarchy(self):
+        """Can get a list including the entity and all its bases in hierarchical order"""
+        class Foo(Entity):
+            pass
+            
+        class Bar(Foo):
+            pass
+            
+            
+        class Baz(Bar):
+            pass
+            
+        self.assertEquals(Baz.hierarchy, [Foo, Bar, Baz])
+        self.assertEquals(Foo.hierarchy, [Foo])
+        
+        
 class TestModel(unittest.TestCase):
     
     def test_unresolvable_link(self):
