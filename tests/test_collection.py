@@ -32,6 +32,7 @@ class Baz(Entity):
 	
 class Hidden(Entity):
 	name = Text(hidden=True)
+	foo = TypeOf(int)
 	
 
 class FoosCollection(Collection):
@@ -74,6 +75,7 @@ class HiddenCollection(Collection):
 		((CREATE,), auth.identity.role == 'admin'),
 		((GET,), auth.result.foo == 23)
 	)
+	hidden_field_authorization = auth.identity.exists()
 	
 
 model = Model(None, (Foo, Bar, Baz))
@@ -474,3 +476,22 @@ class CollectionTest(unittest.TestCase):
 		self.api.hiddens.storage.get_by_id = Mock(return_value={'foo':23})
 		self.api.hiddens.get(123)
 		
+		
+	def test_hidden_result(self):
+		"""Hidden fields aren't shown in results."""
+		obj = self.api.hiddens.create({'name':'foo'}, context={'identity':{'role':'admin'}})
+		self.assertNotIn('name', obj)
+		
+		
+	def test_hidden_show_fail(self):
+		"""Hidden fields aren't shown in results even when show_hidden=True if the user is not authorized."""
+		obj = self.api.hiddens.create({'name':'pokey', 'foo':23}, context={'identity':{'role':'admin'}})
+		obj = self.api.hiddens.get(obj['_id'], show_hidden=True)
+		self.assertNotIn('name', obj)
+		
+		
+	def test_hidden_succeed(self):
+		"""Hidden fields are shown when show_hidden=True and the user is authorized."""
+		obj = self.api.hiddens.create({'name':'pokey', 'foo':23}, context={'identity':{'role':'admin'}})
+		obj = self.api.hiddens.get(obj['_id'], show_hidden=True, context={'identity':{}})
+		self.assertIn('name', obj)

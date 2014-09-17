@@ -613,9 +613,12 @@ class EntityMeta(type):
         fields = {}
         links = []
         references = []
+        hidden_fields = []
         for k,v in attrs.items():
             if isinstance(v, Field):
                 fields[k] = v
+                if v.hidden:
+                    hidden_fields.append(k)
             if isinstance(v, Reference):
                 references.append((k,v))
             elif isinstance(v, ListOf) and isinstance(v.field, Reference):
@@ -627,6 +630,7 @@ class EntityMeta(type):
         attrs['references'] = references
         attrs['links'] = links
         attrs['links_and_references'] = links + references
+        attrs['hidden_fields'] = hidden_fields
         new_cls = super(EntityMeta, cls).__new__(cls, name, bases, attrs)
         new_cls.hierarchy.append(new_cls)
         return new_cls

@@ -86,7 +86,7 @@ class Collection(object):
 				self.authorization[method].append(rule)
 		
 		if self.hidden_field_authorization:
-			assert not auth.uses(self.hidden_field_authorization, 'item'), \
+			assert not self.hidden_field_authorization.uses('item'), \
 				"Hidden field authorization rules must not use `auth.item`"
 			self.authorization['allow_hidden'] = [self.hidden_field_authorization]
 			
@@ -226,6 +226,9 @@ class Collection(object):
 			pass
 		if embed:
 			self.add_embedded_references(item)
+		if not show_hidden:
+			for k in self.entity.hidden_fields:
+				item.pop(k, None)
 		return item
 		
 		
@@ -279,6 +282,17 @@ class Collection(object):
 						
 		if result is None:
 			return
+			
+		hidden_auth_rules = self.authorization.get('allow_hidden')
+		if hidden_auth_rules:
+			for rule in hidden_auth_rules:
+				if rule.uses('identity') and does_not_have_identity:
+					show_hidden = False
+					break
+				elif not rule(context):
+					show_hidden = False
+					break
+		
 		if method == LIST:
 			result = self.prepare_items(result, embed=embed, show_hidden=show_hidden)
 		else:
