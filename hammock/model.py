@@ -73,10 +73,11 @@ class Field(object):
     create your own field.
     """
     
-    def __init__(self, required=False, default=None, hidden=False):
+    def __init__(self, required=False, default=None, hidden=False, help=None):
         self.required = required
         self.default = default
         self.hidden = hidden
+        self.help = help
         
     def validate(self, value):
         if value is None:
