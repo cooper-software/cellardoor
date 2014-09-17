@@ -8,7 +8,7 @@ setup(
 	name='hammock',
 	version=__version__,
 	description='Create ReST APIs how you\'ve always wanted.',
-	long_description=io.open('README.rst', 'r', 'utf-8'),
+	long_description=io.open('README.rst', mode='r', encoding='utf-8').read(),
 	classifiers=[
         'Development Status :: 1 - Planning',
         'Environment :: Web Environment',
