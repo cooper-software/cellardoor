@@ -12,7 +12,7 @@ class EventManager(object):
 		
 		
 	def post(self, event_name, fn):
-		self.add('pre', event_name, fn)
+		self.add('post', event_name, fn)
 		
 		
 	def trigger_pre(self, event_name, *args, **kwargs):
@@ -20,7 +20,7 @@ class EventManager(object):
 		
 		
 	def trigger_post(self, event_name, *args, **kwargs):
-		self.trigger('pre', event_name, *args, **kwargs)
+		self.trigger('post', event_name, *args, **kwargs)
 		
 		
 	def add(self, when, event_name, fn):
@@ -31,4 +31,3 @@ class EventManager(object):
 		fns = self.listeners[when][event_name]
 		for fn in fns:
 			fn(*args, **kwargs)
-			

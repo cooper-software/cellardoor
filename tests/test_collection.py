@@ -183,11 +183,11 @@ class CollectionTest(unittest.TestCase):
 		
 	def test_replace_nonexistent(self):
 		"""
-		Trying to replace a nonexistent item does nothing.
+		Trying to replace a nonexistent item raises an error.
 		"""
 		foo_id = str(ObjectId())
-		result = self.api.foos.replace(foo_id, {'stuff':'things'})
-		self.assertEquals(result, None)
+		with self.assertRaises(errors.NotFoundError):
+			self.api.foos.replace(foo_id, {'stuff':'things'})
 		
 		
 	def test_delete(self):
@@ -555,3 +555,36 @@ class CollectionTest(unittest.TestCase):
 		with self.assertRaises(errors.CompoundValidationError) as cm:
 			self.api.hiddens.list(sort=('+name',), context={'identity':{}})
 		self.assertEquals(cm.exception.errors, {'sort':'The "name" field cannot be used for sorting.'})
+		
+		
+	def test_entity_hooks(self):
+		pre_create = Mock()
+		post_create = Mock()
+		pre_update = Mock()
+		post_update = Mock()
+		pre_delete = Mock()
+		post_delete = Mock()
+		hooks = self.api.foos.entity.hooks
+		hooks.pre('create', pre_create)
+		hooks.post('create', post_create)
+		hooks.pre('update', pre_update)
+		hooks.post('update', post_update)
+		hooks.pre('delete', pre_delete)
+		hooks.post('delete', post_delete)
+		
+		foo = self.api.foos.create({'stuff':'things'})
+		pre_create.assert_called_with({'stuff':'things'})
+		post_create.assert_called_with(foo)
+		
+		foo = self.api.foos.update(foo['_id'], {'stuff':'nothings'})
+		pre_update.assert_called_with(foo['_id'], {'stuff':'nothings'}, replace=False)
+		post_update.assert_called_with(foo)
+		
+		foo = self.api.foos.replace(foo['_id'], {'stuff':'somethings'})
+		pre_update.assert_called_with(foo['_id'], {'stuff':'somethings'}, replace=True)
+		post_update.assert_called_with(foo)
+		
+		self.api.foos.delete(foo['_id'])
+		pre_delete.assert_called_with(foo['_id'])
+		post_delete.assert_called_with(foo['_id'])
+		
