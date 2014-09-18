@@ -93,6 +93,8 @@ class Collection(object):
 			
 	def list(self, filter=None, sort=None, offset=0, limit=0, show_hidden=False, context={}):
 		self.pre(LIST, context)
+		sort = sort if sort else self.default_sort
+		self.check_for_disabled_fields(filter, sort, context)
 		items = self.storage.get(self.entity.__class__, filter=filter, sort=sort, offset=offset, limit=limit)
 		return self.post(LIST, items, context, show_hidden=show_hidden)
 		
@@ -159,6 +161,8 @@ class Collection(object):
 	def resolve_link_or_reference(self, source_item, reference_name, reference_field, filter=None, sort=None, 
 								  offset=0, limit=0, show_hidden=False, context=None):
 		"""Get the item(s) pointed to by a link or reference"""
+		sort = sort if sort else self.default_sort
+		self.check_for_disabled_fields(filter, sort, context)
 		if isinstance(reference_field, Link):
 			return self.resolve_link(source_item, reference_field, filter=filter, sort=sort, offset=offset, 
 				                     limit=limit, show_hidden=show_hidden, context=context)
@@ -205,6 +209,53 @@ class Collection(object):
 			self.pre(GET, context)
 			item = self.storage.get_by_id(self.entity.__class__, reference_value)
 			return self.post(GET, item, context, embed=False, show_hidden=show_hidden)
+			
+			
+	def check_for_disabled_fields(self, filter, sort, context):
+		can_show_hidden = self.can_show_hidden(context)
+		self.check_filter(filter, can_show_hidden)
+		self.check_sort(sort, can_show_hidden)
+			
+			
+	def check_filter(self, filter, can_show_hidden):
+		if filter is None:
+			return None
+		if not self.enabled_filters:
+			raise CompoundValidationError({'filter':'Filtering is disabled.'})
+		allowed_fields = set(self.enabled_filters)
+		if not can_show_hidden:
+			allowed_fields.difference_update(self.entity.hidden_fields)
+		try:
+			self.storage.check_filter(filter, allowed_fields)
+		except errors.DisabledFieldError, e:
+			raise CompoundValidationError({'filter':'The "%s" field cannot be used as a filter.' % e.message})
+		return filter
+		
+		
+	def check_sort(self, sort, can_show_hidden):
+		if not sort:
+			return None
+		if not self.enabled_sort:
+			raise CompoundValidationError({'sort':'Sorting is disabled.'})
+		allowed_fields = set(self.enabled_sort)
+		if not can_show_hidden:
+			allowed_fields.difference_update(self.entity.hidden_fields)
+		for k in sort:
+			field_name = k[1:]
+			if field_name not in allowed_fields:
+				raise CompoundValidationError({'sort':'The "%s" field cannot be used for sorting.' % field_name})
+			
+			
+	def can_show_hidden(self, context):
+		hidden_auth_rules = self.authorization.get('allow_hidden')
+		if hidden_auth_rules:
+			does_not_have_identity = 'identity' not in context
+			for rule in hidden_auth_rules:
+				if rule.uses('identity') and does_not_have_identity:
+					return False
+				elif not rule(context):
+					return False
+		return True
 		
 		
 	def prepare_items(self, items, embed=True, show_hidden=False):
@@ -283,15 +334,7 @@ class Collection(object):
 		if result is None:
 			return
 			
-		hidden_auth_rules = self.authorization.get('allow_hidden')
-		if hidden_auth_rules:
-			for rule in hidden_auth_rules:
-				if rule.uses('identity') and does_not_have_identity:
-					show_hidden = False
-					break
-				elif not rule(context):
-					show_hidden = False
-					break
+		show_hidden = self.can_show_hidden(context) and show_hidden
 		
 		if method == LIST:
 			result = self.prepare_items(result, embed=embed, show_hidden=show_hidden)

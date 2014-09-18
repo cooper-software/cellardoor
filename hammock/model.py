@@ -625,7 +625,8 @@ class EntityMeta(type):
                 references.append((k, v.field))
             elif isinstance(v, Link):
                 links.append((k,v))
-                
+        
+        attrs['fields'] = fields
         attrs['validator'] = Compound(**fields)
         attrs['references'] = references
         attrs['links'] = links

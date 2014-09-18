@@ -15,6 +15,10 @@ class VersionConflictError(Exception):
 	def __init__(self, other):
 		self.other = other
 		super(VersionConflictError, self).__init__()
+		
+		
+class DisabledFieldError(Exception):
+	pass
 	
 	
 from model import CompoundValidationError

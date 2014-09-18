@@ -22,6 +22,7 @@ class Bar(Entity):
 	embedded_foo = Reference(Foo, embedded=True)
 	bazes = ListOf(Reference('Baz'))
 	number = TypeOf(int)
+	name = Text()
 	
 	
 class Baz(Entity):
@@ -44,6 +45,7 @@ class FoosCollection(Collection):
 		'embedded_bazes': 'BazesCollection'
 	}
 	enabled_filters = ('stuff',)
+	enabled_sort = ('stuff',)
 	
 	
 class BarsCollection(Collection):
@@ -55,12 +57,16 @@ class BarsCollection(Collection):
 		'bazes': 'BazesCollection'
 	}
 	enabled_filters = ('number',)
+	enabled_sort = ('number', 'name')
+	default_sort = ('+name',)
 	
 	
 class BazesCollection(Collection):
 	entity = Baz
 	plural_name = 'bazes'
 	enabled_methods = ALL
+	enabled_filters = ('name',)
+	enabled_sort = ('name',)
 	links = {
 		'foo': FoosCollection,
 		'embedded_foo': FoosCollection
@@ -70,12 +76,14 @@ class BazesCollection(Collection):
 class HiddenCollection(Collection):
 	entity = Hidden
 	enabled_methods = ALL
+	enabled_filters = ('name',)
+	enabled_sort = ('name',)
 	method_authorization = (
 		((LIST,), auth.identity.exists()),
 		((CREATE,), auth.identity.role == 'admin'),
 		((GET,), auth.result.foo == 23)
 	)
-	hidden_field_authorization = auth.identity.exists()
+	hidden_field_authorization = auth.identity.foo == 'bar'
 	
 
 model = Model(None, (Foo, Bar, Baz))
@@ -295,6 +303,15 @@ class CollectionTest(unittest.TestCase):
 		self.assertEquals(linked_bars, bars)
 		
 		
+	def test_filter_disabled_error(self):
+		"""
+		An error is raised when attempting to filter by a disabled filter field.
+		"""
+		with self.assertRaises(errors.CompoundValidationError) as cm:
+			self.api.foos.list(filter={'optional_stuff':'cake'})
+		self.assertEquals(cm.exception.errors, {'filter':'The "optional_stuff" field cannot be used as a filter.'})
+		
+		
 	def test_filter(self):
 		"""
 		Only returns results matching the filter.
@@ -342,20 +359,41 @@ class CollectionTest(unittest.TestCase):
 		self.assertEquals([x['_id'] for x in items], [x['_id'] for x in bars[1:]])
 		
 		
+	def test_sort_fail(self):
+		"""
+		Trying to sort by a sort-disabled field raises an error.
+		"""
+		with self.assertRaises(errors.CompoundValidationError) as cm:
+			self.api.foos.list(sort=('+optional_stuff',))
+		
+		
 	def test_sort(self):
 		"""
 		Can sort items
 		"""
-		foos = []
+		bars = []
 		for i in range(0,5):
-			foos.append(
-				self.api.foos.create({'stuff':'Foo#%d' % i})
+			bars.append(
+				self.api.bars.create({'number':i, 'name':'%d' % (5-i)})
 			)
 		
-		items = self.api.foos.list(sort=('-stuff',))
-		foos.reverse()
-		self.assertEquals(items, foos)
+		items = self.api.bars.list(sort=('+number',))
+		self.assertEquals(items, bars)
 		
+		
+	def test_sort_default(self):
+		"""
+		If no sort is set, the default is used.
+		"""
+		bars = []
+		for i in range(0,5):
+			bars.append(
+				self.api.bars.create({'number':i, 'name':'%d' % (5-i)})
+			)
+		bars.reverse()
+		items = self.api.bars.list()
+		self.assertEquals(items, bars)
+	
 		
 	def test_sorted_reference(self):
 		"""
@@ -446,7 +484,7 @@ class CollectionTest(unittest.TestCase):
 			
 	def test_auth_required_present(self):
 		"""Don't raise NotAuthenticatedError if authentication is required and present."""
-		self.api.hiddens.list(context={'identity':{}})
+		self.api.hiddens.list(context={'identity':{'foo':'bar'}})
 		
 		
 	def test_auth_failed(self):
@@ -493,5 +531,27 @@ class CollectionTest(unittest.TestCase):
 	def test_hidden_succeed(self):
 		"""Hidden fields are shown when show_hidden=True and the user is authorized."""
 		obj = self.api.hiddens.create({'name':'pokey', 'foo':23}, context={'identity':{'role':'admin'}})
-		obj = self.api.hiddens.get(obj['_id'], show_hidden=True, context={'identity':{}})
+		obj = self.api.hiddens.get(obj['_id'], show_hidden=True, context={'identity':{'foo':'bar'}})
 		self.assertIn('name', obj)
+		
+		
+	def test_hidden_filter(self):
+		"""Can't filter by a hidden field without authorization."""
+		with self.assertRaises(errors.CompoundValidationError) as cm:
+			self.api.hiddens.list(filter={'name':'zoomy'}, context={'identity':{}})
+		self.assertEquals(cm.exception.errors, {'filter':'The "name" field cannot be used as a filter.'})
+		
+		
+	def test_hidden_filter_authorized(self):
+		"""Can filter by a hidden field when authorized."""
+		self.api.hiddens.create({'name':'poky', 'foo':23}, context={'identity':{'role':'admin'}})
+		self.api.hiddens.create({'name':'zoomy', 'foo':23}, context={'identity':{'role':'admin'}})
+		results = list(self.api.hiddens.list(filter={'name':'zoomy'}, context={'identity':{'foo':'bar'}}))
+		self.assertEquals(len(results), 1)
+		
+		
+	def test_hidden_sort_fail(self):
+		"""Can't sort by a hidden field without authorization."""
+		with self.assertRaises(errors.CompoundValidationError) as cm:
+			self.api.hiddens.list(sort=('+name',), context={'identity':{}})
+		self.assertEquals(cm.exception.errors, {'sort':'The "name" field cannot be used for sorting.'})

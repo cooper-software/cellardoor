@@ -211,27 +211,18 @@ class TestMongoDBStorage(unittest.TestCase):
 		self.assertEquals([r['_id'] for r in results], subset_of_ids)
 		
 		
-	def test_clean_filter(self):
+	def test_check_filter(self):
 		"""
-		Removes fields from a filter that aren't in the list of allowed fields.
+		Raises an error if there are disallowed fields in the filter.
 		"""
 		filter = {
 			'a': 'foo',
-			'b': 'bar',
-			'$or': [{'c':'foo'}, {'d':'bar'}],
-			'e': {'$gt':23},
-			'f': {'$where':'alert("OK")', '$lt': 23},
-			'g': {'$where':'foo()'}
+			'$or': [{'b':'foo'}, {'c':'bar'}],
+			'd': {'$where':'foo()'}
 		}
-		cleaned_filter = storage.clean_filter(filter, ('a','c', 'e', 'f', 'g'))
-		self.assertEquals(cleaned_filter,
-			{
-				'a': 'foo',
-				'$or': [{'c':'foo'}],
-				'e': {'$gt':23},
-				'f': {'$lt':23}
-			}
-		)
+		with self.assertRaises(errors.DisabledFieldError) as cm:
+			storage.check_filter(filter, ('a','b', 'd'))
+		self.assertEquals(cm.exception.message, 'c')
 		
 		
 	def test_get_versioned_fail(self):
