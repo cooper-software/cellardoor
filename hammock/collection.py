@@ -1,5 +1,5 @@
 from .methods import ALL, LIST, CREATE, GET, REPLACE, UPDATE, DELETE
-from .model import CompoundValidationError, ListOf, Reference, Link
+from .model import ListOf, Reference, Link
 from .events import EventManager
 from . import errors
 
@@ -269,10 +269,7 @@ class Collection(object):
 		allowed_fields = set(self.enabled_filters)
 		if not can_show_hidden:
 			allowed_fields.difference_update(self.entity.hidden_fields)
-		try:
-			self.storage.check_filter(filter, allowed_fields)
-		except errors.DisabledFieldError, e:
-			raise CompoundValidationError({'filter':'The "%s" field cannot be used as a filter.' % e.message})
+		self.storage.check_filter(filter, allowed_fields)
 		return filter
 		
 		
@@ -280,14 +277,14 @@ class Collection(object):
 		if not sort:
 			return None
 		if not self.enabled_sort:
-			raise CompoundValidationError({'sort':'Sorting is disabled.'})
+			raise errors.CompoundValidationError({'sort':'Sorting is disabled.'})
 		allowed_fields = set(self.enabled_sort)
 		if not can_show_hidden:
 			allowed_fields.difference_update(self.entity.hidden_fields)
 		for k in sort:
 			field_name = k[1:]
 			if field_name not in allowed_fields:
-				raise CompoundValidationError({'sort':'The "%s" field cannot be used for sorting.' % field_name})
+				raise errors.DisabledFieldError('The "%s" field cannot be used for sorting.' % field_name)
 			
 			
 	def can_show_hidden(self, context):

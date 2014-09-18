@@ -169,6 +169,13 @@ class TestResource(TestBase):
 		self.assertEquals(self.srmock.status, '401 Unauthorized')
 		
 		
+	def test_disabled_field(self):
+		"""If a request attempts to filter or sort by a disabled field, a 401 status is returned"""
+		self.hammock.foos.list = Mock(side_effect=errors.DisabledFieldError)
+		self.simulate_request('/foos', query_string=urllib.urlencode({'filter':json.dumps({'name':'bob'})}))
+		self.assertEquals(self.srmock.status, '401 Unauthorized')
+		
+		
 	def test_list(self):
 		"""Will return a list of items structured by the view"""
 		foos = [{'name':'foo'}, {'name':'bar'}]
@@ -295,4 +302,3 @@ class TestResource(TestBase):
 		self.assertEquals(self.srmock.status, '200 OK')
 		self.assertEquals(result, {'_id':'123'})
 		self.hammock.foos.link.assert_called_with('123', 'bazes', sort=['+name'], filter={'foo':23}, offset=7, limit=10, show_hidden=True)
-		

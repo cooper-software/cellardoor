@@ -321,9 +321,8 @@ class CollectionTest(unittest.TestCase):
 		"""
 		An error is raised when attempting to filter by a disabled filter field.
 		"""
-		with self.assertRaises(errors.CompoundValidationError) as cm:
+		with self.assertRaises(errors.DisabledFieldError):
 			self.api.foos.list(filter={'optional_stuff':'cake'})
-		self.assertEquals(cm.exception.errors, {'filter':'The "optional_stuff" field cannot be used as a filter.'})
 		
 		
 	def test_filter(self):
@@ -377,7 +376,7 @@ class CollectionTest(unittest.TestCase):
 		"""
 		Trying to sort by a sort-disabled field raises an error.
 		"""
-		with self.assertRaises(errors.CompoundValidationError) as cm:
+		with self.assertRaises(errors.DisabledFieldError) as cm:
 			self.api.foos.list(sort=('+optional_stuff',))
 		
 		
@@ -551,9 +550,8 @@ class CollectionTest(unittest.TestCase):
 		
 	def test_hidden_filter(self):
 		"""Can't filter by a hidden field without authorization."""
-		with self.assertRaises(errors.CompoundValidationError) as cm:
+		with self.assertRaises(errors.DisabledFieldError):
 			self.api.hiddens.list(filter={'name':'zoomy'}, context={'identity':{}})
-		self.assertEquals(cm.exception.errors, {'filter':'The "name" field cannot be used as a filter.'})
 		
 		
 	def test_hidden_filter_authorized(self):
@@ -566,9 +564,9 @@ class CollectionTest(unittest.TestCase):
 		
 	def test_hidden_sort_fail(self):
 		"""Can't sort by a hidden field without authorization."""
-		with self.assertRaises(errors.CompoundValidationError) as cm:
+		with self.assertRaises(errors.DisabledFieldError) as cm:
 			self.api.hiddens.list(sort=('+name',), context={'identity':{}})
-		self.assertEquals(cm.exception.errors, {'sort':'The "name" field cannot be used for sorting.'})
+		self.assertEquals(cm.exception.message, 'The "name" field cannot be used for sorting.')
 		
 		
 	def test_entity_hooks(self):

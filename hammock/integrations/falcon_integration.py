@@ -90,10 +90,7 @@ class Resource(object):
 		
 		
 	def call_collection(self, req, resp, method_name, *args, **kwargs):
-		try:
-			return getattr(self.collection, method_name)(*args, **kwargs)
-		except errors.CompoundValidationError, e:
-			resp.content_type, resp.body = self.serialize_one(req, e.errors)
+		return getattr(self.collection, method_name)(*args, **kwargs)
 		
 		
 	def send_one(self, req, resp, item):
@@ -242,6 +239,10 @@ def validation_error_handler(views, exc, req, resp, params):
 	_, view = View.choose(req, views)
 	resp.content_type, resp.body = view.get_individual_response(req, exc.errors)
 	resp.status = falcon.HTTP_400
+	
+	
+def disabled_field_error(exc, req, resp, params):
+	raise falcon.HTTPUnauthorized('Unauthorized', exc.message)
 		
 		
 def add_to_falcon(falcon_api, hammock_api, views):
@@ -256,6 +257,7 @@ def add_to_falcon(falcon_api, hammock_api, views):
 	falcon_api.add_error_handler(errors.NotAuthorizedError, not_authorized_handler)
 	validation_error_handler_with_views = functools.partial(validation_error_handler, views_by_type)
 	falcon_api.add_error_handler(errors.CompoundValidationError, validation_error_handler_with_views)
+	falcon_api.add_error_handler(errors.DisabledFieldError, disabled_field_error)
 	
 	for collection in hammock_api.collections_by_class_name.values():
 		resource = Resource(collection, views_by_type)

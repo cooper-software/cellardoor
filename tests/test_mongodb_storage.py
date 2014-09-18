@@ -222,7 +222,7 @@ class TestMongoDBStorage(unittest.TestCase):
 		}
 		with self.assertRaises(errors.DisabledFieldError) as cm:
 			storage.check_filter(filter, ('a','b', 'd'))
-		self.assertEquals(cm.exception.message, 'c')
+		self.assertEquals(cm.exception.message, 'You cannot filter by the "c" field')
 		
 		
 	def test_get_versioned_fail(self):

@@ -25,4 +25,8 @@ class DisabledMethodError(Exception):
 	pass
 	
 	
+class DuplicateError(Exception):
+	pass
+	
+	
 from model import CompoundValidationError

@@ -225,7 +225,7 @@ class MongoDBStorage(Storage):
 				if k == '$where':
 					continue
 			elif k not in allowed_fields:
-				raise errors.DisabledFieldError(k)
+				raise errors.DisabledFieldError('You cannot filter by the "%s" field' % k)
 				
 			if isinstance(v, (list, tuple)):
 				for x in v:
