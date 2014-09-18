@@ -1,4 +1,5 @@
 import unittest
+from copy import deepcopy
 from mock import Mock
 from bson.objectid import ObjectId
 from hammock.model import Model, Entity, Reference, Link, Text, ListOf, TypeOf
@@ -7,6 +8,15 @@ from hammock.methods import ALL, LIST, GET, CREATE
 from hammock.storage.mongodb import MongoDBStorage
 from hammock import errors, Hammock
 from hammock import auth
+
+
+class CopyingMock(Mock):
+	
+	def __call__(self, *args, **kwargs):
+		args = deepcopy(args)
+		kwargs = deepcopy(kwargs)
+		return super(CopyingMock, self).__call__(*args, **kwargs)
+	
 
 
 class Foo(Entity):
@@ -583,19 +593,63 @@ class CollectionTest(unittest.TestCase):
 		
 		foo = self.api.foos.update(foo['_id'], {'stuff':'nothings'})
 		pre_update.assert_called_with(foo['_id'], {'stuff':'nothings'}, replace=False)
-		post_update.assert_called_with(foo)
+		post_update.assert_called_with(foo, replace=False)
 		
 		foo = self.api.foos.replace(foo['_id'], {'stuff':'somethings'})
 		pre_update.assert_called_with(foo['_id'], {'stuff':'somethings'}, replace=True)
-		post_update.assert_called_with(foo)
+		post_update.assert_called_with(foo, replace=True)
 		
 		self.api.foos.delete(foo['_id'])
 		pre_delete.assert_called_with(foo['_id'])
 		post_delete.assert_called_with(foo['_id'])
 		
 		
+	def test_collection_hooks(self):
+		"""Collections have create, update and delete hooks"""
+		pre_create = CopyingMock()
+		post_create = Mock()
+		pre_update = CopyingMock()
+		post_update = Mock()
+		pre_delete = CopyingMock()
+		post_delete = Mock()
+		hooks = self.api.foos.hooks
+		hooks.pre('create', pre_create)
+		hooks.post('create', post_create)
+		hooks.pre('update', pre_update)
+		hooks.post('update', post_update)
+		hooks.pre('delete', pre_delete)
+		hooks.post('delete', post_delete)
+		context = {'foo':23}
+		
+		foo = self.api.foos.create({'stuff':'things'}, context=context.copy())
+		create_context = context.copy()
+		create_context['result'] = foo
+		pre_create.assert_called_with({'stuff':'things'}, context=context)
+		post_create.assert_called_with(foo, context=create_context)
+		
+		foo = self.api.foos.update(foo['_id'], {'stuff':'nothings'}, context=context.copy())
+		update_context = context.copy()
+		update_context['result'] = foo
+		pre_update.assert_called_with(foo['_id'], {'stuff':'nothings'}, replace=False, context=context)
+		post_update.assert_called_with(foo, context=update_context, replace=False)
+		
+		foo = self.api.foos.replace(foo['_id'], {'stuff':'somethings'}, context=context.copy())
+		replace_context = context.copy()
+		replace_context['result'] = foo
+		pre_update.assert_called_with(foo['_id'], {'stuff':'somethings'}, replace=True, context=context)
+		post_update.assert_called_with(foo, context=replace_context, replace=True)
+		
+		self.api.foos.delete(foo['_id'], context=context.copy())
+		pre_delete.assert_called_with(foo['_id'], context=context)
+		delete_context = context.copy()
+		delete_context['result'] = None
+		post_delete.assert_called_with(foo['_id'], context=delete_context)
+		
+		
 	def test_disabled_method(self):
 		"""An error is raised when attempting to call a disabled method."""
 		with self.assertRaises(errors.DisabledMethodError):
 			self.api.readonly_foos.create({})
+		
+		
 		

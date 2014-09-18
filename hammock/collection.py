@@ -1,5 +1,6 @@
 from .methods import ALL, LIST, CREATE, GET, REPLACE, UPDATE, DELETE
 from .model import CompoundValidationError, ListOf, Reference, Link
+from .events import EventManager
 from . import errors
 
 class CollectionMeta(type):
@@ -78,6 +79,7 @@ class Collection(object):
 		self.storage = storage
 		self.authorization = {}
 		self.entity = self.entity()
+		self.hooks = EventManager('create', 'update', 'delete')
 		
 		enabled_methods = set(self.enabled_methods)
 		for method in ALL:
@@ -106,16 +108,23 @@ class Collection(object):
 		
 	def create(self, fields, show_hidden=False, context={}):
 		self.pre(CREATE, context)
+		
 		self.entity.hooks.trigger_pre('create', fields)
+		self.hooks.trigger_pre('create', fields, context=context)
+		
 		item = self.entity.validator.validate(fields)
 		item['_id'] = self.storage.create(self.entity.__class__, item)
 		item = self.post(CREATE, item, context, show_hidden=show_hidden)
+		
 		self.entity.hooks.trigger_post('create', item)
+		self.hooks.trigger_post('create', item, context=context)
+		
 		return item
 		
 		
 	def get(self, id, show_hidden=False, context=None):
 		self.pre(GET, context)
+		
 		item = self.storage.get_by_id(self.entity.__class__, id)
 		if item is None:
 			raise errors.NotFoundError("No %s with id '%s' was found" % (self.singular_name, id))
@@ -125,34 +134,51 @@ class Collection(object):
 		
 	def update(self, id, fields, show_hidden=False, context=None):
 		self.pre(UPDATE, context)
+		
 		self.entity.hooks.trigger_pre('update', id, fields, replace=False)
+		self.hooks.trigger_pre('update', id, fields, replace=False, context=context)
+		
 		fields = self.entity.validator.validate(fields, enforce_required=False)
 		item = self.storage.update(self.entity.__class__, id, fields)
 		if item is None:
 			raise errors.NotFoundError("No %s with id '%s' was found" % (self.singular_name, id))
 		item = self.post(UPDATE, item, context, show_hidden=show_hidden)
-		self.entity.hooks.trigger_post('update', item)
+		
+		self.entity.hooks.trigger_post('update', item, replace=False)
+		self.hooks.trigger_post('update', item, context=context, replace=False)
+		
 		return item
 		
 		
 	def replace(self, id, fields, show_hidden=False, context=None):
 		self.pre(REPLACE, context)
+		
 		self.entity.hooks.trigger_pre('update', id, fields, replace=True)
+		self.hooks.trigger_pre('update', id, fields, replace=True, context=context)
+		
 		fields = self.entity.validator.validate(fields)
 		item = self.storage.update(self.entity.__class__, id, fields, replace=True)
 		if item is None:
 			raise errors.NotFoundError("No %s with id '%s' was found" % (self.singular_name, id))
 		item = self.post(REPLACE, item, context, show_hidden=show_hidden)
-		self.entity.hooks.trigger_post('update', item)
+		
+		self.entity.hooks.trigger_post('update', item, replace=True)
+		self.hooks.trigger_post('update', item, replace=True, context=context)
+		
 		return item
 		
 		
 	def delete(self, id, context=None):
 		self.pre(DELETE, context)
+		
 		self.entity.hooks.trigger_pre('delete', id)
+		self.hooks.trigger_pre('delete', id, context=context)
+		
 		self.storage.delete(self.entity.__class__, id)
 		self.post(DELETE, None, context)
+		
 		self.entity.hooks.trigger_post('delete', id)
+		self.hooks.trigger_post('delete', id, context=context)
 		
 		
 	def link(self, id, reference_name, filter=None, sort=None, offset=0, limit=0, show_hidden=False, context=None):
