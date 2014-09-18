@@ -1,5 +1,6 @@
 import re
 from datetime import datetime
+from  .events import EventManager
 
 __all__ = [
     'ValidationError',
@@ -532,7 +533,7 @@ class Compound(Field):
     
 class EntityMixin(object):
     
-    def setup(cls):
+    def setup(self):
         pass
     
     
@@ -541,8 +542,8 @@ class Timestamped(EntityMixin):
     modified = DateTime()
     
     def setup(self):
-        self.pre_hook('create', cls.on_create)
-        self.pre_hook('update', cls.on_modify)
+        self.hooks.pre('create', self.on_create)
+        self.hooks.pre('update', self.on_modify)
         
         
     def on_create(self, fields):
@@ -644,28 +645,10 @@ class Entity(object):
     versioned = False
     
     def __init__(self):
-        self.pre_hooks = {'create':[], 'update':[], 'delete':[]}
-        self.post_hooks = {'create':[], 'update':[], 'delete':[]}
+        self.hooks = EventManager('create', 'update', 'delete')
         for base in self.__class__.__bases__:
             if issubclass(base, EntityMixin):
                 base.setup(self)
-                
-    def pre_hook(self, name, fn):
-        self.pre_hooks[name].append(fn)
-        
-        
-    def post_hook(self, name, fn):
-        self.post_hooks[name].append(fn)
-        
-        
-    def trigger_pre(self, name, *args, **kwargs):
-        for fn in self.pre_hooks[name]:
-            fn(*args, **kwargs)
-            
-            
-    def trigger_post(self, name, *args, **kwargs):
-        for fn in self.post_hooks[name]:
-            fn(*args, **kwargs)
 
 
 class Model(object):

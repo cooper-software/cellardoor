@@ -729,80 +729,20 @@ class TestEntity(unittest.TestCase):
         self.assertEquals(result, obj)
         
         
-    def test_mixin_setup(self):
-        """
-        All mixins extending EntityMixin should have their setup() methods called
-        when an entity is instantiated.
-        """
-        class FooMixin(EntityMixin):
-            
-            def setup(self):
-                self.foo = 'foo'
-                
-        class BarMixin(EntityMixin):
-            
-            def setup(self):
-                self.bar = 'bar'
-        
-        class Baz(Entity, FooMixin, BarMixin):
-            pass
-            
-        baz = Baz()
-        self.assertEquals(baz.foo, 'foo')
-        self.assertEquals(baz.bar, 'bar')
-        
-        
-    def test_mixin_hooks(self):
-        """
-        Mixins can set hooks during setup.
-        """
-        class FooMixin(EntityMixin):
-            
-            def setup(self):
-                self.pre_hook('create', self.before_create)
-                self.post_hook('create', self.after_create)
-                
-            def before_create(self, fields):
-                fields['foo'] = 'before'
-                
-            def after_create(self, fields):
-                fields['foo'] = 'after'
-                
-                
-        class Bar(Entity, FooMixin):
-            pass
-            
-        b = Bar()
-        fields = {'foo':None}
-        b.trigger_pre('create', fields)
-        self.assertEquals(fields['foo'], 'before')
-        b.trigger_post('create', fields)
-        self.assertEquals(fields['foo'], 'after')
-        
-        
     def test_hooks(self):
         """
-        Can set hooks when defining entity.
+        Entities have an event manager with create, update and delete events
         """
         class Foo(Entity):
-            
-            def __init__(self, *args, **kwargs):
-                super(Foo, self).__init__(*args, **kwargs)
-                self.pre_hook('update', self.pre_update)
-                self.post_hook('update', self.post_update)
-                
-            def pre_update(self, fields):
-                fields['foo'] = 'pre'
-                
-            def post_update(self):
-                fields['foo'] = 'post'
+            pass
                 
         f = Foo()
-        fields = {'foo':None}
-        f.trigger_pre('update', fields)
-        self.assertEquals(fields['foo'], 'pre')
-        f.trigger_post('update')
-        self.assertEquals(fields['foo'], 'post')
+        f.hooks.pre('create', lambda x: x)
+        f.hooks.post('create', lambda x: x)
+        f.hooks.pre('update', lambda x: x)
+        f.hooks.post('update', lambda x: x)
+        f.hooks.pre('delete', lambda x: x)
+        f.hooks.post('delete', lambda x: x)
         
         
     def test_multiple_inheritance_fail(self):
@@ -836,6 +776,52 @@ class TestEntity(unittest.TestCase):
             
         self.assertEquals(Baz.hierarchy, [Foo, Bar, Baz])
         self.assertEquals(Foo.hierarchy, [Foo])
+        
+        
+        
+class TestMixins(unittest.TestCase):
+    
+    
+    def test_mixin_setup(self):
+        """
+        All mixins extending EntityMixin should have their setup() methods called
+        when an entity is instantiated.
+        """
+        class FooMixin(EntityMixin):
+            
+            def setup(self):
+                self.foo = 'foo'
+                
+        class BarMixin(EntityMixin):
+            
+            def setup(self):
+                self.bar = 'bar'
+        
+        class Baz(Entity, FooMixin, BarMixin):
+            pass
+            
+        baz = Baz()
+        self.assertEquals(baz.foo, 'foo')
+        self.assertEquals(baz.bar, 'bar')
+        
+        
+    def test_timestamped_mixin(self):
+        
+        class Foo(Entity, Timestamped):
+            pass
+            
+        foo = Foo()
+        fields = {}
+        foo.hooks.trigger_pre('create', fields)
+        self.assertIn('created', fields)
+        self.assertIn('modified', fields)
+        self.assertEquals(fields['created'], fields['modified'])
+        self.assertIsInstance(fields['created'], datetime)
+        foo.hooks.trigger_pre('update', fields)
+        self.assertNotEquals(fields['created'], fields['modified'])
+        self.assertIsInstance(fields['created'], datetime)
+        self.assertIsInstance(fields['modified'], datetime)
+        
         
         
 class TestModel(unittest.TestCase):
