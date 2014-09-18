@@ -1,4 +1,4 @@
-from .methods import LIST, CREATE, GET, REPLACE, UPDATE, DELETE
+from .methods import ALL, LIST, CREATE, GET, REPLACE, UPDATE, DELETE
 from .model import CompoundValidationError, ListOf, Reference, Link
 from . import errors
 
@@ -78,6 +78,11 @@ class Collection(object):
 		self.storage = storage
 		self.authorization = {}
 		self.entity = self.entity()
+		
+		enabled_methods = set(self.enabled_methods)
+		for method in ALL:
+			if method not in enabled_methods:
+				setattr(self, method, self.disabled_method_error)
 		
 		for methods, rule in self.method_authorization:
 			for method in methods:
@@ -354,4 +359,8 @@ class Collection(object):
 		else:
 			result = self.prepare_item(result, embed=embed, show_hidden=show_hidden)
 		return result
+		
+		
+	def disabled_method_error(self, *args, **kwargs):
+		raise errors.DisabledMethodError, "This method is not enabled."
 		

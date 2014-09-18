@@ -85,9 +85,13 @@ class HiddenCollection(Collection):
 	)
 	hidden_field_authorization = auth.identity.foo == 'bar'
 	
-
-model = Model(None, (Foo, Bar, Baz))
-
+	
+class ReadOnlyFoosCollection(Collection):
+	entity = Foo
+	singular_name = 'readonly_foo'
+	enabled_methods = (LIST, GET)
+	
+	
 class CollectionTest(unittest.TestCase):
 	
 	def setUp(self):
@@ -96,7 +100,7 @@ class CollectionTest(unittest.TestCase):
 			if not c.startswith('system.'):
 				self.storage.db[c].drop()
 		super(CollectionTest, self).setUp()
-		self.api = Hammock(collections=(FoosCollection, BarsCollection, BazesCollection, HiddenCollection),
+		self.api = Hammock(collections=(FoosCollection, BarsCollection, BazesCollection, HiddenCollection, ReadOnlyFoosCollection),
 						   storage=self.storage)
 		
 		
@@ -558,6 +562,7 @@ class CollectionTest(unittest.TestCase):
 		
 		
 	def test_entity_hooks(self):
+		"""Collections call entity create, update and delete hooks"""
 		pre_create = Mock()
 		post_create = Mock()
 		pre_update = Mock()
@@ -587,4 +592,10 @@ class CollectionTest(unittest.TestCase):
 		self.api.foos.delete(foo['_id'])
 		pre_delete.assert_called_with(foo['_id'])
 		post_delete.assert_called_with(foo['_id'])
+		
+		
+	def test_disabled_method(self):
+		"""An error is raised when attempting to call a disabled method."""
+		with self.assertRaises(errors.DisabledMethodError):
+			self.api.readonly_foos.create({})
 		

@@ -21,4 +21,8 @@ class DisabledFieldError(Exception):
 	pass
 	
 	
+class DisabledMethodError(Exception):
+	pass
+	
+	
 from model import CompoundValidationError
