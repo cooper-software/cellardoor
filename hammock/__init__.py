@@ -11,7 +11,7 @@ class Hammock(object):
 			collection_classes = []
 			for k,v in collections.__dict__.items():
 				try:
-					if issubclass(v, Collection):
+					if issubclass(v, Collection) and v != Collection:
 						collection_classes.append(v)
 				except TypeError:
 					pass
