@@ -1,10 +1,22 @@
+import types
 from version import __version__
 from .model import Model
+from .collection import Collection
 
 
 class Hammock(object):
 	
 	def __init__(self, collections=(), authenticators=(), storage=None):
+		if type(collections) == types.ModuleType:
+			collection_classes = []
+			for k,v in collections.__dict__.items():
+				try:
+					if issubclass(v, Collection):
+						collection_classes.append(v)
+				except TypeError:
+					pass
+		else:
+			collection_classes = collections
 		entities = set()
 		self.collections_by_class_name = {}
 		
