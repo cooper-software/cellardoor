@@ -20,7 +20,7 @@ class Hammock(object):
 		entities = set()
 		self.collections_by_class_name = {}
 		
-		for collection_cls in collections:
+		for collection_cls in collection_classes:
 			entities.add(collection_cls.entity)
 			collection = collection_cls(storage)
 			self.collections_by_class_name[collection_cls.__name__] = collection
