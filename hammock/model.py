@@ -663,13 +663,14 @@ class Link(object):
     Links define a foreign key relationship. They are read-only.
     """
     
-    def __init__(self, entity, field, embedded=False, multiple=True, hidden=False):
+    def __init__(self, entity, field, embedded=False, multiple=True, hidden=False, help=None):
         self.entity = entity
         self.field = field
         self.embedded = embedded
         self.multiple = multiple
         self.hidden = hidden
         self.storage = None
+        self.help = help
     
     
 class EntityMeta(type):
