@@ -26,7 +26,7 @@ class Resource(object):
 		
 		
 	def add_to_falcon(self, app):
-		methods = set(self.collection.enabled_methods)
+		methods = self.collection.rules.enabled_methods
 		collection_methods = methods.intersection((LIST, CREATE))
 		individual_methods = methods.intersection((GET, REPLACE, UPDATE, DELETE))
 		

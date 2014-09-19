@@ -4,8 +4,9 @@ from hammock import auth
 from . import model
 
 
-admin_or_self = (auth.identity.role == 'admin') | (auth.result.id == auth.identity.id)
+admin_or_self = (auth.identity.role == 'admin') | (auth.item.id == auth.identity.id)
 admin_or_user = (auth.identity.role == 'admin') | (auth.identity.role == 'user')
+
 
 class PeopleCollection(Collection):
 	entity = model.Person

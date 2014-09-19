@@ -3,6 +3,55 @@ from .model import ListOf, Reference, Link
 from .events import EventManager
 from . import errors
 
+
+class RuleSet(object):
+	
+	def __init__(self, method_authorization):
+		self.enabled_methods = set()
+		self.item_rules = {}
+		self.non_item_rules = {}
+		
+		if method_authorization:
+			for k,v in method_authorization.items():
+				if not isinstance(k, tuple):
+					k = (k,)
+				for method in k:
+					self.enabled_methods.add(method)
+					if v is None:
+						continue
+					if v.uses('item'):
+						rules = self.item_rules
+					else:
+						rules = self.non_item_rules
+					if method not in rules:
+						rules[method] = []
+					rules[method].append(v)
+				
+				
+	def enforce_item_rules(self, method, item, context):
+		rules = self.item_rules.get(method)
+		if rules:
+			self.enforce_rules(rules, item, context)
+		
+		
+	def enforce_non_item_rules(self, method, context):
+		rules = self.non_item_rules.get(method)
+		if rules:
+			self.enforce_rules(rules, None, context)
+		
+		
+	def enforce_rules(self, rules, item, context):
+		context = context if context else {}
+		context['item'] = item
+		no_identity = 'identity' not in context
+		for rule in rules:
+			if no_identity and rule.uses('identity'):
+				raise errors.NotAuthenticatedError()
+			if not rule(context):
+				raise errors.NotAuthorizedError()
+		
+
+
 class CollectionMeta(type):
 	
 	def __new__(cls, name, bases, attrs):
@@ -51,11 +100,12 @@ class Collection(object):
 	# of a collection.
 	links = None
 	
-	# A list or tuple of `hammock.methods` that are enabled through this collection.
-	#
-	# Note that just because a method is enabled, does not mean it will be available
-	# to any request. Methods are subject to authorization rules.
-	enabled_methods = ()
+	# A dict of authorization rules. The key is a `hammock.method` or a tuple of methods 
+	# and the value is an authorization rule.
+	method_authorization = None
+	
+	# A `hammock.auth.AuthenticationExpression` that must be met for hidden fields to be shown.
+	hidden_field_authorization = None
 	
 	# A list or tuple of fields that are allowed to be used in filters.
 	enabled_filters = ()
@@ -67,53 +117,41 @@ class Collection(object):
 	# used to sort results when no sort is supplied in the request.
 	default_sort = ()
 	
-	# A list or tuple of authorization rules. An authorization rule is a 2-tuple. The first item is a tuple
-	# of `hammock.methods` that the rule applies to. The second item is a `hammock.auth.AuthenticationExpression`.
-	method_authorization = ()
-	
-	# A `hammock.auth.AuthenticationExpression` that must be met for hidden fields to be shown.
-	hidden_field_authorization = ()
-	
 	
 	def __init__(self, storage):
 		self.storage = storage
-		self.authorization = {}
 		self.entity = self.entity()
 		self.hooks = EventManager('create', 'update', 'delete')
+		self.rules = RuleSet(self.method_authorization)
 		
-		enabled_methods = set(self.enabled_methods)
 		for method in ALL:
-			if method not in enabled_methods:
+			if method not in self.rules.enabled_methods:
 				setattr(self, method, self.disabled_method_error)
-		
-		for methods, rule in self.method_authorization:
-			for method in methods:
-				if method not in self.authorization:
-					self.authorization[method] = []
-				self.authorization[method].append(rule)
-		
-		if self.hidden_field_authorization:
-			assert not self.hidden_field_authorization.uses('item'), \
-				"Hidden field authorization rules must not use `auth.item`"
-			self.authorization['allow_hidden'] = [self.hidden_field_authorization]
 			
 			
-	def list(self, filter=None, sort=None, offset=0, limit=0, show_hidden=False, context={}):
-		self.pre(LIST, context)
+	def list(self, filter=None, sort=None, offset=0, limit=0, show_hidden=False, context=None):
+		self.rules.enforce_non_item_rules(LIST, context)
+		
 		sort = sort if sort else self.default_sort
 		self.check_for_disabled_fields(filter, sort, context)
 		items = self.storage.get(self.entity.__class__, filter=filter, sort=sort, offset=offset, limit=limit)
+		
+		self.rules.enforce_item_rules(LIST, items, context)
+				
 		return self.post(LIST, items, context, show_hidden=show_hidden)
 		
 		
-	def create(self, fields, show_hidden=False, context={}):
-		self.pre(CREATE, context)
+	def create(self, fields, show_hidden=False, context=None):
+		self.rules.enforce_non_item_rules(CREATE, context)
 		
 		self.entity.hooks.trigger_pre('create', fields)
 		self.hooks.trigger_pre('create', fields, context=context)
 		
 		item = self.entity.validator.validate(fields)
 		item['_id'] = self.storage.create(self.entity.__class__, item)
+		
+		self.rules.enforce_item_rules(CREATE, item, context)
+		
 		item = self.post(CREATE, item, context, show_hidden=show_hidden)
 		
 		self.entity.hooks.trigger_post('create', item)
@@ -123,25 +161,34 @@ class Collection(object):
 		
 		
 	def get(self, id, show_hidden=False, context=None):
-		self.pre(GET, context)
+		self.rules.enforce_non_item_rules(GET, context)
 		
 		item = self.storage.get_by_id(self.entity.__class__, id)
 		if item is None:
 			raise errors.NotFoundError("No %s with id '%s' was found" % (self.singular_name, id))
-		else:
-			return self.post(GET, item, context, show_hidden=show_hidden)
+		
+		self.rules.enforce_item_rules(GET, item, context)
+		
+		return self.post(GET, item, context, show_hidden=show_hidden)
 		
 		
 	def update(self, id, fields, show_hidden=False, context=None):
-		self.pre(UPDATE, context)
+		self.rules.enforce_non_item_rules(UPDATE, context)
 		
 		self.entity.hooks.trigger_pre('update', id, fields, replace=False)
 		self.hooks.trigger_pre('update', id, fields, replace=False, context=context)
+		
+		if UPDATE in self.rules.item_rules:
+			item = self.storage.get_by_id(self.entity.__class__, id)
+			if item is None:
+				raise errors.NotFoundError("No %s with id '%s' was found" % (self.singular_name, id))
+			self.rules.enforce_item_rules(UPDATE, item, context)
 		
 		fields = self.entity.validator.validate(fields, enforce_required=False)
 		item = self.storage.update(self.entity.__class__, id, fields)
 		if item is None:
 			raise errors.NotFoundError("No %s with id '%s' was found" % (self.singular_name, id))
+		
 		item = self.post(UPDATE, item, context, show_hidden=show_hidden)
 		
 		self.entity.hooks.trigger_post('update', item, replace=False)
@@ -151,7 +198,13 @@ class Collection(object):
 		
 		
 	def replace(self, id, fields, show_hidden=False, context=None):
-		self.pre(REPLACE, context)
+		self.rules.enforce_non_item_rules(REPLACE, context)
+		
+		if REPLACE in self.rules.item_rules:
+			item = self.storage.get_by_id(self.entity.__class__, id)
+			if item is None:
+				raise errors.NotFoundError("No %s with id '%s' was found" % (self.singular_name, id))
+			self.rules.enforce_item_rules(REPLACE, item, context)
 		
 		self.entity.hooks.trigger_pre('update', id, fields, replace=True)
 		self.hooks.trigger_pre('update', id, fields, replace=True, context=context)
@@ -160,6 +213,7 @@ class Collection(object):
 		item = self.storage.update(self.entity.__class__, id, fields, replace=True)
 		if item is None:
 			raise errors.NotFoundError("No %s with id '%s' was found" % (self.singular_name, id))
+			
 		item = self.post(REPLACE, item, context, show_hidden=show_hidden)
 		
 		self.entity.hooks.trigger_post('update', item, replace=True)
@@ -169,7 +223,14 @@ class Collection(object):
 		
 		
 	def delete(self, id, context=None):
-		self.pre(DELETE, context)
+		self.rules.enforce_non_item_rules(DELETE, context)
+		context = context if context else {}
+		
+		item = self.storage.get_by_id(self.entity.__class__, id)
+		if item is None:
+			raise errors.NotFoundError("No %s with id '%s' was found" % (self.singular_name, id))
+			
+		self.rules.enforce_item_rules(DELETE, item, context)
 		
 		self.entity.hooks.trigger_pre('delete', id)
 		self.hooks.trigger_pre('delete', id, context=context)
@@ -178,24 +239,22 @@ class Collection(object):
 		self.post(DELETE, None, context)
 		
 		self.entity.hooks.trigger_post('delete', id)
+		context['item'] = item
 		self.hooks.trigger_post('delete', id, context=context)
 		
 		
 	def link(self, id, reference_name, filter=None, sort=None, offset=0, limit=0, show_hidden=False, context=None):
-		self.pre(GET, context)
+		self.rules.enforce_non_item_rules(GET, context)
 		
 		item = self.storage.get_by_id(self.entity.__class__, id)
-		
 		if item is None:
 			raise errors.NotFoundError("No %s with id '%s' was found" % (self.singular_name, id))
 		
-		self.post(GET, item, context)
+		self.rules.enforce_item_rules(GET, item, context)
 			
 		target_collection = self.links.get(reference_name)
-		
 		if target_collection is None:
 			raise errors.NotFoundError("The %s collection has no link '%s' defined" % (self.plural_name, reference_name))
-		
 		reference_field = getattr(self.entity.__class__, reference_name)
 		
 		return target_collection.resolve_link_or_reference(item, reference_name, reference_field,
@@ -224,13 +283,15 @@ class Collection(object):
 		filter[link_field.field] = source_item['_id']
 		
 		if link_field.multiple:
-			self.pre(LIST, context)
+			self.rules.enforce_non_item_rules(LIST, context)
 			items = list(self.storage.get(self.entity.__class__, filter=filter, sort=sort, offset=offset, limit=limit))
+			self.rules.enforce_item_rules(LIST, items, context)
 			return self.post(LIST, items, context, embed=False, show_hidden=show_hidden)
 		else:
 			try:
-				self.pre(GET, context)
+				self.rules.enforce_non_item_rules(GET, context)
 				item = next(iter(self.storage.get(self.entity.__class__, filter=filter, limit=1)))
+				self.rules.enforce_item_rules(GET, item, context)
 				return self.post(GET, item, context, embed=False, show_hidden=show_hidden)
 			except StopIteration:
 				pass
@@ -245,13 +306,15 @@ class Collection(object):
 			return None
 		
 		if isinstance(reference_field, ListOf):
-			self.pre(LIST, context)
+			self.rules.enforce_non_item_rules(LIST, context)
 			items = list(self.storage.get_by_ids(self.entity.__class__, reference_value,
 						filter=filter, sort=sort, offset=offset, limit=limit))
+			self.rules.enforce_item_rules(LIST, items, context)
 			return self.post(LIST, items, context, embed=False, show_hidden=show_hidden)
 		else:
-			self.pre(GET, context)
+			self.rules.enforce_non_item_rules(GET, context)
 			item = self.storage.get_by_id(self.entity.__class__, reference_value)
+			self.rules.enforce_item_rules(GET, item, context)
 			return self.post(GET, item, context, embed=False, show_hidden=show_hidden)
 			
 			
@@ -288,29 +351,12 @@ class Collection(object):
 			
 			
 	def can_show_hidden(self, context):
-		hidden_auth_rules = self.authorization.get('allow_hidden')
-		if hidden_auth_rules:
-			does_not_have_identity = 'identity' not in context
-			for rule in hidden_auth_rules:
-				if rule.uses('identity') and does_not_have_identity:
-					return False
-				elif not rule(context):
-					return False
+		if self.hidden_field_authorization:
+			if self.hidden_field_authorization.uses('identity') and 'identity' not in context:
+				return False
+			elif not self.hidden_field_authorization(context):
+				return False
 		return True
-		
-		
-	def prepare_items(self, items, embed=True, show_hidden=False):
-		"""Do post-processing on items.
-		
-		For example, adding embedded references, removing hidden fields, etc.
-		
-		:param items: A list of items or a single item to prepare.
-		:returns: A list of prepared items or a single prepared item.
-		"""
-		prepared_items = []
-		for item in items:
-			prepared_items.append(self.prepare_item(item, embed=embed, show_hidden=False))
-		return prepared_items
 		
 		
 	def prepare_item(self, item, embed=True, show_hidden=False):
@@ -345,43 +391,33 @@ class Collection(object):
 		return item
 		
 		
-	def pre(self, method, context):
-		"""Perform pre-method hooks, including authorization that does not require access to fetched items."""
-		context = context if context else {}
-		auth_rules = self.authorization.get(method)
-		does_not_have_identity = 'identity' not in context
-		if auth_rules:
-			for rule in auth_rules:
-				if not rule.uses('result'):
-					if rule.uses('identity') and does_not_have_identity:
-						raise errors.NotAuthenticatedError()
-					elif not rule(context):
-						raise errors.NotAuthorizedError()
-		
-		
 	def post(self, method, result, context, embed=True, show_hidden=False):
 		"""Perform post-method hooks including authentication that requires fetched items."""
-		context = context if context else {}
-		auth_rules = self.authorization.get(method)
-		does_not_have_identity = 'identity' not in context
-		context['result'] = result
-		if auth_rules:
-			for rule in auth_rules:
-				if rule.uses('identity') and does_not_have_identity:
-					raise errors.NotAuthenticatedError()
-				elif not rule(context):
-					raise errors.NotAuthorizedError()
-						
 		if result is None:
 			return
 			
-		show_hidden = self.can_show_hidden(context) and show_hidden
+		context = context if context else {}
 		
 		if method == LIST:
-			result = self.prepare_items(result, embed=embed, show_hidden=show_hidden)
+			if show_hidden and self.hidden_field_authorization and self.hidden_field_authorization.uses('item'):
+				new_results = []
+				for item in result:
+					context['item'] = item
+					new_results.append(
+						self.prepare_item(item, embed=embed, show_hidden=self.can_show_hidden(context))
+					)
+				return new_results
+			else:
+				new_results = []
+				for item in result:
+					new_results.append(
+						self.prepare_item(item, embed=embed, show_hidden=False)
+					)
+				return new_results
 		else:
-			result = self.prepare_item(result, embed=embed, show_hidden=show_hidden)
-		return result
+			context['item'] = result
+			show_hidden = self.can_show_hidden(context) and show_hidden
+			return self.prepare_item(result, embed=embed, show_hidden=show_hidden)
 		
 		
 	def disabled_method_error(self, *args, **kwargs):

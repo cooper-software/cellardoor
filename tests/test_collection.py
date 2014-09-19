@@ -48,7 +48,9 @@ class Hidden(Entity):
 
 class FoosCollection(Collection):
 	entity = Foo
-	enabled_methods = ALL
+	method_authorization = {
+		ALL: None
+	}
 	links = {
 		'bars': 'BarsCollection',
 		'bazes': 'BazesCollection',
@@ -60,7 +62,9 @@ class FoosCollection(Collection):
 	
 class BarsCollection(Collection):
 	entity = Bar
-	enabled_methods = ALL
+	method_authorization = {
+		ALL: None
+	}
 	links = {
 		'foo': FoosCollection,
 		'embedded_foo': FoosCollection,
@@ -74,7 +78,9 @@ class BarsCollection(Collection):
 class BazesCollection(Collection):
 	entity = Baz
 	plural_name = 'bazes'
-	enabled_methods = ALL
+	method_authorization = {
+		ALL: None
+	}
 	enabled_filters = ('name',)
 	enabled_sort = ('name',)
 	links = {
@@ -85,21 +91,23 @@ class BazesCollection(Collection):
 	
 class HiddenCollection(Collection):
 	entity = Hidden
-	enabled_methods = ALL
 	enabled_filters = ('name',)
 	enabled_sort = ('name',)
-	method_authorization = (
-		((LIST,), auth.identity.exists()),
-		((CREATE,), auth.identity.role == 'admin'),
-		((GET,), auth.result.foo == 23)
-	)
+	method_authorization = {
+		LIST: auth.identity.exists(),
+		CREATE: auth.identity.role == 'admin',
+		GET: auth.item.foo == 23
+	}
 	hidden_field_authorization = auth.identity.foo == 'bar'
 	
 	
 class ReadOnlyFoosCollection(Collection):
 	entity = Foo
 	singular_name = 'readonly_foo'
-	enabled_methods = (LIST, GET)
+	method_authorization = {
+		LIST: None,
+		GET: None
+	}
 	
 	
 class CollectionTest(unittest.TestCase):
@@ -621,26 +629,26 @@ class CollectionTest(unittest.TestCase):
 		
 		foo = self.api.foos.create({'stuff':'things'}, context=context.copy())
 		create_context = context.copy()
-		create_context['result'] = foo
+		create_context['item'] = foo
 		pre_create.assert_called_with({'stuff':'things'}, context=context)
 		post_create.assert_called_with(foo, context=create_context)
 		
 		foo = self.api.foos.update(foo['_id'], {'stuff':'nothings'}, context=context.copy())
 		update_context = context.copy()
-		update_context['result'] = foo
+		update_context['item'] = foo
 		pre_update.assert_called_with(foo['_id'], {'stuff':'nothings'}, replace=False, context=context)
 		post_update.assert_called_with(foo, context=update_context, replace=False)
 		
 		foo = self.api.foos.replace(foo['_id'], {'stuff':'somethings'}, context=context.copy())
 		replace_context = context.copy()
-		replace_context['result'] = foo
+		replace_context['item'] = foo
 		pre_update.assert_called_with(foo['_id'], {'stuff':'somethings'}, replace=True, context=context)
 		post_update.assert_called_with(foo, context=replace_context, replace=True)
 		
 		self.api.foos.delete(foo['_id'], context=context.copy())
-		pre_delete.assert_called_with(foo['_id'], context=context)
 		delete_context = context.copy()
-		delete_context['result'] = None
+		delete_context['item'] = foo
+		pre_delete.assert_called_with(foo['_id'], context=context)
 		post_delete.assert_called_with(foo['_id'], context=delete_context)
 		
 		

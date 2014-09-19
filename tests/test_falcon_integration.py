@@ -33,18 +33,24 @@ class FoosCollection(Collection):
 		'bar': 'BarsCollection',
 		'bazes': 'BazesCollection'
 	}
-	enabled_methods = ALL
+	method_authorization = {
+		ALL: None
+	}
 	
 	
 class BarsCollection(Collection):
 	entity = Bar
-	enabled_methods = (LIST, GET, CREATE)
+	method_authorization = {
+		(LIST, GET, CREATE): None
+	}
 	
 	
 class BazesCollection(Collection):
 	entity = Baz
 	plural_name = 'bazes'
-	enabled_methods = (LIST, GET, CREATE)
+	method_authorization = {
+		(LIST, GET, CREATE): None
+	}
 
 
 class TestResource(TestBase):

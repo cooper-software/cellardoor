@@ -57,6 +57,10 @@ class AndExpression(BinaryExpression):
 		return self.a(context) and self.b(context)
 		
 		
+	def __repr__(self):
+		return 'AndExpression(%s, %s)' % (repr(self.a), repr(self.b))
+		
+		
 		
 class OrExpression(BinaryExpression):
 		
@@ -87,6 +91,10 @@ class ObjectProxy(AuthenticationExpression):
 		return self.name in context
 		
 		
+	def __repr__(self):
+		return 'ObjectProxy(%s)' % self.name
+		
+		
 	def match(self, fn):
 		return ObjectProxyMatch(self, fn)
 		
@@ -105,6 +113,10 @@ class ObjectProxyMatch(AuthenticationExpression):
 	def __init__(self, proxy, fn):
 		self.proxy = proxy
 		self.fn = fn
+		
+		
+	def __repr__(self):
+		return 'ObjectProxyMatch(%s, %s)' % (repr(self.proxy), repr(self.fn))
 		
 		
 	def __eq__(self, other):
@@ -126,6 +138,10 @@ class ObjectProxyValue(AuthenticationExpression):
 	def __init__(self, proxy, key):
 		self.proxy = proxy
 		self.key = key
+		
+		
+	def __repr__(self):
+		return 'ObjectProxyValue(%s, %s)' % (repr(self.proxy), self.key)
 		
 		
 	def __eq__(self, other):
@@ -180,9 +196,15 @@ class ObjectProxyValue(AuthenticationExpression):
 		
 class ObjectProxyValueComparison(AuthenticationExpression):
 	
+	opstr = ''
+	
 	def __init__(self, proxy, other):
 		self.proxy = proxy
 		self.other = other
+		
+		
+	def __repr__(self):
+		return '%s %s %s' % (repr(self.proxy), self.opstr, repr(self.other))
 		
 	
 	def __eq__(self, other):
@@ -201,7 +223,7 @@ class ObjectProxyValueComparison(AuthenticationExpression):
 			
 		
 	def compare(self, a, b):
-		raise NotImplementedError
+		self
 		
 		
 	def uses(self, key):
@@ -213,46 +235,53 @@ class ObjectProxyValueComparison(AuthenticationExpression):
 		
 		
 class EqualsComparison(ObjectProxyValueComparison):
+	opstr = '=='
 	
 	def compare(self, a, b):
 		return a == b
 		
 		
 class NotEqualsComparison(ObjectProxyValueComparison):
+	opstr = '!='
 	
 	def compare(self, a, b):
 		return a != b
 		
 		
 class LessThanComparison(ObjectProxyValueComparison):
+	opstr = '<'
 	
 	def compare(self, a, b):
 		return a < b
 		
 		
 class GreaterThanComparison(ObjectProxyValueComparison):
+	opstr = '>'
 	
 	def compare(self, a, b):
 		return a > b
 		
 		
 class LessThanEqualComparison(ObjectProxyValueComparison):
+	opstr = '<='
 	
 	def compare(self, a, b):
 		return a <= b
 		
 		
 class GreaterThanEqualComparison(ObjectProxyValueComparison):
+	opstr = '>='
 	
 	def compare(self, a, b):
 		return a >= b
 		
 		
 class ContainsComparison(ObjectProxyValueComparison):
+	opstr = ' in '
 	
 	def compare(self, a, b):
 		return a in b
 		
 		
 identity = ObjectProxy('identity')
-result = ObjectProxy('result')
+item = ObjectProxy('item')

@@ -11,9 +11,8 @@ CREATE = 'create'
 REPLACE = 'replace'
 UPDATE = 'update'
 DELETE = 'delete'
+
 ALL = (LIST, GET, CREATE, UPDATE, REPLACE, DELETE)
-DESTRUCTIVE = (UPDATE, REPLACE, DELETE)
-READ = (LIST, GET)
 
 _http_methods = {
 	LIST: ('get',),
