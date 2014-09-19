@@ -629,7 +629,6 @@ class EntityMeta(type):
                 links.append((k,v))
         
         attrs['fields'] = fields
-        attrs['validator'] = Compound(**fields)
         attrs['references'] = references
         attrs['links'] = links
         attrs['links_and_references'] = links + references
@@ -641,6 +640,8 @@ class EntityMeta(type):
             attrs['links'] += entity_cls.links
             attrs['links_and_references'] += entity_cls.links_and_references
             attrs['hidden_fields'] += entity_cls.hidden_fields
+        
+        attrs['validator'] = Compound(**fields)
         
         new_cls = super(EntityMeta, cls).__new__(cls, name, bases, attrs)
         new_cls.hierarchy.append(new_cls)

@@ -789,6 +789,9 @@ class TestEntity(unittest.TestCase):
             
         self.assertEquals(set(Bar.fields.keys()), set(['a', 'b', 'c']))
         
+        result = Bar.validator.validate({'a':'1','b':'2','c':'3'})
+        self.assertEquals(result, {'a':'1','b':'2','c':'3'})
+        
         
         
 class TestMixins(unittest.TestCase):
