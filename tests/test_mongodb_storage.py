@@ -374,3 +374,14 @@ class TestMongoDBStorage(unittest.TestCase):
 		
 		with self.assertRaises(errors.DuplicateError):
 			self.storage.create(Baz, {'foo':123})
+			
+			
+	def test_update_collision(self):
+		"""
+		Raises an error when attempting to update an item with a duplicated unique field.
+		"""
+		self.storage.create(Baz, {'foo':123})
+		baz_id = self.storage.create(Baz, {'foo':321})
+		
+		with self.assertRaises(errors.DuplicateError):
+			self.storage.update(Baz, baz_id, {'foo':123})
