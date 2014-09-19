@@ -176,6 +176,13 @@ class TestResource(TestBase):
 		self.assertEquals(self.srmock.status, '401 Unauthorized')
 		
 		
+	def test_unique_field(self):
+		"""If a create request fails with a duplicate field error, a 400 status is returned"""
+		self.hammock.foos.list = Mock(side_effect=errors.DuplicateError)
+		self.simulate_request('/foos')
+		self.assertEquals(self.srmock.status, '400 Bad Request')
+		
+		
 	def test_list(self):
 		"""Will return a list of items structured by the view"""
 		foos = [{'name':'foo'}, {'name':'bar'}]

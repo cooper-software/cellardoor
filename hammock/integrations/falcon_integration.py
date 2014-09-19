@@ -243,6 +243,14 @@ def validation_error_handler(views, exc, req, resp, params):
 	
 def disabled_field_error(exc, req, resp, params):
 	raise falcon.HTTPUnauthorized('Unauthorized', exc.message)
+	
+	
+def duplicate_field_error(views, exc, req, resp, params):
+	error = {}
+	error[exc.message] = 'A duplicate value already exists.'
+	_, view = View.choose(req, views)
+	resp.content_type, resp.body = view.get_individual_response(req, error)
+	resp.status = falcon.HTTP_400
 		
 		
 def add_to_falcon(falcon_api, hammock_api, views):
@@ -258,6 +266,8 @@ def add_to_falcon(falcon_api, hammock_api, views):
 	validation_error_handler_with_views = functools.partial(validation_error_handler, views_by_type)
 	falcon_api.add_error_handler(errors.CompoundValidationError, validation_error_handler_with_views)
 	falcon_api.add_error_handler(errors.DisabledFieldError, disabled_field_error)
+	duplicate_field_error_with_views = functools.partial(duplicate_field_error, views_by_type)
+	falcon_api.add_error_handler(errors.DuplicateError, duplicate_field_error_with_views)
 	
 	for collection in hammock_api.collections_by_class_name.values():
 		resource = Resource(collection, views_by_type)

@@ -5,12 +5,23 @@ from bson.objectid import ObjectId
 from . import Storage
 from .. import errors
 
+find_dupe_index_pattern = re.compile(r'\$([a-zA-Z0-9_]+)\s+')
 
 class MongoDBStorage(Storage):
 	
 	def __init__(self, db=None, *args, **kwargs):
 		self.client = pymongo.MongoClient(*args, **kwargs)
 		self.db = self.client[db]
+		self.unique_fields_by_index = {}
+		
+		
+	def setup(self, model):
+		for e in model.entities:
+			collection = self.get_collection(e)
+			for k,v in e.fields.items():
+				if v.unique:
+					index_name = collection.ensure_index(k, unique=True, sparse=True)
+					self.unique_fields_by_index[index_name] = k
 		
 	
 	def get(self, entity, filter=None, fields=None, sort=None, offset=0, limit=0, versions=False):
@@ -85,7 +96,11 @@ class MongoDBStorage(Storage):
 		type_name = self.get_type_name(entity)
 		if type_name:
 			fields['_type'] = type_name
-		obj_id = collection.insert(fields.copy())
+		try:
+			obj_id = collection.insert(fields.copy())
+		except pymongo.errors.DuplicateKeyError, e:
+			self._raise_dupe_error(e)
+			
 		return str(obj_id)
 		
 		
@@ -232,4 +247,15 @@ class MongoDBStorage(Storage):
 					self._check_filter(x, allowed_fields)
 			elif isinstance(v, dict):
 				self._check_filter(v, allowed_fields)
+				
+				
+	def _raise_dupe_error(self, orig_exc):
+		m = find_dupe_index_pattern.search(orig_exc.message)
+		if m:
+			index_name = m.group(1)
+			key_name = self.unique_fields_by_index.get(index_name)
+		else:
+			key_name = 'unknown'
+		
+		raise errors.DuplicateError(key_name)
 				

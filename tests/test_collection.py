@@ -650,4 +650,3 @@ class CollectionTest(unittest.TestCase):
 			self.api.readonly_foos.create({})
 		
 		
-		
