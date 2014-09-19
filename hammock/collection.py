@@ -351,6 +351,7 @@ class Collection(object):
 			
 			
 	def can_show_hidden(self, context):
+		context = context if context else {}
 		if self.hidden_field_authorization:
 			if self.hidden_field_authorization.uses('identity') and 'identity' not in context:
 				return False
