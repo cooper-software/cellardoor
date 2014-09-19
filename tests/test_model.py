@@ -334,7 +334,105 @@ class TestBoolean(unittest.TestCase):
                 self.assertEqual(True, field.validate(true))
             except ValidationError:
                 self.fail("Didn't pass '%s'" % true)
+
+
+
+class RangeImpl(Range):
+    
+    def str_value(self, value):
+        return str(value)
+
+
+class TestRange(unittest.TestCase):
+    
+    def test_min(self):
+        """Fails if the value is less than the min"""
+        field = RangeImpl(min=5)
+        self.assertRaises(ValidationError, field.validate, 4)
         
+        
+    def test_max(self):
+        """Fails if the value is greater than the max"""
+        field = RangeImpl(max=5)
+        self.assertRaises(ValidationError, field.validate, 6)
+
+        
+        
+class TestFloat(unittest.TestCase):
+    
+    
+    def test_float_range(self):
+        """A Float is a kind of Range"""
+        field = Float()
+        self.assertIsInstance(field, Range)
+    
+    
+    def test_float_fail(self):
+        """A Float doesn't pass anything that's not a float"""
+        not_floats = [
+            'heEEey',
+            {'7':7},
+            (1,2,3)
+        ]
+        
+        field = Float()
+        
+        for not_float in not_floats:
+            self.assertRaises(ValidationError, field.validate, not_float)
+            
+            
+    def test_float_pass(self):
+        """A Float passes a float or a string representing a float"""
+        floats = [
+            13,
+            13.31,
+            '13',
+            '13.31e-4'
+        ]
+            
+        field = Float()
+        
+        for f in floats:
+            field.validate(f)
+            
+            
+            
+class TestInteger(unittest.TestCase):
+    
+    
+    def test_integer_range(self):
+        """An Integer is a kind of Range"""
+        field = Integer()
+        self.assertIsInstance(field, Range)
+    
+    
+    def test_integer_fail(self):
+        """An Integer doesn't pass anything that's not an integer"""
+        not_integers = [
+            'heEEey',
+            {'7':7},
+            (1,2,3),
+            1.1
+        ]
+        
+        field = Integer()
+        
+        for not_integer in not_integers:
+            self.assertRaises(ValidationError, field.validate, not_integer)
+            
+            
+    def test_integer_pass(self):
+        """An Integer passes an integer or a string representing an integer"""
+        floats = [
+            13,
+            '13'
+        ]
+            
+        field = Integer()
+        
+        for f in floats:
+            field.validate(f)
+            
         
         
 class TestBoundingBox(unittest.TestCase):

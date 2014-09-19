@@ -14,6 +14,9 @@ __all__ = [
     'Email',
     'DateTime',
     'Boolean',
+    'Range',
+    'Float',
+    'Integer',
     'BoundingBox',
     'LatLng',
     'Enum',
@@ -255,6 +258,80 @@ class Boolean(Field):
         elif isinstance(value, bool):
             return value
         raise ValidationError(self.NOT_BOOL)
+        
+        
+class Range(Field):
+    
+    TOO_BIG = "Exceeds the maximum value of %s."
+    TOO_SMALL = "Smaller than the minimum value of %s."
+    
+    def __init__(self, min=None, max=None, *args, **kwargs):
+        self.min = min
+        self.max = max
+        super(Range, self).__init__(*args, **kwargs)
+        
+        
+    def _validate(self, value):
+        if self.min and value < self.min:
+            raise ValidationError(self.TOO_SMALL % self.str_value(self.min))
+        if self.max and self.max < value:
+            raise ValidationError(self.TOO_BIG % self.str_value(self.max))
+            
+            
+    def str_value(self, value):
+        raise NotImplementedError
+        
+        
+class Float(Range):
+    """
+    Passes a floating point number.
+    
+        field = Float()
+        field.validate(13) # ok
+        field.validate(13.31) # ok
+        field.validate('13') # ok -> 13.0
+        field.validate('13.31e-4') # -> 0.001331
+    """
+    
+    NOT_A_FLOAT = "Expected a real number."
+    
+    def _validate(self, value):
+        try:
+            value = float(value)
+        except (ValueError, TypeError):
+            raise ValidationError(self.NOT_A_FLOAT)
+            
+        return super(Float, self)._validate(value)
+        
+    def str_value(self, value):
+        return '%.2f' % value
+        
+        
+        
+class Integer(Range):
+    """
+    Passes an integer.
+    
+        field = Integer()
+        field.validate(13) # ok
+        field.validate('13') # ok -> 13
+    """
+    
+    NOT_AN_INTEGER = "Expected an integer."
+    
+    def _validate(self, value):
+        if isinstance(value, float):
+            raise ValidationError(self.NOT_AN_INTEGER)
+        try:
+            value = int(value)
+        except (ValueError, TypeError):
+            raise ValidationError(self.NOT_AN_INTEGER)
+        
+        return super(Integer, self)._validate(value)
+        
+    def str_value(self, value):
+        return '%d' % value
+        
         
         
 class BoundingBox(Field):
