@@ -326,4 +326,22 @@ class TestAuth(unittest.TestCase):
 		self.assertFalse(
 			(a >= c)(context)
 		)
+	
+	
+	def test_auth_expr_equality_fail(self):
+		"""Different expressions should not evaluate as equal"""
+		a = ObjectProxy('foo').bar
+		b = ObjectProxy('foo').baz
+		expr_equal = a == b
+		expr_not_equal = a != b
+		self.assertNotEquals(expr_equal, expr_not_equal)
+		
+		
+	def test_auth_expr_equality(self):
+		"""Identical expressions should evaluate as equal"""
+		foo = ObjectProxy('foo')
+		bar = ObjectProxy('bar')
+		expr_one = foo.exists() & (foo.baz == bar.baz) | (foo.skidoo == 23)
+		expr_two = foo.exists() & (foo.baz == bar.baz) | (foo.skidoo == 23)
+		self.assertEquals(expr_one, expr_two)
 		

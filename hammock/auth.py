@@ -21,6 +21,10 @@ class AuthenticationExpression(object):
 		return lambda x: not self(x)
 		
 		
+	def __eq__(self, other):
+		raise NotImplementedError
+		
+		
 	def require_auth_expr(self, other):
 		if not isinstance(other, AuthenticationExpression):
 			raise TypeError, "Type '%s' is incompatible with type '%s'" % (type(self).__name__, type(other).__name__)
@@ -33,29 +37,28 @@ class AuthenticationExpression(object):
 			
 class BinaryExpression(AuthenticationExpression):
 	
+	def __init__(self, a, b):
+		self.a = a
+		self.b = b
+	
 	def uses(self, key):
 		return self.a.uses(key) or self.b.uses(key)
+		
+		
+	def __eq__(self, other):
+		return isinstance(other, self.__class__) and other.a == self.a and other.b == self.b
 		
 		
 			
 class AndExpression(BinaryExpression):
 	
-	def __init__(self, a, b):
-		self.a = a
-		self.b = b
-		
-		
+	
 	def __call__(self, context):
 		return self.a(context) and self.b(context)
 		
 		
 		
 class OrExpression(BinaryExpression):
-	
-	def __init__(self, a, b):
-		self.a = a
-		self.b = b
-		
 		
 	def __call__(self, context):
 		return self.a(context) or self.b(context)
@@ -66,6 +69,10 @@ class ObjectProxy(AuthenticationExpression):
 	
 	def __init__(self, name):
 		self.name = name
+		
+		
+	def __eq__(self, other):
+		return isinstance(other, ObjectProxy) and other.name == self.name
 		
 		
 	def __getattr__(self, key):
@@ -100,6 +107,10 @@ class ObjectProxyMatch(AuthenticationExpression):
 		self.fn = fn
 		
 		
+	def __eq__(self, other):
+		return isinstance(other, ObjectProxyMatch) and other.proxy == self.proxy and other.fn == self.fn
+		
+		
 	def __call__(self, context):
 		obj = context.get(self.proxy.name)
 		return self.fn(obj)
@@ -115,6 +126,10 @@ class ObjectProxyValue(AuthenticationExpression):
 	def __init__(self, proxy, key):
 		self.proxy = proxy
 		self.key = key
+		
+		
+	def __eq__(self, other):
+		return isinstance(other, ObjectProxyValue) and other.proxy == self.proxy and other.key == self.key
 		
 		
 	def get_value(self, context):
@@ -168,6 +183,10 @@ class ObjectProxyValueComparison(AuthenticationExpression):
 	def __init__(self, proxy, other):
 		self.proxy = proxy
 		self.other = other
+		
+	
+	def __eq__(self, other):
+		return isinstance(other, self.__class__) and other.proxy == self.proxy and other.other == self.other
 		
 		
 	def __call__(self, context):
