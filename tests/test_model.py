@@ -778,6 +778,18 @@ class TestEntity(unittest.TestCase):
         self.assertEquals(Foo.hierarchy, [Foo])
         
         
+    def test_inheritance_field_summing(self):
+        """A descendant should have it's ancestor's fields as well as its own."""
+        class Foo(Entity):
+            a = Text()
+            b = Text()
+            
+        class Bar(Foo):
+            c = Text()
+            
+        self.assertEquals(set(Bar.fields.keys()), set(['a', 'b', 'c']))
+        
+        
         
 class TestMixins(unittest.TestCase):
     

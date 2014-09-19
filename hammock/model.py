@@ -634,6 +634,14 @@ class EntityMeta(type):
         attrs['links'] = links
         attrs['links_and_references'] = links + references
         attrs['hidden_fields'] = hidden_fields
+        
+        for entity_cls in attrs['hierarchy']:
+            attrs['fields'].update(entity_cls.fields)
+            attrs['references'] += entity_cls.references
+            attrs['links'] += entity_cls.links
+            attrs['links_and_references'] += entity_cls.links_and_references
+            attrs['hidden_fields'] += entity_cls.hidden_fields
+        
         new_cls = super(EntityMeta, cls).__new__(cls, name, bases, attrs)
         new_cls.hierarchy.append(new_cls)
         return new_cls
