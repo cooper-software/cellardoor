@@ -104,7 +104,7 @@ class Collection(object):
 	# and the value is an authorization rule.
 	method_authorization = None
 	
-	# A `hammock.auth.AuthenticationExpression` that must be met for hidden fields to be shown.
+	# A `hammock.authorization.AuthenticationExpression` that must be met for hidden fields to be shown.
 	hidden_field_authorization = None
 	
 	# A list or tuple of fields that are allowed to be used in filters.

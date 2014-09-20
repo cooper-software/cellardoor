@@ -7,7 +7,7 @@ from hammock.collection import Collection
 from hammock.methods import ALL, LIST, GET, CREATE
 from hammock.storage.mongodb import MongoDBStorage
 from hammock import errors, Hammock
-from hammock import auth
+from hammock import authorization as auth
 
 
 class CopyingMock(Mock):

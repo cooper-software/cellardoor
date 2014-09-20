@@ -1,7 +1,7 @@
 import unittest
-from hammock.auth import *
+from hammock.authorization import *
 
-class TestAuth(unittest.TestCase):
+class TestAuthorization(unittest.TestCase):
 	
 	def test_auth_expr_abstract(self):
 		"""A base auth expression can't be called"""
