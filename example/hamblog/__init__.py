@@ -1,17 +1,16 @@
 import falcon
 from hammock import Hammock
 from hammock.falcon import add_to_falcon
-from hammock.views import MinimalView, SirenView
-from .collections import PeopleCollection, TagsCollection, PostsCollection
-from .auth import LoginResource
+from hammock.views import MinimalView
+from . import collections
 from .storage import storage
 
 
-hammock_api = Hammock(
-		PeopleCollection, TagsCollection, PostsCollection,
-		storage=storage)
+def create_app():
+	app = falcon.API()
+	api = Hammock(
+			collections=collections
+			storage=storage)
 
-falcon_api = falcon.API()
-falcon_api.add_resource('/login', LoginResource())
-
-add_to_falcon(falcon_api, hammock_api)
+	add_to_falcon(app, api)
+	return app

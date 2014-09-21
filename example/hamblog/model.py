@@ -2,6 +2,7 @@ import re
 from datetime import datetime
 from hammock.model import *
 from .storage import storage
+from .hash_password import hash_password
 
 
 class Slug(Text):
@@ -14,12 +15,18 @@ class Person(Entity, Timestamped):
 	first_name = Text(maxlength=50, required=True)
 	last_name = Text(maxlength=50, required=True)
 	email = Email(required=True, hidden=True)
-	password = Text(maxlength=50, hidden=True)
+	password = Text(maxlength=50, hidden=True, required=True)
 	role = Enum('anonymous', 'normal', 'admin', default='anonymous')
-	token = Compound(
-		value=Text(maxlength=150, required=True),
-		expires=DateTime(required=True)
-	)
+	
+	def __init__(self, *args, **kwargs):
+		super(Person, self).__init__(*args, **kwargs)
+		self.hooks.pre('create', self.hash_password)
+		self.hooks.pre('update', self.hash_password)
+		
+		
+	def hash_password(self, fields):
+		if 'password' in fields:
+			fields['password'] = hash_password(fields['password'])
 	
 	
 class Post(Entity, Timestamped):
