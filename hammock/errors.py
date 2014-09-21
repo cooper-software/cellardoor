@@ -10,6 +10,10 @@ class NotAuthenticatedError(Exception):
 	pass
 	
 	
+class IdentificationError(Exception):
+	pass
+	
+	
 class VersionConflictError(Exception):
 	
 	def __init__(self, other):

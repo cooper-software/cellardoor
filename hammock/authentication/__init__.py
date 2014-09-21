@@ -1,3 +1,6 @@
+from .. import errors
+
+
 class AuthenticationMiddleware(object):
 	
 	def __init__(self, app, pairs=[]):
@@ -36,6 +39,5 @@ class Authenticator(object):
 	
 	def authenticate(self, credentials):
 		raise NotImplementedError
-		
 		
 		
