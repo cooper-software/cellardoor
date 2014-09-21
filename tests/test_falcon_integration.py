@@ -3,7 +3,7 @@ import json
 import msgpack
 from mock import Mock
 import urllib
-from falcon.testing import TestBase
+from falcon.testing import TestBase, create_environ
 from hammock import Hammock
 from hammock.integrations import add_to_falcon
 from hammock.model import Entity, Text, Reference, ListOf
@@ -126,7 +126,7 @@ class TestResource(TestBase):
 		created_foo = json.loads(''.join(result))
 		self.assertEquals(created_foo, foo)
 		self.assertEquals(self.srmock.status, '201 Created')
-		self.hammock.foos.create.assert_called_with({'name':'foo'}, show_hidden=False)
+		self.hammock.foos.create.assert_called_with({'name':'foo'}, show_hidden=False, context={})
 		
 		
 	def test_create_msgpack(self):
@@ -144,7 +144,7 @@ class TestResource(TestBase):
 		created_foo = msgpack.unpackb(''.join(result))
 		self.assertEquals(created_foo, foo)
 		self.assertEquals(self.srmock.status, '201 Created')
-		self.hammock.foos.create.assert_called_with({'name':'foo'}, show_hidden=False)
+		self.hammock.foos.create.assert_called_with({'name':'foo'}, show_hidden=False, context={})
 		
 		
 	def test_not_found(self):
@@ -152,7 +152,7 @@ class TestResource(TestBase):
 		self.hammock.foos.get = Mock(side_effect=errors.NotFoundError())
 		self.simulate_request('/foos/123', method='GET')
 		self.assertEquals(self.srmock.status, '404 Not Found')
-		self.hammock.foos.get.assert_called_with('123', show_hidden=False)
+		self.hammock.foos.get.assert_called_with('123', show_hidden=False, context={})
 		
 		
 	def test_method_not_allowed(self):
@@ -211,7 +211,7 @@ class TestResource(TestBase):
 		result = json.loads(''.join(data))
 		self.assertEquals(self.srmock.status, '200 OK')
 		self.assertEquals(result, {'items':foos})
-		self.hammock.foos.list.assert_called_with(sort=['+name'], filter={'foo':23}, offset=7, limit=10, show_hidden=True)
+		self.hammock.foos.list.assert_called_with(sort=['+name'], filter={'foo':23}, offset=7, limit=10, show_hidden=True, context={})
 		
 		
 	def test_get(self):
@@ -221,7 +221,7 @@ class TestResource(TestBase):
 		result = json.loads(''.join(data))
 		self.assertEquals(self.srmock.status, '200 OK')
 		self.assertEquals(result, {'name':'foo', '_id':'123'})
-		self.hammock.foos.get.assert_called_with('123', show_hidden=False)
+		self.hammock.foos.get.assert_called_with('123', show_hidden=False, context={})
 		
 		
 	def test_update_fail_validation(self):
@@ -257,7 +257,7 @@ class TestResource(TestBase):
 		result = json.loads(''.join(data))
 		self.assertEquals(self.srmock.status, '200 OK')
 		self.assertEquals(result, {'name':'bar', '_id':'123'})
-		self.hammock.foos.update.assert_called_with('123', {'name':'bar'}, show_hidden=False)
+		self.hammock.foos.update.assert_called_with('123', {'name':'bar'}, show_hidden=False, context={})
 		
 		
 	def test_replace(self):
@@ -275,7 +275,7 @@ class TestResource(TestBase):
 		result = json.loads(''.join(data))
 		self.assertEquals(self.srmock.status, '200 OK')
 		self.assertEquals(result, {'name':'bar', '_id':'123'})
-		self.hammock.foos.replace.assert_called_with('123', {'name':'bar'}, show_hidden=False)
+		self.hammock.foos.replace.assert_called_with('123', {'name':'bar'}, show_hidden=False, context={})
 		
 		
 	def test_delete(self):
@@ -283,7 +283,7 @@ class TestResource(TestBase):
 		self.hammock.foos.delete = Mock()
 		self.simulate_request('/foos/123', method='DELETE')
 		self.assertEquals(self.srmock.status, '200 OK')
-		self.hammock.foos.delete.assert_called_with('123')
+		self.hammock.foos.delete.assert_called_with('123', context={})
 		
 		
 	def test_get_single_link(self):
@@ -293,7 +293,7 @@ class TestResource(TestBase):
 		result = json.loads(''.join(data))
 		self.assertEquals(self.srmock.status, '200 OK')
 		self.assertEquals(result, {'_id':'123'})
-		self.hammock.foos.link.assert_called_with('123', 'bar', filter=None, sort=None, offset=0, limit=0, show_hidden=False)
+		self.hammock.foos.link.assert_called_with('123', 'bar', filter=None, sort=None, offset=0, limit=0, show_hidden=False, context={})
 		
 		
 	def test_get_multiple_link(self):
@@ -314,7 +314,14 @@ class TestResource(TestBase):
 		result = json.loads(''.join(data))
 		self.assertEquals(self.srmock.status, '200 OK')
 		self.assertEquals(result, {'_id':'123'})
-		self.hammock.foos.link.assert_called_with('123', 'bazes', sort=['+name'], filter={'foo':23}, offset=7, limit=10, show_hidden=True)
+		self.hammock.foos.link.assert_called_with('123', 'bazes', sort=['+name'], filter={'foo':23}, offset=7, limit=10, show_hidden=True, context={})
 		
+		
+	def test_pass_identity(self):
+		self.hammock.foos.list = Mock(return_value=[])
+		environ = create_environ('/foos')
+		environ['hammock.identity'] = 'foo'
+		self.api(environ, lambda *args, **kwargs: [])
+		self.hammock.foos.list.assert_called_with(sort=None, filter=None, offset=0, limit=0, show_hidden=False, context={'identity': 'foo'})
 		
 		

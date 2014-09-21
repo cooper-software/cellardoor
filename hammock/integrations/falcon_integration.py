@@ -48,49 +48,45 @@ class Resource(object):
 	
 	def list(self, req, resp):
 		filter, sort, offset, limit, show_hidden = self.get_list_params(req)
-		items = self.collection.list(filter=filter, sort=sort, offset=offset, limit=limit, show_hidden=show_hidden)
+		items = self.collection.list(filter=filter, sort=sort, offset=offset, limit=limit, show_hidden=show_hidden, context=self.get_context(req))
 		self.send_list(req, resp, items)
 		
 		
 	def create(self, req, resp):
 		fields = self.get_fields_from_request(req)
-		item = self.collection.create(fields, show_hidden=self.get_show_hidden(req))
+		item = self.collection.create(fields, show_hidden=self.get_show_hidden(req), context=self.get_context(req))
 		resp.status = falcon.HTTP_201
 		self.send_one(req, resp, item)
 		
 	
 	def get(self, req, resp, id):
-		item = self.collection.get(id, show_hidden=self.get_show_hidden(req))
+		item = self.collection.get(id, show_hidden=self.get_show_hidden(req), context=self.get_context(req))
 		self.send_one(req, resp, item)
 		
 		
 	def update(self, req, resp, id):
 		fields = self.get_fields_from_request(req)
-		item = self.collection.update(id, fields, show_hidden=self.get_show_hidden(req))
+		item = self.collection.update(id, fields, show_hidden=self.get_show_hidden(req), context=self.get_context(req))
 		self.send_one(req, resp, item)
 		
 		
 	def replace(self, req, resp, id):
 		fields = self.get_fields_from_request(req)
-		item = self.collection.replace(id, fields, show_hidden=self.get_show_hidden(req))
+		item = self.collection.replace(id, fields, show_hidden=self.get_show_hidden(req), context=self.get_context(req))
 		self.send_one(req, resp, item)
 		
 		
 	def delete(self, req, resp, id):
-		self.collection.delete(id)
+		self.collection.delete(id, context=self.get_context(req))
 		
 		
 	def get_link_or_reference(self, req, resp, id, reference_name):
 		filter, sort, offset, limit, show_hidden = self.get_list_params(req)
-		result = self.collection.link(id, reference_name, filter=filter, sort=sort, offset=offset, limit=limit, show_hidden=show_hidden)
+		result = self.collection.link(id, reference_name, filter=filter, sort=sort, offset=offset, limit=limit, show_hidden=show_hidden, context=self.get_context(req))
 		if isinstance(result, dict):
 			self.send_one(req, resp, result)
 		else:
 			self.send_list(req, resp, result)
-		
-		
-	def call_collection(self, req, resp, method_name, *args, **kwargs):
-		return getattr(self.collection, method_name)(*args, **kwargs)
 		
 		
 	def send_one(self, req, resp, item):
@@ -164,6 +160,14 @@ class Resource(object):
 			return parsing_fn(param)
 		except:
 			raise falcon.HTTPBadRequest("Bad Request", "Could not parse %s parameter" % param_name)
+			
+			
+	def get_context(self, req):
+		context = {}
+		identity = req.env.get('hammock.identity')
+		if identity:
+			context['identity'] = identity
+		return context
 		
 			
 			
