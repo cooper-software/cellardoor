@@ -930,7 +930,7 @@ class TestMixins(unittest.TestCase):
         self.assertIn('modified', fields)
         self.assertEquals(fields['created'], fields['modified'])
         self.assertIsInstance(fields['created'], datetime)
-        foo.hooks.trigger_pre('update', fields)
+        foo.hooks.trigger_pre('update', '123', fields, replace=False)
         self.assertNotEquals(fields['created'], fields['modified'])
         self.assertIsInstance(fields['created'], datetime)
         self.assertIsInstance(fields['modified'], datetime)

@@ -630,7 +630,7 @@ class Timestamped(EntityMixin):
         fields['modified'] = now
         
         
-    def on_modify(self, fields):
+    def on_modify(self, id, fields, replace=False):
         fields['modified'] = datetime.utcnow()
         
         
