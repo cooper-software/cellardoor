@@ -1,14 +1,14 @@
 import falcon
-from hammock import Hammock
-from hammock.falcon import add_to_falcon
-from hammock.views import MinimalView
+from cellardoor import CellarDoor
+from cellardoor.falcon import add_to_falcon
+from cellardoor.views import MinimalView
 from . import collections
 from .storage import storage
 
 
 def create_app():
 	app = falcon.API()
-	api = Hammock(
+	api = CellarDoor(
 			collections=collections
 			storage=storage)
 

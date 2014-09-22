@@ -1,6 +1,6 @@
 import re
 from datetime import datetime
-from hammock.model import *
+from cellardoor.model import *
 from .storage import storage
 from .hash_password import hash_password
 

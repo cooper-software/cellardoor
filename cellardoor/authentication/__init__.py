@@ -23,7 +23,7 @@ class AuthenticationMiddleware(object):
 			if credentials:
 				identity = authenticator.authenticate(credentials)
 				break
-		environ['hammock.identity'] = identity
+		environ['cellardoor.identity'] = identity
 		return self.app(environ, start_response)
 		
 		

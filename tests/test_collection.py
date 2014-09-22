@@ -1,12 +1,12 @@
 import unittest
 from copy import deepcopy
 from mock import Mock
-from hammock.model import Model, Entity, Reference, Link, Text, ListOf, TypeOf
-from hammock.collection import Collection
-from hammock.methods import ALL, LIST, GET, CREATE
-from hammock.storage import Storage
-from hammock import errors, Hammock
-from hammock import authorization as auth
+from cellardoor.model import Model, Entity, Reference, Link, Text, ListOf, TypeOf
+from cellardoor.collection import Collection
+from cellardoor.methods import ALL, LIST, GET, CREATE
+from cellardoor.storage import Storage
+from cellardoor import errors, CellarDoor
+from cellardoor import authorization as auth
 
 
 class CopyingMock(Mock):
@@ -118,7 +118,7 @@ class CollectionTest(unittest.TestCase):
 	def setUp(self):
 		global api, storage
 		storage = Storage()
-		api = Hammock(
+		api = CellarDoor(
 			collections=(
 				FoosCollection, 
 				BarsCollection, 

@@ -100,11 +100,11 @@ class Collection(object):
 	# of a collection.
 	links = None
 	
-	# A dict of authorization rules. The key is a `hammock.method` or a tuple of methods 
+	# A dict of authorization rules. The key is a `cellardoor.method` or a tuple of methods 
 	# and the value is an authorization rule.
 	method_authorization = None
 	
-	# A `hammock.authorization.AuthenticationExpression` that must be met for hidden fields to be shown.
+	# A `cellardoor.authorization.AuthenticationExpression` that must be met for hidden fields to be shown.
 	hidden_field_authorization = None
 	
 	# A list or tuple of fields that are allowed to be used in filters.

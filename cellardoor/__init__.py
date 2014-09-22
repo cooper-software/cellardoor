@@ -4,7 +4,7 @@ from .model import Model
 from .collection import Collection
 
 
-class Hammock(object):
+class CellarDoor(object):
 	
 	def __init__(self, collections=(), authenticators=(), storage=None):
 		if type(collections) == types.ModuleType:

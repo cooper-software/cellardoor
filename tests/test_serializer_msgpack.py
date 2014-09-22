@@ -2,7 +2,7 @@ import unittest
 import msgpack
 from datetime import datetime
 from cStringIO import StringIO
-from hammock.serializers import MsgPackSerializer
+from cellardoor.serializers import MsgPackSerializer
 
 
 class TestJSONSerializer(unittest.TestCase):

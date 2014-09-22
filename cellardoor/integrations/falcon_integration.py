@@ -164,7 +164,7 @@ class Resource(object):
 			
 	def get_context(self, req):
 		context = {}
-		identity = req.env.get('hammock.identity')
+		identity = req.env.get('cellardoor.identity')
 		if identity:
 			context['identity'] = identity
 		return context
@@ -257,7 +257,7 @@ def duplicate_field_error(views, exc, req, resp, params):
 	resp.status = falcon.HTTP_400
 		
 		
-def add_to_falcon(falcon_api, hammock_api, views):
+def add_to_falcon(falcon_api, cellardoor_api, views):
 	views_by_type = []
 	
 	for v in views:
@@ -273,7 +273,7 @@ def add_to_falcon(falcon_api, hammock_api, views):
 	duplicate_field_error_with_views = functools.partial(duplicate_field_error, views_by_type)
 	falcon_api.add_error_handler(errors.DuplicateError, duplicate_field_error_with_views)
 	
-	for collection in hammock_api.collections_by_class_name.values():
+	for collection in cellardoor_api.collections_by_class_name.values():
 		resource = Resource(collection, views_by_type)
 		resource.add_to_falcon(falcon_api)
 		

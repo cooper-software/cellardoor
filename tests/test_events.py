@@ -1,6 +1,6 @@
 import unittest
 from mock import Mock
-from hammock.events import EventManager
+from cellardoor.events import EventManager
 
 
 class TestEventManager(unittest.TestCase):

@@ -2,10 +2,10 @@ import io
 import os.path
 from setuptools import setup, find_packages
 
-execfile(os.path.join('hammock', 'version.py'))
+execfile(os.path.join('cellardoor', 'version.py'))
 
 setup(
-	name='hammock',
+	name='cellardoor',
 	version=__version__,
 	description='Create ReST APIs how you\'ve always wanted.',
 	long_description=io.open('README.rst', mode='r', encoding='utf-8').read(),
@@ -27,7 +27,7 @@ setup(
     keywords='wsgi web api framework rest http cloud',
     author='Elisha Fitch-Cook',
     author_email='elisha@cooper.com',
-    url='http://github.com/cooper-software/hammock',
+    url='http://github.com/cooper-software/cellardoor',
     license='MIT',
     packages=find_packages(exclude=['tests']),
     install_requires=['falcon'],

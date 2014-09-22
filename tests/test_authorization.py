@@ -1,5 +1,5 @@
 import unittest
-from hammock.authorization import *
+from cellardoor.authorization import *
 
 class TestAuthorization(unittest.TestCase):
 	

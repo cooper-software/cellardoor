@@ -1,7 +1,7 @@
 import unittest
 import json
 import msgpack
-from hammock.views import MinimalView
+from cellardoor.views import MinimalView
 from . import create_fake_request
 
 

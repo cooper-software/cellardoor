@@ -4,7 +4,7 @@ from datetime import datetime
 from . import Serializer
 
 
-class HammockJSONEncoder(json.JSONEncoder):
+class CellarDoorJSONEncoder(json.JSONEncoder):
 	
 	def default(self, obj):
 		try:
@@ -17,7 +17,7 @@ class HammockJSONEncoder(json.JSONEncoder):
 		if isinstance(obj, datetime):
 			return obj.isoformat()
 		
-		return super(HammockJSONEncoder, self).default(obj)
+		return super(CellarDoorJSONEncoder, self).default(obj)
 		
 
 
@@ -26,7 +26,7 @@ class JSONSerializer(Serializer):
 	mimetype = 'application/json'
 	
 	def serialize(self, obj):
-		return json.dumps(obj, cls=HammockJSONEncoder)
+		return json.dumps(obj, cls=CellarDoorJSONEncoder)
 		
 		
 	def unserialize(self, stream):

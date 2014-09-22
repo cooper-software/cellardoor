@@ -1,4 +1,4 @@
-from hammock.authentication import Authenticator
+from cellardoor.authentication import Authenticator
 from .storage import storage
 from .model import Person
 from .hash_password import hash_password

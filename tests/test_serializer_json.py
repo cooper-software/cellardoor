@@ -2,7 +2,7 @@ import unittest
 import json
 from datetime import datetime
 from cStringIO import StringIO
-from hammock.serializers import JSONSerializer
+from cellardoor.serializers import JSONSerializer
 
 
 class TestJSONSerializer(unittest.TestCase):

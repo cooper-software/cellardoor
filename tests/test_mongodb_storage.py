@@ -1,8 +1,8 @@
 import unittest
 from datetime import datetime
-from hammock.model import *
-from hammock.storage.mongodb import MongoDBStorage
-from hammock import errors
+from cellardoor.model import *
+from cellardoor.storage.mongodb import MongoDBStorage
+from cellardoor import errors
 
 
 class Foo(Entity):

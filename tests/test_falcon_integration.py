@@ -4,13 +4,13 @@ import msgpack
 from mock import Mock
 import urllib
 from falcon.testing import TestBase, create_environ
-from hammock import Hammock
-from hammock.integrations import add_to_falcon
-from hammock.model import Entity, Text, Reference, ListOf
-from hammock.collection import Collection
-from hammock.methods import ALL, LIST, GET, CREATE
-from hammock.views.minimal import MinimalView
-from hammock import errors
+from cellardoor import CellarDoor
+from cellardoor.integrations import add_to_falcon
+from cellardoor.model import Entity, Text, Reference, ListOf
+from cellardoor.collection import Collection
+from cellardoor.methods import ALL, LIST, GET, CREATE
+from cellardoor.views.minimal import MinimalView
+from cellardoor import errors
 
 
 class Foo(Entity):
@@ -57,9 +57,9 @@ class TestResource(TestBase):
 	
 	def setUp(self):
 		super(TestResource, self).setUp()
-		self.hammock = Hammock(
+		self.cellardoor = CellarDoor(
 			collections=(FoosCollection, BarsCollection, BazesCollection))
-		add_to_falcon(self.api, self.hammock, (MinimalView(),))
+		add_to_falcon(self.api, self.cellardoor, (MinimalView(),))
 		
 		
 	def test_create_fail_content_type(self):
@@ -113,7 +113,7 @@ class TestResource(TestBase):
 	def test_create_succeed(self):
 		"""If the body matches the content type and the data passes validation, an item is created."""
 		foo = {'_id':'123', 'name':'foo'}
-		self.hammock.foos.create = Mock(return_value=foo)
+		self.cellardoor.foos.create = Mock(return_value=foo)
 		result = self.simulate_request(
 			'/foos',
 			method='POST',
@@ -126,12 +126,12 @@ class TestResource(TestBase):
 		created_foo = json.loads(''.join(result))
 		self.assertEquals(created_foo, foo)
 		self.assertEquals(self.srmock.status, '201 Created')
-		self.hammock.foos.create.assert_called_with({'name':'foo'}, show_hidden=False, context={})
+		self.cellardoor.foos.create.assert_called_with({'name':'foo'}, show_hidden=False, context={})
 		
 		
 	def test_create_msgpack(self):
 		foo = {'_id':'123', 'name':'foo'}
-		self.hammock.foos.create = Mock(return_value=foo)
+		self.cellardoor.foos.create = Mock(return_value=foo)
 		result = self.simulate_request(
 			'/foos',
 			method='POST',
@@ -144,15 +144,15 @@ class TestResource(TestBase):
 		created_foo = msgpack.unpackb(''.join(result))
 		self.assertEquals(created_foo, foo)
 		self.assertEquals(self.srmock.status, '201 Created')
-		self.hammock.foos.create.assert_called_with({'name':'foo'}, show_hidden=False, context={})
+		self.cellardoor.foos.create.assert_called_with({'name':'foo'}, show_hidden=False, context={})
 		
 		
 	def test_not_found(self):
 		"""If a collection raises NotFoundError, a 404 status is returned"""
-		self.hammock.foos.get = Mock(side_effect=errors.NotFoundError())
+		self.cellardoor.foos.get = Mock(side_effect=errors.NotFoundError())
 		self.simulate_request('/foos/123', method='GET')
 		self.assertEquals(self.srmock.status, '404 Not Found')
-		self.hammock.foos.get.assert_called_with('123', show_hidden=False, context={})
+		self.cellardoor.foos.get.assert_called_with('123', show_hidden=False, context={})
 		
 		
 	def test_method_not_allowed(self):
@@ -163,28 +163,28 @@ class TestResource(TestBase):
 		
 	def test_forbidden(self):
 		"""If authorization fails a 403 status is returned"""
-		self.hammock.foos.get = Mock(side_effect=errors.NotAuthorizedError)
+		self.cellardoor.foos.get = Mock(side_effect=errors.NotAuthorizedError)
 		self.simulate_request('/foos/123', method='GET')
 		self.assertEquals(self.srmock.status, '403 Forbidden')
 		
 		
 	def test_unauthenticated(self):
 		"""If a method is enabled but requires authentication, a 401 status is returned"""
-		self.hammock.foos.get = Mock(side_effect=errors.NotAuthenticatedError)
+		self.cellardoor.foos.get = Mock(side_effect=errors.NotAuthenticatedError)
 		self.simulate_request('/foos/123', method='GET')
 		self.assertEquals(self.srmock.status, '401 Unauthorized')
 		
 		
 	def test_disabled_field(self):
 		"""If a request attempts to filter or sort by a disabled field, a 401 status is returned"""
-		self.hammock.foos.list = Mock(side_effect=errors.DisabledFieldError)
+		self.cellardoor.foos.list = Mock(side_effect=errors.DisabledFieldError)
 		self.simulate_request('/foos', query_string=urllib.urlencode({'filter':json.dumps({'name':'bob'})}))
 		self.assertEquals(self.srmock.status, '401 Unauthorized')
 		
 		
 	def test_unique_field(self):
 		"""If a create request fails with a duplicate field error, a 400 status is returned"""
-		self.hammock.foos.list = Mock(side_effect=errors.DuplicateError)
+		self.cellardoor.foos.list = Mock(side_effect=errors.DuplicateError)
 		self.simulate_request('/foos')
 		self.assertEquals(self.srmock.status, '400 Bad Request')
 		
@@ -192,7 +192,7 @@ class TestResource(TestBase):
 	def test_list(self):
 		"""Will return a list of items structured by the view"""
 		foos = [{'name':'foo'}, {'name':'bar'}]
-		self.hammock.foos.list = Mock(return_value=foos)
+		self.cellardoor.foos.list = Mock(return_value=foos)
 		data = self.simulate_request(
 			'/foos',
 			method='GET',
@@ -211,17 +211,17 @@ class TestResource(TestBase):
 		result = json.loads(''.join(data))
 		self.assertEquals(self.srmock.status, '200 OK')
 		self.assertEquals(result, {'items':foos})
-		self.hammock.foos.list.assert_called_with(sort=['+name'], filter={'foo':23}, offset=7, limit=10, show_hidden=True, context={})
+		self.cellardoor.foos.list.assert_called_with(sort=['+name'], filter={'foo':23}, offset=7, limit=10, show_hidden=True, context={})
 		
 		
 	def test_get(self):
 		"""A GET with a path to /collection/{id} calls colleciton.get"""
-		self.hammock.foos.get = Mock(return_value={'_id':'123', 'name':'foo'})
+		self.cellardoor.foos.get = Mock(return_value={'_id':'123', 'name':'foo'})
 		data = self.simulate_request('/foos/123', method='GET', headers={'accept':'application/json'})
 		result = json.loads(''.join(data))
 		self.assertEquals(self.srmock.status, '200 OK')
 		self.assertEquals(result, {'name':'foo', '_id':'123'})
-		self.hammock.foos.get.assert_called_with('123', show_hidden=False, context={})
+		self.cellardoor.foos.get.assert_called_with('123', show_hidden=False, context={})
 		
 		
 	def test_update_fail_validation(self):
@@ -244,7 +244,7 @@ class TestResource(TestBase):
 		
 	def test_update(self):
 		"""A PATCH with a path to /collection/{id} calls colleciton.update"""
-		self.hammock.foos.update = Mock(return_value={'_id':'123', 'name':'bar'})
+		self.cellardoor.foos.update = Mock(return_value={'_id':'123', 'name':'bar'})
 		data = self.simulate_request(
 			'/foos/123', 
 			method='PATCH', 
@@ -257,12 +257,12 @@ class TestResource(TestBase):
 		result = json.loads(''.join(data))
 		self.assertEquals(self.srmock.status, '200 OK')
 		self.assertEquals(result, {'name':'bar', '_id':'123'})
-		self.hammock.foos.update.assert_called_with('123', {'name':'bar'}, show_hidden=False, context={})
+		self.cellardoor.foos.update.assert_called_with('123', {'name':'bar'}, show_hidden=False, context={})
 		
 		
 	def test_replace(self):
 		"""A PUT with a path to /collection/{id} calls colleciton.replace"""
-		self.hammock.foos.replace = Mock(return_value={'_id':'123', 'name':'bar'})
+		self.cellardoor.foos.replace = Mock(return_value={'_id':'123', 'name':'bar'})
 		data = self.simulate_request(
 			'/foos/123', 
 			method='PUT', 
@@ -275,30 +275,30 @@ class TestResource(TestBase):
 		result = json.loads(''.join(data))
 		self.assertEquals(self.srmock.status, '200 OK')
 		self.assertEquals(result, {'name':'bar', '_id':'123'})
-		self.hammock.foos.replace.assert_called_with('123', {'name':'bar'}, show_hidden=False, context={})
+		self.cellardoor.foos.replace.assert_called_with('123', {'name':'bar'}, show_hidden=False, context={})
 		
 		
 	def test_delete(self):
 		"""A DELETE with a path to /collection/{id} calls collection.delete"""
-		self.hammock.foos.delete = Mock()
+		self.cellardoor.foos.delete = Mock()
 		self.simulate_request('/foos/123', method='DELETE')
 		self.assertEquals(self.srmock.status, '200 OK')
-		self.hammock.foos.delete.assert_called_with('123', context={})
+		self.cellardoor.foos.delete.assert_called_with('123', context={})
 		
 		
 	def test_get_single_link(self):
 		"""A GET with a path to /collection/{id}/link calls collection.link"""
-		self.hammock.foos.link = Mock(return_value={'_id':'123'})
+		self.cellardoor.foos.link = Mock(return_value={'_id':'123'})
 		data = self.simulate_request('/foos/123/bar', method='GET', headers={'accept':'application/json'})
 		result = json.loads(''.join(data))
 		self.assertEquals(self.srmock.status, '200 OK')
 		self.assertEquals(result, {'_id':'123'})
-		self.hammock.foos.link.assert_called_with('123', 'bar', filter=None, sort=None, offset=0, limit=0, show_hidden=False, context={})
+		self.cellardoor.foos.link.assert_called_with('123', 'bar', filter=None, sort=None, offset=0, limit=0, show_hidden=False, context={})
 		
 		
 	def test_get_multiple_link(self):
 		"""A GET with a path to /collection/{id}/link calls collection.link"""
-		self.hammock.foos.link = Mock(return_value={'_id':'123'})
+		self.cellardoor.foos.link = Mock(return_value={'_id':'123'})
 		data = self.simulate_request(
 			'/foos/123/bazes', 
 			method='GET', 
@@ -314,14 +314,14 @@ class TestResource(TestBase):
 		result = json.loads(''.join(data))
 		self.assertEquals(self.srmock.status, '200 OK')
 		self.assertEquals(result, {'_id':'123'})
-		self.hammock.foos.link.assert_called_with('123', 'bazes', sort=['+name'], filter={'foo':23}, offset=7, limit=10, show_hidden=True, context={})
+		self.cellardoor.foos.link.assert_called_with('123', 'bazes', sort=['+name'], filter={'foo':23}, offset=7, limit=10, show_hidden=True, context={})
 		
 		
 	def test_pass_identity(self):
-		self.hammock.foos.list = Mock(return_value=[])
+		self.cellardoor.foos.list = Mock(return_value=[])
 		environ = create_environ('/foos')
-		environ['hammock.identity'] = 'foo'
+		environ['cellardoor.identity'] = 'foo'
 		self.api(environ, lambda *args, **kwargs: [])
-		self.hammock.foos.list.assert_called_with(sort=None, filter=None, offset=0, limit=0, show_hidden=False, context={'identity': 'foo'})
+		self.cellardoor.foos.list.assert_called_with(sort=None, filter=None, offset=0, limit=0, show_hidden=False, context={'identity': 'foo'})
 		
 		

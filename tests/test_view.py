@@ -1,6 +1,6 @@
 from . import create_fake_request
-from hammock.views import View
-from hammock.serializers import Serializer
+from cellardoor.views import View
+from cellardoor.serializers import Serializer
 import unittest
 
 

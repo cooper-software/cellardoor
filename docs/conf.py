@@ -1,6 +1,6 @@
 # -*- coding: utf-8 -*-
 #
-# Hammock documentation build configuration file, created by
+# CellarDoor documentation build configuration file, created by
 # sphinx-quickstart on Sat Aug 23 20:08:07 2014.
 #
 # This file is execfile()d with the current directory set to its
@@ -43,7 +43,7 @@ source_suffix = '.rst'
 master_doc = 'index'
 
 # General information about the project.
-project = u'Hammock'
+project = u'CellarDoor'
 copyright = u'2014, Elisha Fitch-Cook'
 
 # The version info for the project you're documenting, acts as replacement for
@@ -176,7 +176,7 @@ html_static_path = ['_static']
 #html_file_suffix = None
 
 # Output file base name for HTML help builder.
-htmlhelp_basename = 'Hammockdoc'
+htmlhelp_basename = 'CellarDoordoc'
 
 
 # -- Options for LaTeX output ---------------------------------------------
@@ -196,7 +196,7 @@ latex_elements = {
 # (source start file, target name, title,
 #  author, documentclass [howto, manual, or own class]).
 latex_documents = [
-  ('index', 'Hammock.tex', u'Hammock Documentation',
+  ('index', 'CellarDoor.tex', u'CellarDoor Documentation',
    u'Elisha Fitch-Cook', 'manual'),
 ]
 
@@ -226,7 +226,7 @@ latex_documents = [
 # One entry per manual page. List of tuples
 # (source start file, name, description, authors, manual section).
 man_pages = [
-    ('index', 'hammock', u'Hammock Documentation',
+    ('index', 'cellardoor', u'CellarDoor Documentation',
      [u'Elisha Fitch-Cook'], 1)
 ]
 
@@ -240,8 +240,8 @@ man_pages = [
 # (source start file, target name, title, author,
 #  dir menu entry, description, category)
 texinfo_documents = [
-  ('index', 'Hammock', u'Hammock Documentation',
-   u'Elisha Fitch-Cook', 'Hammock', 'One line description of project.',
+  ('index', 'CellarDoor', u'CellarDoor Documentation',
+   u'Elisha Fitch-Cook', 'CellarDoor', 'One line description of project.',
    'Miscellaneous'),
 ]
 

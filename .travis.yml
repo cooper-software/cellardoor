@@ -5,7 +5,7 @@ python:
 install: "pip install falcon timelib python-dateutil msgpack-python pymongo coveralls nose"
 
 script:
-  nosetests --with-coverage --cover-package=hammock
+  nosetests --with-coverage --cover-package=cellardoor
 
 after_success:
   coveralls

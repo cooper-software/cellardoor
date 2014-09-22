@@ -2,7 +2,7 @@
 Unit tests for data fields
 """
 import unittest
-from hammock.model import *
+from cellardoor.model import *
 from datetime import datetime
 import time
 

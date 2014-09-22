@@ -1,5 +1,5 @@
-from hammock.collection import Collection
-from hammock.methods import LIST, GET, CREATE, UPDATE, DELETE, ALL
+from cellardoor.collection import Collection
+from cellardoor.methods import LIST, GET, CREATE, UPDATE, DELETE, ALL
 from . import model
 from .authorization import admin_or_self, admin_or_user
 

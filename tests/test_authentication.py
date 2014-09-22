@@ -1,9 +1,9 @@
 import unittest
 from mock import Mock
 import base64
-from hammock import errors
-from hammock.authentication import *
-from hammock.authentication.basic import BasicAuthIdentifier
+from cellardoor import errors
+from cellardoor.authentication import *
+from cellardoor.authentication.basic import BasicAuthIdentifier
 
 
 class FooIdentifier(Identifier):
@@ -30,7 +30,7 @@ class TestAuthentication(unittest.TestCase):
 		middleware(environ, lambda: None)
 		identifier.identify.assert_called_once_with(environ)
 		authenticator.authenticate.assert_called_once_with('foo')
-		self.assertEquals(environ, {'skidoo':23, 'hammock.identity':'bar'})
+		self.assertEquals(environ, {'skidoo':23, 'cellardoor.identity':'bar'})
 		
 	def test_middleware_skip(self):
 		id_one = FooIdentifier()
@@ -58,7 +58,7 @@ class TestAuthentication(unittest.TestCase):
 		
 		environ = {}
 		middleware(environ, lambda: None)
-		self.assertEquals(environ, {'hammock.identity':'two'})
+		self.assertEquals(environ, {'cellardoor.identity':'two'})
 		
 
 class TestBasic(unittest.TestCase):

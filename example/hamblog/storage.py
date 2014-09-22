@@ -1,3 +1,3 @@
-from hammock.storage.mongodb import MongoDBStorage
+from cellardoor.storage.mongodb import MongoDBStorage
 
 storage = MongoDBStorage('hamblog')
