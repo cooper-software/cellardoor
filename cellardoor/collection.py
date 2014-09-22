@@ -415,21 +415,29 @@ class Collection(object):
 		context = context if context else {}
 		
 		if method == LIST:
-			if show_hidden and self.hidden_field_authorization and self.hidden_field_authorization.uses('item'):
+			if bypass_authorization:
 				new_results = []
 				for item in result:
-					context['item'] = item
 					new_results.append(
-						self.prepare_item(item, embed=embed, show_hidden=self.can_show_hidden(context))
+						self.prepare_item(item, embed=embed, show_hidden=True)
 					)
 				return new_results
 			else:
-				new_results = []
-				for item in result:
-					new_results.append(
-						self.prepare_item(item, embed=embed, show_hidden=False)
-					)
-				return new_results
+				if show_hidden and self.hidden_field_authorization and self.hidden_field_authorization.uses('item'):
+					new_results = []
+					for item in result:
+						context['item'] = item
+						new_results.append(
+							self.prepare_item(item, embed=embed, show_hidden=self.can_show_hidden(context))
+						)
+					return new_results
+				else:
+					new_results = []
+					for item in result:
+						new_results.append(
+							self.prepare_item(item, embed=embed, show_hidden=False)
+						)
+					return new_results
 		else:
 			context['item'] = result
 			show_hidden = bypass_authorization or self.can_show_hidden(context) and show_hidden

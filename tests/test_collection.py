@@ -513,11 +513,10 @@ class CollectionTest(unittest.TestCase):
 		
 	def test_authorization_bypass(self):
 		"""Can bypass authorization for methods, filters and sort."""
-		hidden = {'name':'zoomy', 'foo':23}
-		storage.get = Mock(return_value=[hidden])
+		storage.get = Mock(return_value=[{'name':'zoomy', 'foo':23}])
 		results = api.hiddens.list(filter={'name':'zoomy'}, sort=('+name',), bypass_authorization=True)
 		storage.get.assert_called_once_with(Hidden, sort=('+name',), filter={'name':'zoomy'}, limit=0, offset=0)
-		self.assertEquals(results, [hidden])
+		self.assertEquals(results, [{'name':'zoomy', 'foo':23}])
 		
 		
 		
