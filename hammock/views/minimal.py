@@ -7,8 +7,8 @@ from ..serializers import JSONSerializer, MsgPackSerializer
 class MinimalView(View):
 	
 	serializers = (
-		('application/x-msgpack', MsgPackSerializer()),
-		('application/json', JSONSerializer())
+		('application/json', JSONSerializer()),
+		('application/x-msgpack', MsgPackSerializer())
 	)
 	
 	def get_collection_response(self, req, objs):
