@@ -511,6 +511,16 @@ class CollectionTest(unittest.TestCase):
 		self.assertEquals(cm.exception.message, 'The "name" field cannot be used for sorting.')
 		
 		
+	def test_authorization_bypass(self):
+		"""Can bypass authorization for methods, filters and sort."""
+		hidden = {'name':'zoomy', 'foo':23}
+		storage.get = Mock(return_value=[hidden])
+		results = api.hiddens.list(filter={'name':'zoomy'}, sort=('+name',), bypass_authorization=True)
+		storage.get.assert_called_once_with(Hidden, sort=('+name',), filter={'name':'zoomy'}, limit=0, offset=0)
+		self.assertEquals(results, [hidden])
+		
+		
+		
 	def test_entity_hooks(self):
 		"""Collections call entity create, update and delete hooks"""
 		pre_create = Mock()

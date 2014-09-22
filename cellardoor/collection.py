@@ -129,20 +129,24 @@ class Collection(object):
 				setattr(self, method, self.disabled_method_error)
 			
 			
-	def list(self, filter=None, sort=None, offset=0, limit=0, show_hidden=False, context=None):
-		self.rules.enforce_non_item_rules(LIST, context)
-		
+	def list(self, filter=None, sort=None, offset=0, limit=0, show_hidden=False, context=None, bypass_authorization=False):
 		sort = sort if sort else self.default_sort
-		self.check_for_disabled_fields(filter, sort, context)
+		
+		if not bypass_authorization:
+			self.rules.enforce_non_item_rules(LIST, context)
+			self.check_for_disabled_fields(filter, sort, context)
+			
 		items = self.storage.get(self.entity.__class__, filter=filter, sort=sort, offset=offset, limit=limit)
 		
-		self.rules.enforce_item_rules(LIST, items, context)
+		if not bypass_authorization:
+			self.rules.enforce_item_rules(LIST, items, context)
 				
-		return self.post(LIST, items, context, show_hidden=show_hidden)
+		return self.post(LIST, items, context, show_hidden=show_hidden, bypass_authorization=bypass_authorization)
 		
 		
-	def create(self, fields, show_hidden=False, context=None):
-		self.rules.enforce_non_item_rules(CREATE, context)
+	def create(self, fields, show_hidden=False, context=None, bypass_authorization=False):
+		if not bypass_authorization:
+			self.rules.enforce_non_item_rules(CREATE, context)
 		
 		self.entity.hooks.trigger_pre('create', fields)
 		self.hooks.trigger_pre('create', fields, context=context)
@@ -150,9 +154,10 @@ class Collection(object):
 		item = self.entity.validator.validate(fields)
 		item['_id'] = self.storage.create(self.entity.__class__, item)
 		
-		self.rules.enforce_item_rules(CREATE, item, context)
+		if not bypass_authorization:
+			self.rules.enforce_item_rules(CREATE, item, context)
 		
-		item = self.post(CREATE, item, context, show_hidden=show_hidden)
+		item = self.post(CREATE, item, context, show_hidden=show_hidden, bypass_authorization=bypass_authorization)
 		
 		self.entity.hooks.trigger_post('create', item)
 		self.hooks.trigger_post('create', item, context=context)
@@ -160,25 +165,28 @@ class Collection(object):
 		return item
 		
 		
-	def get(self, id, show_hidden=False, context=None):
-		self.rules.enforce_non_item_rules(GET, context)
+	def get(self, id, show_hidden=False, context=None, bypass_authorization=False):
+		if not bypass_authorization:
+			self.rules.enforce_non_item_rules(GET, context)
 		
 		item = self.storage.get_by_id(self.entity.__class__, id)
 		if item is None:
 			raise errors.NotFoundError("No %s with id '%s' was found" % (self.singular_name, id))
 		
-		self.rules.enforce_item_rules(GET, item, context)
+		if not bypass_authorization:
+			self.rules.enforce_item_rules(GET, item, context)
 		
-		return self.post(GET, item, context, show_hidden=show_hidden)
+		return self.post(GET, item, context, show_hidden=show_hidden, bypass_authorization=bypass_authorization)
 		
 		
-	def update(self, id, fields, show_hidden=False, context=None):
-		self.rules.enforce_non_item_rules(UPDATE, context)
+	def update(self, id, fields, show_hidden=False, context=None, bypass_authorization=False):
+		if not bypass_authorization:
+			self.rules.enforce_non_item_rules(UPDATE, context)
 		
 		self.entity.hooks.trigger_pre('update', id, fields, replace=False)
 		self.hooks.trigger_pre('update', id, fields, replace=False, context=context)
 		
-		if UPDATE in self.rules.item_rules:
+		if not bypass_authorization and UPDATE in self.rules.item_rules:
 			item = self.storage.get_by_id(self.entity.__class__, id)
 			if item is None:
 				raise errors.NotFoundError("No %s with id '%s' was found" % (self.singular_name, id))
@@ -189,7 +197,7 @@ class Collection(object):
 		if item is None:
 			raise errors.NotFoundError("No %s with id '%s' was found" % (self.singular_name, id))
 		
-		item = self.post(UPDATE, item, context, show_hidden=show_hidden)
+		item = self.post(UPDATE, item, context, show_hidden=show_hidden, bypass_authorization=bypass_authorization)
 		
 		self.entity.hooks.trigger_post('update', item, replace=False)
 		self.hooks.trigger_post('update', item, context=context, replace=False)
@@ -197,10 +205,11 @@ class Collection(object):
 		return item
 		
 		
-	def replace(self, id, fields, show_hidden=False, context=None):
-		self.rules.enforce_non_item_rules(REPLACE, context)
+	def replace(self, id, fields, show_hidden=False, context=None, bypass_authorization=False):
+		if not bypass_authorization:
+			self.rules.enforce_non_item_rules(REPLACE, context)
 		
-		if REPLACE in self.rules.item_rules:
+		if not bypass_authorization and REPLACE in self.rules.item_rules:
 			item = self.storage.get_by_id(self.entity.__class__, id)
 			if item is None:
 				raise errors.NotFoundError("No %s with id '%s' was found" % (self.singular_name, id))
@@ -214,7 +223,7 @@ class Collection(object):
 		if item is None:
 			raise errors.NotFoundError("No %s with id '%s' was found" % (self.singular_name, id))
 			
-		item = self.post(REPLACE, item, context, show_hidden=show_hidden)
+		item = self.post(REPLACE, item, context, show_hidden=show_hidden, bypass_authorization=bypass_authorization)
 		
 		self.entity.hooks.trigger_post('update', item, replace=True)
 		self.hooks.trigger_post('update', item, replace=True, context=context)
@@ -222,15 +231,18 @@ class Collection(object):
 		return item
 		
 		
-	def delete(self, id, context=None):
-		self.rules.enforce_non_item_rules(DELETE, context)
+	def delete(self, id, context=None, bypass_authorization=False):
 		context = context if context else {}
+		
+		if not bypass_authorization:
+			self.rules.enforce_non_item_rules(DELETE, context)
 		
 		item = self.storage.get_by_id(self.entity.__class__, id)
 		if item is None:
 			raise errors.NotFoundError("No %s with id '%s' was found" % (self.singular_name, id))
-			
-		self.rules.enforce_item_rules(DELETE, item, context)
+		
+		if not bypass_authorization:
+			self.rules.enforce_item_rules(DELETE, item, context)
 		
 		self.entity.hooks.trigger_pre('delete', id)
 		self.hooks.trigger_pre('delete', id, context=context)
@@ -243,14 +255,16 @@ class Collection(object):
 		self.hooks.trigger_post('delete', id, context=context)
 		
 		
-	def link(self, id, reference_name, filter=None, sort=None, offset=0, limit=0, show_hidden=False, context=None):
-		self.rules.enforce_non_item_rules(GET, context)
+	def link(self, id, reference_name, filter=None, sort=None, offset=0, limit=0, show_hidden=False, context=None, bypass_authorization=False):
+		if not bypass_authorization:
+			self.rules.enforce_non_item_rules(GET, context)
 		
 		item = self.storage.get_by_id(self.entity.__class__, id)
 		if item is None:
 			raise errors.NotFoundError("No %s with id '%s' was found" % (self.singular_name, id))
 		
-		self.rules.enforce_item_rules(GET, item, context)
+		if not bypass_authorization:
+			self.rules.enforce_item_rules(GET, item, context)
 			
 		target_collection = self.links.get(reference_name)
 		if target_collection is None:
@@ -258,24 +272,25 @@ class Collection(object):
 		reference_field = getattr(self.entity.__class__, reference_name)
 		
 		return target_collection.resolve_link_or_reference(item, reference_name, reference_field,
-						filter=filter, sort=sort, offset=offset, limit=limit, show_hidden=show_hidden, context=context)
+						filter=filter, sort=sort, offset=offset, limit=limit, show_hidden=show_hidden, bypass_authorization=bypass_authorization, context=context)
 		
 		
 	def resolve_link_or_reference(self, source_item, reference_name, reference_field, filter=None, sort=None, 
-								  offset=0, limit=0, show_hidden=False, context=None):
+								  offset=0, limit=0, show_hidden=False, context=None, bypass_authorization=False):
 		"""Get the item(s) pointed to by a link or reference"""
 		sort = sort if sort else self.default_sort
-		self.check_for_disabled_fields(filter, sort, context)
+		if not bypass_authorization:
+			self.check_for_disabled_fields(filter, sort, context)
 		if isinstance(reference_field, Link):
 			return self.resolve_link(source_item, reference_field, filter=filter, sort=sort, offset=offset, 
-				                     limit=limit, show_hidden=show_hidden, context=context)
+				                     limit=limit, show_hidden=show_hidden, bypass_authorization=bypass_authorization, context=context)
 		else:
 			return self.resolve_reference(source_item, reference_name, reference_field,
 							filter=filter, sort=sort, offset=offset, limit=limit, context=context)
 		
 		
 	def resolve_link(self, source_item, link_field, filter=None, sort=None, offset=0, 
-				     limit=0, show_hidden=False, context=None):
+				     limit=0, show_hidden=False, context=None, bypass_authorization=False):
 		"""
 		Get the items for a single or multiple link
 		"""
@@ -286,19 +301,19 @@ class Collection(object):
 			self.rules.enforce_non_item_rules(LIST, context)
 			items = list(self.storage.get(self.entity.__class__, filter=filter, sort=sort, offset=offset, limit=limit))
 			self.rules.enforce_item_rules(LIST, items, context)
-			return self.post(LIST, items, context, embed=False, show_hidden=show_hidden)
+			return self.post(LIST, items, context, embed=False, show_hidden=show_hidden, bypass_authorization=bypass_authorization)
 		else:
 			try:
 				self.rules.enforce_non_item_rules(GET, context)
 				item = next(iter(self.storage.get(self.entity.__class__, filter=filter, limit=1)))
 				self.rules.enforce_item_rules(GET, item, context)
-				return self.post(GET, item, context, embed=False, show_hidden=show_hidden)
+				return self.post(GET, item, context, embed=False, show_hidden=show_hidden, bypass_authorization=bypass_authorization)
 			except StopIteration:
 				pass
 		
 	
 	def resolve_reference(self, source_item, reference_name, reference_field, filter=None, sort=None, 
-						  offset=0, limit=0, show_hidden=False, context=None):
+						  offset=0, limit=0, show_hidden=False, context=None, bypass_authorization=False):
 		"""Get the items for a single or multiple reference"""
 		reference_value = source_item.get(reference_name)
 		
@@ -310,12 +325,12 @@ class Collection(object):
 			items = list(self.storage.get_by_ids(self.entity.__class__, reference_value,
 						filter=filter, sort=sort, offset=offset, limit=limit))
 			self.rules.enforce_item_rules(LIST, items, context)
-			return self.post(LIST, items, context, embed=False, show_hidden=show_hidden)
+			return self.post(LIST, items, context, embed=False, show_hidden=show_hidden, bypass_authorization=bypass_authorization)
 		else:
 			self.rules.enforce_non_item_rules(GET, context)
 			item = self.storage.get_by_id(self.entity.__class__, reference_value)
 			self.rules.enforce_item_rules(GET, item, context)
-			return self.post(GET, item, context, embed=False, show_hidden=show_hidden)
+			return self.post(GET, item, context, embed=False, show_hidden=show_hidden, bypass_authorization=bypass_authorization)
 			
 			
 	def check_for_disabled_fields(self, filter, sort, context):
@@ -371,7 +386,7 @@ class Collection(object):
 		return item
 		
 		
-	def add_embedded_references(self, item, show_hidden=False, context=None):
+	def add_embedded_references(self, item, show_hidden=False, context=None, bypass_authorization=False):
 		"""Add embedded references and links to an item"""
 		for reference_name, reference_field in self.entity.links_and_references:
 			if not reference_field.embedded:
@@ -392,7 +407,7 @@ class Collection(object):
 		return item
 		
 		
-	def post(self, method, result, context, embed=True, show_hidden=False):
+	def post(self, method, result, context, embed=True, show_hidden=False, bypass_authorization=False):
 		"""Perform post-method hooks including authentication that requires fetched items."""
 		if result is None:
 			return
@@ -417,7 +432,7 @@ class Collection(object):
 				return new_results
 		else:
 			context['item'] = result
-			show_hidden = self.can_show_hidden(context) and show_hidden
+			show_hidden = bypass_authorization or self.can_show_hidden(context) and show_hidden
 			return self.prepare_item(result, embed=embed, show_hidden=show_hidden)
 		
 		
