@@ -32,7 +32,7 @@ class MongoDBStorage(Storage):
 			if filter:
 				if '_id' in filter:
 					if isinstance(filter['_id'], basestring):
-						filter['_id'] = ObjectId(filter['_id'])
+						filter['_id'] = self._objectid(filter['_id'])
 					filter['_id._id'] = filter['_id']
 					del filter['_id']
 				if '_version' in filter:
@@ -41,7 +41,7 @@ class MongoDBStorage(Storage):
 		else:
 			to_dict = self.document_to_dict
 			if filter and '_id' in filter and isinstance(filter['_id'], basestring):
-				filter['_id'] = ObjectId(filter['_id'])
+				filter['_id'] = self._objectid(filter['_id'])
 				
 		if sort is not None:
 			sort = [(field[1:], 1) if field[0] == '+' else (field[1:], -1) for field in sort]
@@ -71,13 +71,13 @@ class MongoDBStorage(Storage):
 			
 		if not filter:
 			filter = {}
-		filter['_id'] = {'$in':map(ObjectId, ids)}
+		filter['_id'] = {'$in':map(self._objectid, ids)}
 		return self.get(entity, filter=filter, fields=fields, sort=sort, offset=offset, limit=limit, versions=versions)
 		
 		
 	def get_by_id(self, entity, id, fields=None):
 		collection = self.get_collection(entity)
-		filter = {'_id':ObjectId(id)}
+		filter = {'_id':self._objectid(id)}
 		type_filter = self.get_type_filter(entity)
 		if type_filter:
 			filter.update(type_filter)
@@ -101,7 +101,7 @@ class MongoDBStorage(Storage):
 		except pymongo.errors.DuplicateKeyError, e:
 			self._raise_dupe_error(e)
 			
-		return str(obj_id)
+		return self._from_objectid(obj_id)
 		
 		
 	def update(self, entity, id, fields, replace=False):
@@ -123,7 +123,7 @@ class MongoDBStorage(Storage):
 		current_version = fields.pop('_version')
 		collection = self.get_collection(entity)
 		shadow_collection = self.get_collection(entity, shadow=True)
-		obj_id = ObjectId(id)
+		obj_id = self._objectid(id)
 		current_doc = collection.find_one(obj_id)
 		
 		if not current_doc and not replace:
@@ -157,7 +157,7 @@ class MongoDBStorage(Storage):
 		
 	def _unversioned_update(self, entity, id, fields, replace=None):
 		collection = self.get_collection(entity)
-		obj_id = ObjectId(id)
+		obj_id = self._objectid(id)
 		if replace:
 			doc = fields
 		else:
@@ -177,7 +177,7 @@ class MongoDBStorage(Storage):
 	def _versioned_delete(self, entity, id, deleted_by):
 		collection = self.get_collection(entity)
 		shadow_collection = self.get_collection(entity, shadow=True)
-		obj_id = ObjectId(id)
+		obj_id = self._objectid(id)
 		current_doc = collection.find_one(obj_id)
 		current_doc['_id'] = {'_id':current_doc['_id'], '_version':current_doc['_version']}
 		shadow_collection.insert(current_doc)
@@ -195,17 +195,17 @@ class MongoDBStorage(Storage):
 		
 	def _unversioned_delete(self, entity, id):
 		collection = self.get_collection(entity)
-		obj_id = ObjectId(id)
+		obj_id = self._objectid(id)
 		collection.remove(obj_id)
 		
 		
 	def document_to_dict(self, doc):
-		doc['_id'] = str(doc['_id'])
+		doc['_id'] = self._from_objectid(doc['_id'])
 		return doc
 		
 		
 	def versioned_document_to_dict(self, doc):
-		doc['_id'] = str(doc['_id']['_id'])
+		doc['_id'] = self._from_objectid(doc['_id']['_id'])
 		return doc
 		
 		
@@ -266,4 +266,16 @@ class MongoDBStorage(Storage):
 			key_name = 'unknown'
 		
 		raise errors.DuplicateError(key_name)
-				
+			
+		
+	def _objectid(self, id):
+		try:
+			return ObjectId(id)
+		except:
+			return id
+			
+	def _from_objectid(self, id):
+		if isinstance(id, ObjectId):
+			return str(id)
+		else:
+			return id
