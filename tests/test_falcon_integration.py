@@ -325,3 +325,17 @@ class TestResource(TestBase):
 		self.cellardoor.foos.list.assert_called_with(sort=None, filter=None, offset=0, limit=0, show_hidden=False, context={'identity': 'foo'})
 		
 		
+	def test_show_hidden(self):
+		"""If show_hidden is set in the request, show_hidden=True in the collection call"""
+		self.cellardoor.foos.list = Mock(return_value=None)
+		self.cellardoor.foos.create = Mock(return_value=None)
+		self.cellardoor.foos.get = Mock(return_value=None)
+		
+		self.simulate_request('/foos', query_string='show_hidden=1')
+		self.simulate_request('/foos', method='POST', headers={'content-type':'application/json'}, body='{}', query_string='show_hidden=1')
+		self.simulate_request('/foos/123', query_string='show_hidden=1')
+		
+		self.cellardoor.foos.list.assert_called_with(sort=None, filter=None, offset=0, limit=0, show_hidden=True, context={})
+		self.cellardoor.foos.create.assert_called_with({}, show_hidden=True, context={})
+		self.cellardoor.foos.get.assert_called_with('123', show_hidden=True, context={})
+		

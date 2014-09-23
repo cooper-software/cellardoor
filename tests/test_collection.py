@@ -472,19 +472,15 @@ class CollectionTest(unittest.TestCase):
 		
 	def test_hidden_show_fail(self):
 		"""Hidden fields aren't shown in results even when show_hidden=True if the user is not authorized."""
-		storage.create = Mock(return_value={'_id':'123', 'name':'foo', 'foo':23})
 		storage.get_by_id = Mock(return_value={'_id':'123', 'name':'foo', 'foo':23})
-		obj = api.hiddens.create({'name':'foo', 'foo':23}, context={'identity':{'role':'admin'}})
-		obj = api.hiddens.get(obj['_id'], show_hidden=True)
+		obj = api.hiddens.get('123', show_hidden=True)
 		self.assertNotIn('name', obj)
 		
 		
 	def test_hidden_succeed(self):
 		"""Hidden fields are shown when show_hidden=True and the user is authorized."""
-		storage.create = Mock(return_value={'_id':'123', 'name':'foo', 'foo':23})
 		storage.get_by_id = Mock(return_value={'_id':'123', 'name':'foo', 'foo':23})
-		obj = api.hiddens.create({'name':'foo', 'foo':23}, context={'identity':{'role':'admin'}})
-		obj = api.hiddens.get(obj['_id'], show_hidden=True, context={'identity':{'foo':'bar'}})
+		obj = api.hiddens.get('123', show_hidden=True, context={'identity':{'foo':'bar'}})
 		self.assertIn('name', obj)
 		
 		
