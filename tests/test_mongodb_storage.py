@@ -391,17 +391,16 @@ class TestMongoDBStorage(unittest.TestCase):
 		"""
 		Can use something other than a `bson.objectid.ObjectId` as an item id.
 		"""
-		baz = {'_id':123, 'foo':123}
 		baz_id = self.storage.create(Baz, {'_id':123, 'foo':123})
-		self.assertEquals(baz_id, 123)
+		self.assertEquals(baz_id, '123')
 		
-		fetched_baz = self.storage.get_by_id(Baz, 123)
-		self.assertEquals(fetched_baz, baz)
+		fetched_baz = self.storage.get_by_id(Baz, '123')
+		self.assertEquals(fetched_baz, {'_id':'123', 'foo':123})
 		
-		udpated_baz = self.storage.update(Baz, 123, {'foo':666})
-		baz['foo'] = 666
-		self.assertEquals(udpated_baz, baz)
+		udpated_baz = self.storage.update(Baz, '123', {'foo':666})
+		self.assertEquals(udpated_baz, {'_id':'123', 'foo':666})
 		
-		self.storage.delete(Baz, 123)
-		fetched_baz = self.storage.get_by_id(Baz, 123)
+		self.storage.delete(Baz, '123')
+		fetched_baz = self.storage.get_by_id(Baz, '123')
 		self.assertEquals(fetched_baz, None)
+		

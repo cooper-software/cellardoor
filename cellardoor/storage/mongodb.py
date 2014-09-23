@@ -96,6 +96,8 @@ class MongoDBStorage(Storage):
 		type_name = self.get_type_name(entity)
 		if type_name:
 			fields['_type'] = type_name
+		if '_id' in fields:
+			fields['_id'] = self._objectid(fields['_id'])
 		try:
 			obj_id = collection.insert(fields.copy())
 		except pymongo.errors.DuplicateKeyError, e:
@@ -272,7 +274,7 @@ class MongoDBStorage(Storage):
 		try:
 			return ObjectId(id)
 		except:
-			return id
+			return str(id)
 			
 	def _from_objectid(self, id):
 		if isinstance(id, ObjectId):
