@@ -192,7 +192,7 @@ class CollectionTest(unittest.TestCase):
 		foo = {'_id':123, 'stuff':'baz'}
 		storage.update = Mock(return_value=foo)
 		updated_foo = api.foos.update(123, {'stuff':'baz'})
-		storage.update.assert_called_once_with(Foo, 123, {'stuff':'baz'})
+		storage.update.assert_called_once_with(Foo, 123, {'stuff':'baz'}, replace=False)
 		self.assertEquals(updated_foo, foo)
 		
 		
@@ -606,4 +606,13 @@ class CollectionTest(unittest.TestCase):
 		with self.assertRaises(errors.DisabledMethodError):
 			api.readonly_foos.create({})
 		
+		
+	def test_passes_version(self):
+		"""When updating, the _version field is passed through to the storage method"""
+		storage.update = Mock(return_value={'_id':'123'})
+		storage.get_by_id = Mock(return_value={'_id':'123'})
+		api.foos.update('123', {'_version':57})
+		storage.update.assert_called_with(Foo, '123', {'_version':57}, replace=False)
+		api.foos.replace('123', {'_version':57})
+		storage.update.assert_called_with(Foo, '123', {'_version':57}, replace=True)
 		

@@ -21,6 +21,10 @@ class VersionConflictError(Exception):
 		super(VersionConflictError, self).__init__()
 		
 		
+class NotVersionedError(Exception):
+	pass
+		
+		
 class DisabledFieldError(Exception):
 	pass
 	

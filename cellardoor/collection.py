@@ -179,56 +179,38 @@ class Collection(object):
 		return self.post(GET, item, context, show_hidden=show_hidden, bypass_authorization=bypass_authorization)
 		
 		
-	def update(self, id, fields, show_hidden=False, context=None, bypass_authorization=False):
+	def update(self, id, fields, show_hidden=False, context=None, bypass_authorization=False, _replace=False, _method=UPDATE):
 		if not bypass_authorization:
-			self.rules.enforce_non_item_rules(UPDATE, context)
+			self.rules.enforce_non_item_rules(_method, context)
 		
-		self.entity.hooks.trigger_pre('update', id, fields, replace=False)
-		self.hooks.trigger_pre('update', id, fields, replace=False, context=context)
+		self.entity.hooks.trigger_pre('update', id, fields, replace=_replace)
+		self.hooks.trigger_pre('update', id, fields, replace=_replace, context=context)
 		
 		if not bypass_authorization and UPDATE in self.rules.item_rules:
 			item = self.storage.get_by_id(self.entity.__class__, id)
 			if item is None:
 				raise errors.NotFoundError("No %s with id '%s' was found" % (self.singular_name, id))
-			self.rules.enforce_item_rules(UPDATE, item, context)
+			self.rules.enforce_item_rules(_method, item, context)
 		
+		version = fields.pop('_version', None)
 		fields = self.entity.validator.validate(fields, enforce_required=False)
-		item = self.storage.update(self.entity.__class__, id, fields)
+		if version:
+			fields['_version'] = version
+		item = self.storage.update(self.entity.__class__, id, fields, replace=_replace)
 		if item is None:
 			raise errors.NotFoundError("No %s with id '%s' was found" % (self.singular_name, id))
 		
-		item = self.post(UPDATE, item, context, show_hidden=show_hidden, bypass_authorization=bypass_authorization)
+		item = self.post(_method, item, context, show_hidden=show_hidden, bypass_authorization=bypass_authorization)
 		
-		self.entity.hooks.trigger_post('update', item, replace=False)
-		self.hooks.trigger_post('update', item, context=context, replace=False)
+		self.entity.hooks.trigger_post('update', item, replace=_replace)
+		self.hooks.trigger_post('update', item, context=context, replace=_replace)
 		
 		return item
 		
 		
 	def replace(self, id, fields, show_hidden=False, context=None, bypass_authorization=False):
-		if not bypass_authorization:
-			self.rules.enforce_non_item_rules(REPLACE, context)
-		
-		if not bypass_authorization and REPLACE in self.rules.item_rules:
-			item = self.storage.get_by_id(self.entity.__class__, id)
-			if item is None:
-				raise errors.NotFoundError("No %s with id '%s' was found" % (self.singular_name, id))
-			self.rules.enforce_item_rules(REPLACE, item, context)
-		
-		self.entity.hooks.trigger_pre('update', id, fields, replace=True)
-		self.hooks.trigger_pre('update', id, fields, replace=True, context=context)
-		
-		fields = self.entity.validator.validate(fields)
-		item = self.storage.update(self.entity.__class__, id, fields, replace=True)
-		if item is None:
-			raise errors.NotFoundError("No %s with id '%s' was found" % (self.singular_name, id))
-			
-		item = self.post(REPLACE, item, context, show_hidden=show_hidden, bypass_authorization=bypass_authorization)
-		
-		self.entity.hooks.trigger_post('update', item, replace=True)
-		self.hooks.trigger_post('update', item, replace=True, context=context)
-		
-		return item
+		return self.update(id, fields, show_hidden=show_hidden, context=context, 
+			bypass_authorization=bypass_authorization, _replace=True, _method=REPLACE)
 		
 		
 	def delete(self, id, context=None, bypass_authorization=False):
