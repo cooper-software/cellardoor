@@ -2,6 +2,7 @@ import types
 from version import __version__
 from .model import Model
 from .collection import Collection
+from .spec.jsonschema import to_jsonschema
 
 
 class CellarDoor(object):
@@ -37,3 +38,7 @@ class CellarDoor(object):
 					referenced_collection = self.collections_by_class_name.get(v)
 					new_links[k] = referenced_collection
 			collection.links = new_links
+			
+			
+	def schema(self):
+		return to_jsonschema(self.model.entities)
