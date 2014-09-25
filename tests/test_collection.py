@@ -86,6 +86,8 @@ class BazesCollection(Collection):
 		'foo': FoosCollection,
 		'embedded_foo': FoosCollection
 	}
+	default_limit = 10
+	max_limit = 20
 	
 	
 class HiddenCollection(Collection):
@@ -616,3 +618,16 @@ class CollectionTest(unittest.TestCase):
 		api.foos.replace('123', {'_version':57})
 		storage.update.assert_called_with(Foo, '123', {'_version':57}, replace=True)
 		
+		
+	def test_default_limit(self):
+		"""A default limit is used when limit is not passed"""
+		storage.get = Mock(return_value=[])
+		api.bazes.list()
+		storage.get.assert_called_once_with(Baz, sort=(), filter=None, offset=0, limit=10)
+		
+		
+	def test_max_limit(self):
+		"""Limit can't exceed max_limit"""
+		storage.get = Mock(return_value=[])
+		api.bazes.list(limit=50)
+		storage.get.assert_called_once_with(Baz, sort=(), filter=None, offset=0, limit=20)

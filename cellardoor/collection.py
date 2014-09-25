@@ -117,6 +117,9 @@ class Collection(object):
 	# used to sort results when no sort is supplied in the request.
 	default_sort = ()
 	
+	default_limit = 0
+	max_limit = 100
+	
 	
 	def __init__(self, storage):
 		self.storage = storage
@@ -135,7 +138,9 @@ class Collection(object):
 		if not bypass_authorization:
 			self.rules.enforce_non_item_rules(LIST, context)
 			self.check_for_disabled_fields(filter, sort, context)
-			
+		
+		limit = self.get_limit(limit)
+		
 		items = self.storage.get(self.entity.__class__, filter=filter, sort=sort, offset=offset, limit=limit)
 		
 		if not bypass_authorization:
@@ -263,6 +268,7 @@ class Collection(object):
 		sort = sort if sort else self.default_sort
 		if not bypass_authorization:
 			self.check_for_disabled_fields(filter, sort, context)
+		limit = self.get_limit(limit)
 		if isinstance(reference_field, Link):
 			return self.resolve_link(source_item, reference_field, filter=filter, sort=sort, offset=offset, 
 				                     limit=limit, show_hidden=show_hidden, bypass_authorization=bypass_authorization, context=context)
@@ -428,4 +434,10 @@ class Collection(object):
 		
 	def disabled_method_error(self, *args, **kwargs):
 		raise errors.DisabledMethodError, "This method is not enabled."
+		
+		
+	def get_limit(self, limit):
+		if not limit:
+			limit = self.default_limit
+		return min(limit, self.max_limit)
 		
