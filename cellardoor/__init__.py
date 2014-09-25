@@ -19,26 +19,29 @@ class CellarDoor(object):
 		else:
 			collection_classes = collections
 		entities = set()
-		self.collections_by_class_name = {}
+		collections_by_class_name = {}
 		
 		for collection_cls in collection_classes:
 			entities.add(collection_cls.entity)
 			collection = collection_cls(storage)
-			self.collections_by_class_name[collection_cls.__name__] = collection
+			collections_by_class_name[collection_cls.__name__] = collection
 			setattr(self, collection_cls.plural_name, collection)
 			
 		self.model = Model(storage, entities)
 		
-		for collection in self.collections_by_class_name.values():
+		for collection in collections_by_class_name.values():
 			new_links = {}
 			if collection.links:
 				for k, v in collection.links.items():
 					if not isinstance(v, basestring):
 						v = v.__name__
-					referenced_collection = self.collections_by_class_name.get(v)
+					referenced_collection = collections_by_class_name.get(v)
 					new_links[k] = referenced_collection
 			collection.links = new_links
+		
+		self.collections = collections_by_class_name.values()
+		self.entities = entities
 			
 			
-	def schema(self):
-		return to_jsonschema(self.model.entities)
+	def schema(self, base_url):
+		return to_jsonschema(self, base_url)

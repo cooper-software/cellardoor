@@ -210,7 +210,7 @@ class TestResource(TestBase):
 		)
 		result = json.loads(''.join(data))
 		self.assertEquals(self.srmock.status, '200 OK')
-		self.assertEquals(result, {'items':foos})
+		self.assertEquals(result, foos)
 		self.cellardoor.foos.list.assert_called_with(sort=['+name'], filter={'foo':23}, offset=7, limit=10, show_hidden=True, context={})
 		
 		

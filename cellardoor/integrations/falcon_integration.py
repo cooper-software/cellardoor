@@ -273,7 +273,7 @@ def add_to_falcon(falcon_api, cellardoor_api, views):
 	duplicate_field_error_with_views = functools.partial(duplicate_field_error, views_by_type)
 	falcon_api.add_error_handler(errors.DuplicateError, duplicate_field_error_with_views)
 	
-	for collection in cellardoor_api.collections_by_class_name.values():
+	for collection in cellardoor_api.collections:
 		resource = Resource(collection, views_by_type)
 		resource.add_to_falcon(falcon_api)
 		

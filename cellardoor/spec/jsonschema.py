@@ -1,28 +1,14 @@
 from .. import model
 
 
-class JSONSchemaSerializer(object):
+class EntitySerializer(object):
 	
 	fallbacks = (
 		model.Text, model.Integer, model.Float, model.DateTime,
 		model.Boolean, model.Enum, model.ListOf, model.OneOf
 	)
-	
-	def create_schema(self, entities):
-		return {
-			"$schema": "http://json-schema.org/draft-04/schema#",
-			"definitions": self.get_definitions(entities)
-		}
 		
-		
-	def get_definitions(self, entities):
-		definitions = {}
-		for e in entities:
-			definitions[e.__name__] = self.get_definition(e)
-		return definitions
-			
-			
-	def get_definition(self, entity):
+	def create_schema(self, entity):
 		props = {}
 		required_props = []
 		for k,v in entity.fields.items():
@@ -39,6 +25,7 @@ class JSONSchemaSerializer(object):
 			
 	def get_property(self, field):
 		prop = {}
+		prop['default'] = field.default
 		if field.help:
 			prop['description'] = field.help
 		type_name = field.__class__.__name__
@@ -114,11 +101,118 @@ class JSONSchemaSerializer(object):
 		prop['format'] = 'reference'
 		prop['schema'] = '#/definitions/%s' % field.entity.__name__
 		
+		
+		
+class APISerializer(object):
+	
+	def create_schema(self, api, base_url, entity_serializer):
+		self.base_url = base_url
+		definitions = {}
+		for e in api.entities:
+			definitions[e.__name__] = entity_serializer.create_schema(e)
+		
+		resources = {}
+		for collection in api.collections:
+			resources[collection.plural_name] = self.get_resource_schema(collection)
+		
+		return {
+			"$schema": "http://json-schema.org/draft-04/schema#",
+			"type": "object",
+			"definitions": definitions,
+			"properties": resources
+		}
+		
+		
+	def get_resource_schema(self, collection):
+		links = {}
+		
+		for method in collection.rules.enabled_methods:
+			fn = getattr(self, 'get_%s_link' % method)
+			links[method] = fn(collection)
+		
+		return {
+			"links": links
+		}
+		
+		
+	def get_list_link(self, collection):
+		return {
+			'href': self.base_url + '/%s' % collection.plural_name,
+			'method': 'GET',
+			'rel': 'instances',
+			'title': 'List',
+			'targetSchema': {
+				'type': 'array',
+				'items': {
+					'$ref': self.entity_schema_ref(collection)
+				}
+			}
+		}
+		
+		
+	def get_get_link(self, collection):
+		return {
+			'href': self.base_url + '/%s/{id}' % collection.plural_name,
+			'method': 'GET',
+			'rel': 'instance',
+			'title': 'Details',
+			'targetSchema': { '$ref': self.entity_schema_ref(collection) }
+		}
+		
+		
+	def get_create_link(self, collection):
+		return {
+			'href': self.base_url + '/%s' % collection.plural_name,
+			'method': 'POST',
+			'rel': 'create',
+			'title': 'New',
+			'schema': { '$ref': self.entity_schema_ref(collection) },
+			'targetSchema': { '$ref': self.entity_schema_ref(collection) }
+		}
+		
+		
+	def get_update_link(self, collection):
+		return {
+			'href': self.base_url + '/%s/{id}' % collection.plural_name,
+			'method': 'PATCH',
+			'rel': 'update',
+			'title': 'Update',
+			'schema': {
+				'allOf': [ { '$ref': self.entity_schema_ref(collection) } ],
+				'required': []
+			},
+			'targetSchema': { '$ref': self.entity_schema_ref(collection) }
+		}
+		
+		
+	def get_replace_link(self, collection):
+		return {
+			'href': self.base_url + '/%s/{id}' % collection.plural_name,
+			'method': 'PUT',
+			'rel': 'replace',
+			'title': 'Replace',
+			'schema': { '$ref': self.entity_schema_ref(collection) },
+			'targetSchema': { '$ref': self.entity_schema_ref(collection) }
+		}
+		
+		
+	def get_delete_link(self, collection):
+		return {
+			'href': self.base_url + '/%s/{id}' % collection.plural_name,
+			'method': 'DELETE',
+			'rel': 'delete',
+			'title': 'Delete'
+		}
+		
+		
+	def entity_schema_ref(self, collection):
+		return '#/definitions/%s' % collection.entity.__class__.__name__
 
 
-def to_jsonschema(entities, cls=JSONSchemaSerializer):
-	serializer = cls()
-	return serializer.create_schema(entities)
+def to_jsonschema(api, base_url, api_cls=APISerializer, entity_cls=EntitySerializer):
+	api_serializer = api_cls()
+	entity_serializer = entity_cls()
+	return api_serializer.create_schema(api, base_url, entity_serializer)
 	
 	
 	

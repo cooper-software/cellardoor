@@ -17,12 +17,12 @@ class TestMinimalView(unittest.TestCase):
 		req = create_fake_request(headers={'accept':'application/json'})
 		content_type, result = view.get_collection_response(req, objs)
 		self.assertEquals(content_type, 'application/json')
-		self.assertEquals(result, json.dumps({'items':objs}))
+		self.assertEquals(result, json.dumps(objs))
 		
 		req = create_fake_request(headers={'accept':'application/x-msgpack'})
 		content_type, result = view.get_collection_response(req, objs)
 		self.assertEquals(content_type, 'application/x-msgpack')
-		self.assertEquals(result, msgpack.packb({'items':objs}))
+		self.assertEquals(result, msgpack.packb(objs))
 		
 		
 	def test_individual_response(self):
