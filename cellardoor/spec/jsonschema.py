@@ -20,7 +20,21 @@ class EntitySerializer(object):
 		}
 		if required_props:
 			definition['required'] = required_props
+		links = self.get_links(entity)
+		if links:
+			definition['links'] = links
 		return definition
+			
+			
+	def get_links(self, entity):
+		if len(entity.hierarchy) > 1:
+			parent = entity.hierarchy[-2]
+			return {
+				'parent': {
+					'rel': 'parent',
+					'href': '#/definitions/%s' % parent.__name__
+				}
+			}
 			
 			
 	def get_property(self, field):
@@ -47,9 +61,14 @@ class EntitySerializer(object):
 		if field.maxlength:
 			prop['maxLength'] = field.maxlength
 		if field.minlength:
-			prop['maxLength'] = field.maxlength
+			prop['minLength'] = field.minlength
 		if field.regex:
 			prop['pattern'] = field.regex.pattern
+			
+			
+	def handle_HTML(self, field, prop):
+		self.handle_Text(field, prop)
+		prop['format'] = 'html'
 		
 		
 	def handle_Integer(self, field, prop):
@@ -61,22 +80,25 @@ class EntitySerializer(object):
 		
 		
 	def handle_Float(self, field, prop):
+		self.handle_Integer(field, prop)
 		prop['type'] = 'number'
 		
 		
 	def handle_DateTime(self, field, prop):
-		self.handle_Text(field, prop)
+		prop['type'] = 'string'
 		prop['format'] = 'date-time'
 		
 		
 	def handle_Email(self, field, prop):
 		self.handle_Text(field, prop)
 		prop['format'] = 'email'
+		del prop['pattern']
 		
 		
 	def handle_URL(self, field, prop):
 		self.handle_Text(field, prop)
 		prop['format'] = 'uri'
+		del prop['pattern']
 		
 		
 	def handle_Boolean(self, field, prop):
@@ -93,13 +115,48 @@ class EntitySerializer(object):
 		
 		
 	def handle_OneOf(self, field, prop):
-		prop['oneOf'] = map(self.get_property, field.fields)
+		prop['anyOf'] = map(self.get_property, field.fields)
 		
 		
 	def handle_Reference(self, field, prop):
 		self.handle_Text(field, prop)
 		prop['format'] = 'reference'
 		prop['schema'] = '#/definitions/%s' % field.entity.__name__
+		
+		
+	def handle_Compound(self, field, prop):
+		prop['type'] = 'object'
+		properties = {}
+		required = []
+		for k, v in field.fields.items():
+			properties[k] = self.get_property(v)
+			if v.required:
+				required.append(k)
+		prop['properties'] = properties
+		if len(required) > 0:
+			prop['required'] = required
+			
+			
+	def handle_BoundingBox(self, field, prop):
+		prop['type'] = 'array'
+		prop['items'] = {
+			'type': 'float',
+			'minimum': -180.0,
+			'maximum': 180.0,
+			'maxItems': 4,
+			'minItems': 4
+		}
+		
+		
+	def handle_LatLng(self, field, prop):
+		prop['type'] = 'array'
+		prop['items'] = {
+			'type': 'float',
+			'minimum': -180.0,
+			'maximum': 180.0,
+			'maxItems': 2,
+			'minItems': 2
+		}
 		
 		
 		
@@ -129,6 +186,10 @@ class APISerializer(object):
 		for method in collection.rules.enabled_methods:
 			fn = getattr(self, 'get_%s_link' % method)
 			links[method] = fn(collection)
+			
+		if collection.links:
+			for k,v in collection.links.items():
+				links['link-%s' % k] = self.get_link_link(collection, k, v)
 		
 		return {
 			"links": links
@@ -203,6 +264,24 @@ class APISerializer(object):
 			'rel': 'delete',
 			'title': 'Delete'
 		}
+		
+		
+	def get_link_link(self, collection, link_name, link_collection):
+		schema_link = {
+			'href': self.base_url + '/%s/{id}/%s' % (collection.plural_name, link_name),
+			'method': 'GET',
+			'rel': 'link',
+			'title': 'Link'
+		}
+		if collection.entity.is_multiple_link(getattr(collection.entity, link_name)):
+			schema_link['targetSchema'] = {
+				'type': 'array',
+				'items': { '$ref': self.entity_schema_ref(link_collection) }
+			}
+		else:
+			schema_link['targetSchema'] = { '$ref': self.entity_schema_ref(link_collection) }
+			
+		return schema_link
 		
 		
 	def entity_schema_ref(self, collection):
