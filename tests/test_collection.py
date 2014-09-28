@@ -23,12 +23,13 @@ class Foo(Entity):
 	optional_stuff = Text()
 	bars = Link('Bar', 'foo')
 	bazes = ListOf(Reference('Baz'))
-	embedded_bazes = ListOf(Reference('Baz', embedded=True))
+	embedded_bazes = ListOf(Reference('Baz', embeddable=True))
+	embedded_foos = ListOf(Reference('Foo', embeddable=True, embed_by_default=False, embedded_fields=('stuff',)))
 	
 	
 class Bar(Entity):
 	foo = Reference(Foo)
-	embedded_foo = Reference(Foo, embedded=True)
+	embedded_foo = Reference(Foo, embeddable=True)
 	bazes = ListOf(Reference('Baz'))
 	number = TypeOf(int)
 	name = Text()
@@ -37,7 +38,7 @@ class Bar(Entity):
 class Baz(Entity):
 	name = Text(required=True)
 	foo = Link(Foo, 'bazes', multiple=False)
-	embedded_foo = Link(Foo, 'bazes', multiple=False, embedded=True)
+	embedded_foo = Link(Foo, 'bazes', multiple=False, embeddable=True, embed_by_default=False)
 	
 	
 class Hidden(Entity):
@@ -53,7 +54,8 @@ class FoosCollection(Collection):
 	links = {
 		'bars': 'BarsCollection',
 		'bazes': 'BazesCollection',
-		'embedded_bazes': 'BazesCollection'
+		'embedded_bazes': 'BazesCollection',
+		'embedded_foos': 'FoosCollection'
 	}
 	enabled_filters = ('stuff',)
 	enabled_sort = ('stuff',)
@@ -304,9 +306,10 @@ class CollectionTest(unittest.TestCase):
 			
 		foo = {'_id':'123', 'bazes':baz_ids}
 		
-		api.foos.storage = Storage()
-		api.bazes.storage = Storage()
+		api.foos.set_storage(Storage())
+		api.bazes.set_storage(Storage())
 		api.foos.storage.get_by_id = Mock(return_value=foo)
+		api.foos.storage.check_filter = Mock(return_value=None)
 		api.bazes.storage.get_by_ids = Mock(return_value=created_bazes)
 		api.bazes.storage.check_filter = Mock(return_value=None)
 		
@@ -379,7 +382,7 @@ class CollectionTest(unittest.TestCase):
 		api.foos.storage.get = Mock(return_value=[foo])
 		api.bazes.storage.get_by_id = Mock(return_value=created_bazes[0])
 		
-		baz = api.bazes.get(baz_ids[0])
+		baz = api.bazes.get(baz_ids[0], embed=('embedded_foo',))
 		self.assertEquals(baz['embedded_foo'], foo)
 		
 		
@@ -396,8 +399,8 @@ class CollectionTest(unittest.TestCase):
 			bars.append(bar)
 			bar_ids.append(bar['_id'])
 		
-		api.foos.storage = Storage()
-		api.bars.storage = Storage()
+		api.foos.set_storage(Storage())
+		api.bars.set_storage(Storage())
 		api.foos.storage.get_by_id = Mock(return_value=foo)
 		api.bars.storage.get = Mock(return_value=bars)
 		api.bars.storage.check_filter = Mock(return_value=None)
@@ -512,20 +515,19 @@ class CollectionTest(unittest.TestCase):
 	def test_authorization_bypass(self):
 		"""Can bypass authorization for methods, filters and sort."""
 		storage.get = Mock(return_value=[{'name':'zoomy', 'foo':23}])
-		results = api.hiddens.list(filter={'name':'zoomy'}, sort=('+name',), bypass_authorization=True)
+		results = api.hiddens.list(filter={'name':'zoomy'}, sort=('+name',), bypass_authorization=True, show_hidden=True)
 		storage.get.assert_called_once_with(Hidden, sort=('+name',), filter={'name':'zoomy'}, limit=0, offset=0)
 		self.assertEquals(results, [{'name':'zoomy', 'foo':23}])
 		
 		
-		
 	def test_entity_hooks(self):
 		"""Collections call entity create, update and delete hooks"""
-		pre_create = Mock()
-		post_create = Mock()
-		pre_update = Mock()
-		post_update = Mock()
-		pre_delete = Mock()
-		post_delete = Mock()
+		pre_create = CopyingMock()
+		post_create = CopyingMock()
+		pre_update = CopyingMock()
+		post_update = CopyingMock()
+		pre_delete = CopyingMock()
+		post_delete = CopyingMock()
 		hooks = api.foos.entity.hooks
 		hooks.pre('create', pre_create)
 		hooks.post('create', post_create)
@@ -534,36 +536,47 @@ class CollectionTest(unittest.TestCase):
 		hooks.pre('delete', pre_delete)
 		hooks.post('delete', post_delete)
 		
+		context = {'foo':23}
+		options = {'bypass_authorization': False, 'fields': None, 'allow_embedding': True, 'show_hidden': False, 'context': {'foo': 23}, 'embed': None, 'can_show_hidden': True}
+		
 		storage.create = Mock(return_value='123')
 		storage.update = Mock(return_value={'_id':'123', 'stuff':'nothings'})
 		storage.delete = Mock(return_value=None)
 		storage.get_by_id = Mock(return_value={'_id':'123', 'stuff':'nothings'})
 		
-		foo = api.foos.create({'stuff':'things'})
-		pre_create.assert_called_once_with({'stuff':'things'})
-		post_create.assert_called_once_with(foo)
+		foo = api.foos.create({'stuff':'things'}, context=context.copy())
+		create_options = deepcopy(options)
+		create_options['context']['item'] = foo
+		pre_create.assert_called_once_with({'stuff':'things'}, options)
+		post_create.assert_called_once_with(foo, create_options)
 		
-		foo = api.foos.update(foo['_id'], {'stuff':'nothings'})
-		pre_update.assert_called_with(foo['_id'], {'stuff':'nothings'}, replace=False)
-		post_update.assert_called_with(foo, replace=False)
+		foo = api.foos.update(foo['_id'], {'stuff':'nothings'}, context=context.copy())
+		update_options = deepcopy(options)
+		update_options['context']['item'] = foo
+		pre_update.assert_called_with(foo['_id'], {'stuff':'nothings'}, options)
+		post_update.assert_called_with(foo, update_options)
 		
-		foo = api.foos.replace(foo['_id'], {'stuff':'nothings'})
-		pre_update.assert_called_with(foo['_id'], {'stuff':'nothings'}, replace=True)
-		post_update.assert_called_with(foo, replace=True)
+		foo = api.foos.replace(foo['_id'], {'stuff':'somethings'}, context=context.copy())
+		replace_options = deepcopy(options)
+		replace_options['context']['item'] = foo
+		pre_update.assert_called_with(foo['_id'], {'stuff':'somethings'}, options)
+		post_update.assert_called_with(foo, replace_options)
 		
-		api.foos.delete(foo['_id'])
-		pre_delete.assert_called_once_with(foo['_id'])
-		post_delete.assert_called_once_with(foo['_id'])
+		api.foos.delete(foo['_id'], context=context.copy())
+		delete_options = deepcopy(options)
+		delete_options['context']['item'] = foo
+		pre_delete.assert_called_once_with(foo['_id'], options)
+		post_delete.assert_called_once_with(foo['_id'], delete_options)
 		
 		
 	def test_collection_hooks(self):
 		"""Collections have create, update and delete hooks"""
 		pre_create = CopyingMock()
-		post_create = Mock()
+		post_create = CopyingMock()
 		pre_update = CopyingMock()
-		post_update = Mock()
+		post_update = CopyingMock()
 		pre_delete = CopyingMock()
-		post_delete = Mock()
+		post_delete = CopyingMock()
 		hooks = api.foos.hooks
 		hooks.pre('create', pre_create)
 		hooks.post('create', post_create)
@@ -572,6 +585,7 @@ class CollectionTest(unittest.TestCase):
 		hooks.pre('delete', pre_delete)
 		hooks.post('delete', post_delete)
 		context = {'foo':23}
+		options = {'bypass_authorization': False, 'fields': None, 'allow_embedding': True, 'show_hidden': False, 'context': {'foo': 23}, 'embed': None, 'can_show_hidden': True}
 		
 		storage.create = Mock(return_value='123')
 		storage.update = Mock(return_value={'_id':'123', 'stuff':'nothings'})
@@ -579,28 +593,28 @@ class CollectionTest(unittest.TestCase):
 		storage.get_by_id = Mock(return_value={'_id':'123', 'stuff':'nothings'})
 		
 		foo = api.foos.create({'stuff':'things'}, context=context.copy())
-		create_context = context.copy()
-		create_context['item'] = foo
-		pre_create.assert_called_once_with({'stuff':'things'}, context=context)
-		post_create.assert_called_once_with(foo, context=create_context)
+		create_options = deepcopy(options)
+		create_options['context']['item'] = foo
+		pre_create.assert_called_once_with({'stuff':'things'}, options)
+		post_create.assert_called_once_with(foo, create_options)
 		
 		foo = api.foos.update(foo['_id'], {'stuff':'nothings'}, context=context.copy())
-		update_context = context.copy()
-		update_context['item'] = foo
-		pre_update.assert_called_with(foo['_id'], {'stuff':'nothings'}, replace=False, context=context)
-		post_update.assert_called_with(foo, context=update_context, replace=False)
+		update_options = deepcopy(options)
+		update_options['context']['item'] = foo
+		pre_update.assert_called_with(foo['_id'], {'stuff':'nothings'}, options)
+		post_update.assert_called_with(foo, update_options)
 		
 		foo = api.foos.replace(foo['_id'], {'stuff':'somethings'}, context=context.copy())
-		replace_context = context.copy()
-		replace_context['item'] = foo
-		pre_update.assert_called_with(foo['_id'], {'stuff':'somethings'}, replace=True, context=context)
-		post_update.assert_called_with(foo, context=replace_context, replace=True)
+		replace_options = deepcopy(options)
+		replace_options['context']['item'] = foo
+		pre_update.assert_called_with(foo['_id'], {'stuff':'somethings'}, options)
+		post_update.assert_called_with(foo, replace_options)
 		
 		api.foos.delete(foo['_id'], context=context.copy())
-		delete_context = context.copy()
-		delete_context['item'] = foo
-		pre_delete.assert_called_once_with(foo['_id'], context=context)
-		post_delete.assert_called_once_with(foo['_id'], context=delete_context)
+		delete_options = deepcopy(options)
+		delete_options['context']['item'] = foo
+		pre_delete.assert_called_once_with(foo['_id'], options)
+		post_delete.assert_called_once_with(foo['_id'], delete_options)
 		
 		
 	def test_disabled_method(self):
@@ -615,8 +629,8 @@ class CollectionTest(unittest.TestCase):
 		storage.get_by_id = Mock(return_value={'_id':'123'})
 		api.foos.update('123', {'_version':57})
 		storage.update.assert_called_with(Foo, '123', {'_version':57}, replace=False)
-		api.foos.replace('123', {'_version':57})
-		storage.update.assert_called_with(Foo, '123', {'_version':57}, replace=True)
+		api.foos.replace('123', {'stuff':'things', '_version':57})
+		storage.update.assert_called_with(Foo, '123', {'stuff':'things', '_version':57}, replace=True)
 		
 		
 	def test_default_limit(self):
@@ -631,3 +645,50 @@ class CollectionTest(unittest.TestCase):
 		storage.get = Mock(return_value=[])
 		api.bazes.list(limit=50)
 		storage.get.assert_called_once_with(Baz, sort=(), filter=None, offset=0, limit=20)
+		
+		
+	def test_default_embedded_not_default(self):
+		"""A reference can be embeddable but not embedded"""
+		storage.get = Mock(return_value=[{'_id':'123', 'embedded_foos':['1','2','3']}])
+		storage.get_by_ids = Mock(return_value=[])
+		api.foos.list()
+		self.assertFalse(storage.get_by_ids.called)
+		
+		
+	def test_default_not_embedded_not_default_included(self):
+		"""A reference that is not embedded by default can still be embedded"""
+		storage.get = Mock(return_value=[{'_id':'123', 'embedded_foos':['1','2','3']}])
+		storage.get_by_ids = Mock(return_value=[])
+		api.foos.list(embed=['embedded_foos'])
+		storage.get_by_ids.assert_called_once_with(Foo, ['1','2','3'], sort=(), filter=None, limit=0, offset=0)
+		
+		
+	def test_embeddable_included_if_fields_set(self):
+		"""An embeddable field is included if it is in the fields argument"""
+		storage.get = Mock(return_value=[{'_id':'123', 'embedded_foos':['1','2','3']}])
+		storage.get_by_ids = Mock(return_value=[])
+		api.foos.list(fields=['embedded_foos'])
+		storage.get_by_ids.assert_called_once_with(Foo, ['1','2','3'], sort=(), filter=None, limit=0, offset=0)
+		
+		
+	def test_embeddable_fields(self):
+		"""Only fields in an entity's embedded_fields list are included"""
+		storage.get = Mock(return_value=[{'_id':'123', 'embedded_foos':['1','2','3']}])
+		storage.get_by_ids = Mock(return_value=[{'_id':'666', 'stuff':123, 'optional_stuff':456}])
+		result = api.foos.list(embed=('embedded_foos',))
+		self.assertEquals(result, [{'_id':'123', 'embedded_foos':[{'_id':'666', 'stuff':123}]}])
+		
+		
+	def test_field_subset(self):
+		"""Can fetch only a subset of fields"""
+		storage.get_by_id = CopyingMock(return_value={'_id':'123', 'stuff':123, 'optional_stuff':456})
+		result = api.foos.get('123', fields=('optional_stuff',))
+		self.assertEquals(result, {'_id':'123', 'optional_stuff':456})
+		
+		
+	def test_no_fields(self):
+		"""Only an item's ID is included if fields is an empty list"""
+		storage.get_by_id = CopyingMock(return_value={'_id':'123', 'stuff':123, 'optional_stuff':456})
+		result = api.foos.get('123', fields=())
+		self.assertEquals(result, {'_id':'123'})
+		

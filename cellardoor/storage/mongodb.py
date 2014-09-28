@@ -75,13 +75,14 @@ class MongoDBStorage(Storage):
 		return self.get(entity, filter=filter, fields=fields, sort=sort, offset=offset, limit=limit, versions=versions)
 		
 		
-	def get_by_id(self, entity, id, fields=None):
+	def get_by_id(self, entity, id, filter=None, fields=None):
 		collection = self.get_collection(entity)
-		filter = {'_id':self._objectid(id)}
+		filter = filter if filter else {}
+		filter['_id'] = self._objectid(id)
 		type_filter = self.get_type_filter(entity)
 		if type_filter:
 			filter.update(type_filter)
-		result = collection.find_one(filter)
+		result = collection.find_one(filter, fields=fields)
 		
 		if result is None:
 			return None

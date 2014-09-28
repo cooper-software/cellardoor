@@ -49,7 +49,118 @@ class RuleSet(object):
 				raise errors.NotAuthenticatedError()
 			if not rule(context):
 				raise errors.NotAuthorizedError()
+				
+				
+				
+class BaseOptionsProcessor(object):
+	
+	
+	def __init__(self, visible_fields=set(), hidden_field_authorization=None):
+		self.visible_fields = visible_fields
+		self.hidden_field_authorization = hidden_field_authorization
 		
+	
+	def process(self, options):
+		new_options = {}
+		new_options['embed'] = options.get('embed', None)
+		new_options['allow_embedding'] = options.get('allow_embedding', True)
+		new_options['fields'] = options.get('fields', None)
+		new_options['show_hidden'] = options.get('show_hidden', False)
+		new_options['context'] = options.get('context', {})
+		new_options['bypass_authorization'] = options.get('bypass_authorization', False)
+		
+		if new_options['bypass_authorization']:
+			new_options['can_show_hidden'] = True
+		else:
+			new_options['can_show_hidden'] = self.can_show_hidden(new_options['context'])
+		
+		if not new_options['can_show_hidden']:
+			if new_options['fields'] is not None:
+				new_options['fields'] = self.visible_fields.intersection(new_options['fields'])
+			else:
+				new_options['fields'] = self.visible_fields
+		
+		if new_options['fields'] is not None:
+			new_options['fields'] = set(new_options['fields'])
+			new_options['fields'].add('_id')
+		
+		return new_options
+			
+			
+	def can_show_hidden(self, context):
+		if self.hidden_field_authorization:
+			if self.hidden_field_authorization.uses('identity') and 'identity' not in context:
+				return False
+			elif not self.hidden_field_authorization(context):
+				return False
+		return True
+	    
+	    
+	    
+class ListOptionsProcessor(BaseOptionsProcessor):
+	
+	def __init__(self, storage=None,
+					   hidden_fields=(), 
+					   enabled_filters=(), 
+					   enabled_sort=(), 
+					   default_sort=(), 
+					   default_limit=0, 
+					   max_limit=0, 
+					   **kwargs):
+		self.storage = storage
+		self.hidden_fields = set(hidden_fields)
+		self.enabled_filters = set(enabled_filters)
+		self.enabled_filters_no_hidden = self.enabled_filters.difference(self.hidden_fields)
+		self.enabled_sort = set(enabled_sort)
+		self.enabled_sort_no_hidden = self.enabled_sort.difference(self.hidden_fields)
+		self.default_sort = default_sort
+		self.default_limit = default_limit
+		self.max_limit = max_limit
+		super(ListOptionsProcessor, self).__init__(**kwargs)
+		
+		
+	def process(self, options):
+		new_options = super(ListOptionsProcessor, self).process(options)
+		new_options['filter'] = options.get('filter', None)
+		new_options['sort'] = options.get('sort', None)
+		new_options['sort'] = options['sort'] if options.get('sort') else self.default_sort
+		new_options['offset'] = options.get('offset', 0)
+		new_options['limit'] = options.get('limit', 0)
+		new_options['limit'] = min(new_options['limit'] if new_options['limit'] else self.default_limit, self.max_limit)
+		
+		self.check_filter(new_options)
+		self.check_sort(new_options)
+		
+		return new_options
+		
+		
+	def check_filter(self, options):
+		if not options['filter'] or options['bypass_authorization']:
+			return
+		if not self.enabled_filters:
+			raise CompoundValidationError({'filter':'Filtering is disabled.'})
+		if options['can_show_hidden']:
+			allowed_fields = self.enabled_filters
+		else:
+			allowed_fields = self.enabled_filters_no_hidden
+		self.storage.check_filter(options['filter'], allowed_fields)
+		
+		
+	def check_sort(self, options):
+		if not options['sort'] or options['bypass_authorization']:
+			return
+		if not self.enabled_sort:
+			raise errors.CompoundValidationError({'sort':'Sorting is disabled.'})
+		if options['can_show_hidden']:
+			allowed_fields = self.enabled_sort
+		else:
+			allowed_fields = self.enabled_sort_no_hidden
+			
+		for k in options['sort']:
+			field_name = k[1:]
+			if field_name not in allowed_fields:
+				raise errors.DisabledFieldError('The "%s" field cannot be used for sorting.' % field_name)
+
 
 
 class CollectionMeta(type):
@@ -79,6 +190,10 @@ class CollectionMeta(type):
 		
 		attrs['singular_name'] = singular_name
 		attrs['plural_name'] = plural_name
+		
+		hidden_field_authorization = attrs.get('hidden_field_authorization')
+		if hidden_field_authorization and hidden_field_authorization.uses('item'):
+			raise Exception, "Hidden field authorization cannot use `authorization.item`"
 		
 		return super(CollectionMeta, cls).__new__(cls, name, bases, attrs)
 
@@ -126,268 +241,271 @@ class Collection(object):
 		self.entity = self.entity()
 		self.hooks = EventManager('create', 'update', 'delete')
 		self.rules = RuleSet(self.method_authorization)
+		self.base_options_processor = BaseOptionsProcessor(visible_fields=self.entity.visible_fields,
+														   hidden_field_authorization=self.hidden_field_authorization)
+		self.list_options_processor = ListOptionsProcessor(storage=self.storage,
+														   hidden_fields=self.entity.hidden_fields, 
+														   enabled_filters=self.enabled_filters,
+														   enabled_sort=self.enabled_sort,
+														   default_sort=self.default_sort,
+														   default_limit=self.default_limit,
+														   max_limit=self.max_limit,
+														   hidden_field_authorization=self.hidden_field_authorization)
 		
 		for method in ALL:
 			if method not in self.rules.enabled_methods:
 				setattr(self, method, self.disabled_method_error)
-			
-			
-	def list(self, filter=None, sort=None, offset=0, limit=0, show_hidden=False, context=None, bypass_authorization=False):
-		sort = sort if sort else self.default_sort
-		
-		if not bypass_authorization:
-			self.rules.enforce_non_item_rules(LIST, context)
-			self.check_for_disabled_fields(filter, sort, context)
-		
-		limit = self.get_limit(limit)
-		
-		items = self.storage.get(self.entity.__class__, filter=filter, sort=sort, offset=offset, limit=limit)
-		
-		if not bypass_authorization:
-			self.rules.enforce_item_rules(LIST, items, context)
 				
-		return self.post(LIST, items, context, show_hidden=show_hidden, bypass_authorization=bypass_authorization)
+				
+	def set_storage(self, storage):
+		self.storage = storage
+		self.base_options_processor.storage = storage
+		self.list_options_processor.storage = storage
+			
+			
+	def list(self, **kwargs):
+		options = self.list_options_processor.process(kwargs)
+		
+		if not options['bypass_authorization']:
+			self.rules.enforce_non_item_rules(LIST, options['context'])
+		
+		items = self.storage.get(self.entity.__class__, 
+							filter=options['filter'], sort=options['sort'], 
+							offset=options['offset'], limit=options['limit'])
+		
+		if not options['bypass_authorization']:
+			self.rules.enforce_item_rules(LIST, items, options['context'])
+				
+		return self.post(LIST, options, items)
 		
 		
-	def create(self, fields, show_hidden=False, context=None, bypass_authorization=False):
-		if not bypass_authorization:
-			self.rules.enforce_non_item_rules(CREATE, context)
+	def create(self, fields, **kwargs):
+		options = self.base_options_processor.process(kwargs)
 		
-		self.entity.hooks.trigger_pre('create', fields)
-		self.hooks.trigger_pre('create', fields, context=context)
+		if not options['bypass_authorization']:
+			self.rules.enforce_non_item_rules(CREATE, options['context'])
+		
+		self.entity.hooks.trigger_pre('create', fields, options)
+		self.hooks.trigger_pre('create', fields, options)
 		
 		item = self.entity.validator.validate(fields)
 		item['_id'] = self.storage.create(self.entity.__class__, item)
 		
-		if not bypass_authorization:
-			self.rules.enforce_item_rules(CREATE, item, context)
+		if not options['bypass_authorization']:
+			self.rules.enforce_item_rules(CREATE, item, options['context'])
 		
-		item = self.post(CREATE, item, context, show_hidden=show_hidden, bypass_authorization=bypass_authorization)
+		item = self.post(CREATE, options, item)
 		
-		self.entity.hooks.trigger_post('create', item)
-		self.hooks.trigger_post('create', item, context=context)
+		self.entity.hooks.trigger_post('create', item, options)
+		self.hooks.trigger_post('create', item, options)
 		
 		return item
 		
 		
-	def get(self, id, show_hidden=False, context=None, bypass_authorization=False):
-		if not bypass_authorization:
-			self.rules.enforce_non_item_rules(GET, context)
+	def get(self, id, **kwargs):
+		options = self.base_options_processor.process(kwargs)
+		
+		if not options['bypass_authorization']:
+			self.rules.enforce_non_item_rules(GET, options['context'])
 		
 		item = self.storage.get_by_id(self.entity.__class__, id)
 		if item is None:
 			raise errors.NotFoundError("No %s with id '%s' was found" % (self.singular_name, id))
 		
-		if not bypass_authorization:
-			self.rules.enforce_item_rules(GET, item, context)
+		if not options['bypass_authorization']:
+			self.rules.enforce_item_rules(GET, item, options['context'])
 		
-		return self.post(GET, item, context, show_hidden=show_hidden, bypass_authorization=bypass_authorization)
+		return self.post(GET, options, item)
 		
 		
-	def update(self, id, fields, show_hidden=False, context=None, bypass_authorization=False, _replace=False, _method=UPDATE):
-		if not bypass_authorization:
-			self.rules.enforce_non_item_rules(_method, context)
+	def update(self, id, fields, _replace=False, _method=UPDATE, **kwargs):
+		options = self.base_options_processor.process(kwargs)
 		
-		self.entity.hooks.trigger_pre('update', id, fields, replace=_replace)
-		self.hooks.trigger_pre('update', id, fields, replace=_replace, context=context)
+		if not options['bypass_authorization']:
+			self.rules.enforce_non_item_rules(_method, options['context'])
 		
-		if not bypass_authorization and UPDATE in self.rules.item_rules:
+		self.entity.hooks.trigger_pre('update', id, fields, options)
+		self.hooks.trigger_pre('update', id, fields, options)
+		
+		if not options['bypass_authorization'] and UPDATE in self.rules.item_rules:
 			item = self.storage.get_by_id(self.entity.__class__, id)
 			if item is None:
 				raise errors.NotFoundError("No %s with id '%s' was found" % (self.singular_name, id))
-			self.rules.enforce_item_rules(_method, item, context)
+			self.rules.enforce_item_rules(_method, item, options['context'])
 		
 		version = fields.pop('_version', None)
-		fields = self.entity.validator.validate(fields, enforce_required=False)
+		fields = self.entity.validator.validate(fields, enforce_required=_replace)
 		if version:
 			fields['_version'] = version
 		item = self.storage.update(self.entity.__class__, id, fields, replace=_replace)
 		if item is None:
 			raise errors.NotFoundError("No %s with id '%s' was found" % (self.singular_name, id))
 		
-		item = self.post(_method, item, context, show_hidden=show_hidden, bypass_authorization=bypass_authorization)
+		item = self.post(_method, options, item)
 		
-		self.entity.hooks.trigger_post('update', item, replace=_replace)
-		self.hooks.trigger_post('update', item, context=context, replace=_replace)
+		self.entity.hooks.trigger_post('update', item, options)
+		self.hooks.trigger_post('update', item, options)
 		
 		return item
 		
 		
-	def replace(self, id, fields, show_hidden=False, context=None, bypass_authorization=False):
-		return self.update(id, fields, show_hidden=show_hidden, context=context, 
-			bypass_authorization=bypass_authorization, _replace=True, _method=REPLACE)
+	def replace(self, id, fields, **kwargs):
+		return self.update(id, fields, _replace=True, _method=REPLACE, **kwargs)
 		
 		
-	def delete(self, id, context=None, bypass_authorization=False):
-		context = context if context else {}
+	def delete(self, id, **kwargs):
+		options = self.base_options_processor.process(kwargs)
 		
-		if not bypass_authorization:
-			self.rules.enforce_non_item_rules(DELETE, context)
+		if not options['bypass_authorization']:
+			self.rules.enforce_non_item_rules(DELETE, options['context'])
 		
 		item = self.storage.get_by_id(self.entity.__class__, id)
 		if item is None:
 			raise errors.NotFoundError("No %s with id '%s' was found" % (self.singular_name, id))
 		
-		if not bypass_authorization:
-			self.rules.enforce_item_rules(DELETE, item, context)
+		if not options['bypass_authorization']:
+			self.rules.enforce_item_rules(DELETE, item, options['context'])
 		
-		self.entity.hooks.trigger_pre('delete', id)
-		self.hooks.trigger_pre('delete', id, context=context)
+		self.entity.hooks.trigger_pre('delete', id, options)
+		self.hooks.trigger_pre('delete', id, options)
 		
 		self.storage.delete(self.entity.__class__, id)
-		self.post(DELETE, None, context)
+		self.post(DELETE, options)
 		
-		self.entity.hooks.trigger_post('delete', id)
-		context['item'] = item
-		self.hooks.trigger_post('delete', id, context=context)
+		options['context']['item'] = item
+		self.entity.hooks.trigger_post('delete', id, options)
+		self.hooks.trigger_post('delete', id, options)
 		
 		
-	def link(self, id, reference_name, filter=None, sort=None, offset=0, limit=0, show_hidden=False, context=None, bypass_authorization=False):
-		if not bypass_authorization:
-			self.rules.enforce_non_item_rules(GET, context)
+	def link(self, id, reference_name, **kwargs):
+		options = self.base_options_processor.process(kwargs)
+		
+		if not options['bypass_authorization']:
+			self.rules.enforce_non_item_rules(GET, options['context'])
 		
 		item = self.storage.get_by_id(self.entity.__class__, id)
 		if item is None:
 			raise errors.NotFoundError("No %s with id '%s' was found" % (self.singular_name, id))
 		
-		if not bypass_authorization:
-			self.rules.enforce_item_rules(GET, item, context)
+		if not options['bypass_authorization']:
+			self.rules.enforce_item_rules(GET, item, options['context'])
 			
 		target_collection = self.links.get(reference_name)
 		if target_collection is None:
 			raise errors.NotFoundError("The %s collection has no link '%s' defined" % (self.plural_name, reference_name))
 		reference_field = getattr(self.entity.__class__, reference_name)
 		
-		return target_collection.resolve_link_or_reference(item, reference_name, reference_field,
-						filter=filter, sort=sort, offset=offset, limit=limit, show_hidden=show_hidden, bypass_authorization=bypass_authorization, context=context)
+		return target_collection.resolve_link_or_reference(item, reference_name, reference_field, kwargs)
 		
 		
-	def resolve_link_or_reference(self, source_item, reference_name, reference_field, filter=None, sort=None, 
-								  offset=0, limit=0, show_hidden=False, context=None, bypass_authorization=False):
+	def resolve_link_or_reference(self, source_item, reference_name, reference_field, options):
 		"""Get the item(s) pointed to by a link or reference"""
-		sort = sort if sort else self.default_sort
-		if not bypass_authorization:
-			self.check_for_disabled_fields(filter, sort, context)
-		limit = self.get_limit(limit)
+		options = self.list_options_processor.process(options)
+		
 		if isinstance(reference_field, Link):
-			return self.resolve_link(source_item, reference_field, filter=filter, sort=sort, offset=offset, 
-				                     limit=limit, show_hidden=show_hidden, bypass_authorization=bypass_authorization, context=context)
+			return self.resolve_link(source_item, reference_field, options)
 		else:
-			return self.resolve_reference(source_item, reference_name, reference_field,
-							filter=filter, sort=sort, offset=offset, limit=limit, context=context)
+			return self.resolve_reference(source_item, reference_name, reference_field, options)
 		
 		
-	def resolve_link(self, source_item, link_field, filter=None, sort=None, offset=0, 
-				     limit=0, show_hidden=False, context=None, bypass_authorization=False):
+	def resolve_link(self, source_item, link_field, options):
 		"""
 		Get the items for a single or multiple link
 		"""
-		filter = filter if filter else {}
-		filter[link_field.field] = source_item['_id']
+		options['filter'] = options['filter'] if options['filter'] else {}
+		options['filter'][link_field.field] = source_item['_id']
 		
 		if link_field.multiple:
-			self.rules.enforce_non_item_rules(LIST, context)
-			items = list(self.storage.get(self.entity.__class__, filter=filter, sort=sort, offset=offset, limit=limit))
-			self.rules.enforce_item_rules(LIST, items, context)
-			return self.post(LIST, items, context, embed=False, show_hidden=show_hidden, bypass_authorization=bypass_authorization)
+			self.rules.enforce_non_item_rules(LIST, options['context'])
+			items = list(self.storage.get(self.entity.__class__, 
+							filter=options['filter'], sort=options['sort'], 
+							offset=options['offset'], limit=options['limit']))
+			self.rules.enforce_item_rules(LIST, items, options['context'])
+			return self.post(LIST, options, items)
 		else:
 			try:
-				self.rules.enforce_non_item_rules(GET, context)
-				item = next(iter(self.storage.get(self.entity.__class__, filter=filter, limit=1)))
-				self.rules.enforce_item_rules(GET, item, context)
-				return self.post(GET, item, context, embed=False, show_hidden=show_hidden, bypass_authorization=bypass_authorization)
+				if not options['bypass_authorization']:
+					self.rules.enforce_non_item_rules(GET, options['context'])
+				item = next(iter(self.storage.get(self.entity.__class__, filter=options['filter'], limit=1)))
+				if not options['bypass_authorization']:
+					self.rules.enforce_item_rules(GET, item, options['context'])
+				return self.post(GET, options, item)
 			except StopIteration:
 				pass
 		
 	
-	def resolve_reference(self, source_item, reference_name, reference_field, filter=None, sort=None, 
-						  offset=0, limit=0, show_hidden=False, context=None, bypass_authorization=False):
+	def resolve_reference(self, source_item, reference_name, reference_field, options):
 		"""Get the items for a single or multiple reference"""
 		reference_value = source_item.get(reference_name)
-		
 		if reference_value is None:
 			return None
 		
 		if isinstance(reference_field, ListOf):
-			self.rules.enforce_non_item_rules(LIST, context)
+			if not options['bypass_authorization']:
+				self.rules.enforce_non_item_rules(LIST, options['context'])
 			items = list(self.storage.get_by_ids(self.entity.__class__, reference_value,
-						filter=filter, sort=sort, offset=offset, limit=limit))
-			self.rules.enforce_item_rules(LIST, items, context)
-			return self.post(LIST, items, context, embed=False, show_hidden=show_hidden, bypass_authorization=bypass_authorization)
+								filter=options['filter'], sort=options['sort'], 
+								offset=options['offset'], limit=options['limit']))
+			if not options['bypass_authorization']:
+				self.rules.enforce_item_rules(LIST, items, options['context'])
+			return self.post(LIST, options, items)
 		else:
-			self.rules.enforce_non_item_rules(GET, context)
+			self.rules.enforce_non_item_rules(GET, options['context'])
 			item = self.storage.get_by_id(self.entity.__class__, reference_value)
-			self.rules.enforce_item_rules(GET, item, context)
-			return self.post(GET, item, context, embed=False, show_hidden=show_hidden, bypass_authorization=bypass_authorization)
-			
-			
-	def check_for_disabled_fields(self, filter, sort, context):
-		can_show_hidden = self.can_show_hidden(context)
-		self.check_filter(filter, can_show_hidden)
-		self.check_sort(sort, can_show_hidden)
-			
-			
-	def check_filter(self, filter, can_show_hidden):
-		if filter is None:
-			return None
-		if not self.enabled_filters:
-			raise CompoundValidationError({'filter':'Filtering is disabled.'})
-		allowed_fields = set(self.enabled_filters)
-		if not can_show_hidden:
-			allowed_fields.difference_update(self.entity.hidden_fields)
-		self.storage.check_filter(filter, allowed_fields)
-		return filter
+			self.rules.enforce_item_rules(GET, item, options['context'])
+			return self.post(GET, options, item)
 		
 		
-	def check_sort(self, sort, can_show_hidden):
-		if not sort:
-			return None
-		if not self.enabled_sort:
-			raise errors.CompoundValidationError({'sort':'Sorting is disabled.'})
-		allowed_fields = set(self.enabled_sort)
-		if not can_show_hidden:
-			allowed_fields.difference_update(self.entity.hidden_fields)
-		for k in sort:
-			field_name = k[1:]
-			if field_name not in allowed_fields:
-				raise errors.DisabledFieldError('The "%s" field cannot be used for sorting.' % field_name)
-			
-			
-	def can_show_hidden(self, context):
-		context = context if context else {}
-		if self.hidden_field_authorization:
-			if self.hidden_field_authorization.uses('identity') and 'identity' not in context:
-				return False
-			elif not self.hidden_field_authorization(context):
-				return False
-		return True
-		
-		
-	def prepare_item(self, item, embed=True, show_hidden=False):
-		if not show_hidden:
-			pass
-		if embed:
-			self.add_embedded_references(item)
-		if not show_hidden:
-			for k in self.entity.hidden_fields:
-				item.pop(k, None)
+	def prepare_item(self, item, options):
+		self.remove_hidden_fields(item, options)
+		self.add_embedded_references(item, options)
 		return item
 		
 		
-	def add_embedded_references(self, item, show_hidden=False, context=None, bypass_authorization=False):
+	def remove_hidden_fields(self, item, options):
+		if options['show_hidden'] and options['can_show_hidden']:
+			return
+		if options['fields']:
+			for k in item.keys():
+				if k not in options['fields']:
+					item.pop(k, None)
+		else:
+			for k in self.entity.hidden_fields:
+				item.pop(k, None)
+		
+		
+	def add_embedded_references(self, item, options):
 		"""Add embedded references and links to an item"""
-		for reference_name, reference_field in self.entity.links_and_references:
-			if not reference_field.embedded:
-				continue
-				
-			if not show_hidden and reference_field.hidden:
-				continue
-				
+		if not options['allow_embedding']:
+			return
+		
+		if options['embed']:
+			embed = self.entity.embeddable.intersection(options['embed'])
+		else:
+			embed = self.entity.embed_by_default
+			
+		if options['fields']:
+			embed.update(
+				self.entity.embeddable.intersection(options['fields'])
+			)
+		
+		if not options['show_hidden'] or not options['can_show_hidden']:
+			embed.difference_update(self.entity.hidden_fields)
+		
+		for reference_name in embed:
 			referenced_collection = self.links.get(reference_name)
 			if not referenced_collection:
 				raise Exception, "No link defined in '%s' collection for embedded reference '%s'" % (self.plural_name, reference_name)
-				
-			result = referenced_collection.resolve_link_or_reference(item, reference_name, getattr(self.entity.__class__, reference_name), context=context)
+			
+			reference_field = getattr(self.entity, reference_name)
+			
+			link_options = {
+				'context': options['context'],
+				'allow_embedding': False,
+				'fields': reference_field.field.embedded_fields if isinstance(reference_field, ListOf) else reference_field.embedded_fields
+			}
+			
+			result = referenced_collection.resolve_link_or_reference(item, reference_name, reference_field, link_options)
 			
 			if result:
 				item[reference_name] = result
@@ -395,49 +513,24 @@ class Collection(object):
 		return item
 		
 		
-	def post(self, method, result, context, embed=True, show_hidden=False, bypass_authorization=False):
+	def post(self, method, options, result=None):
 		"""Perform post-method hooks including authentication that requires fetched items."""
 		if result is None:
 			return
 			
-		context = context if context else {}
-		
 		if method == LIST:
-			if bypass_authorization:
-				new_results = []
-				for item in result:
-					new_results.append(
-						self.prepare_item(item, embed=embed, show_hidden=True)
-					)
-				return new_results
-			else:
-				if show_hidden and self.hidden_field_authorization and self.hidden_field_authorization.uses('item'):
-					new_results = []
-					for item in result:
-						context['item'] = item
-						new_results.append(
-							self.prepare_item(item, embed=embed, show_hidden=self.can_show_hidden(context))
-						)
-					return new_results
-				else:
-					new_results = []
-					for item in result:
-						new_results.append(
-							self.prepare_item(item, embed=embed, show_hidden=False)
-						)
-					return new_results
+			new_results = []
+			for item in result:
+				new_results.append(
+					self.prepare_item(item, options)
+				)
+			options['context']['item'] = result
+			return new_results
 		else:
-			context['item'] = result
-			show_hidden = bypass_authorization or self.can_show_hidden(context) and show_hidden
-			return self.prepare_item(result, embed=embed, show_hidden=show_hidden)
+			options['context']['item'] = result
+			return self.prepare_item(result, options)
 		
 		
 	def disabled_method_error(self, *args, **kwargs):
 		raise errors.DisabledMethodError, "This method is not enabled."
-		
-		
-	def get_limit(self, limit):
-		if not limit:
-			limit = self.default_limit
-		return min(limit, self.max_limit)
 		

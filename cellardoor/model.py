@@ -11,6 +11,7 @@ __all__ = [
     'Timestamped',
     'Compound',
     'Text',
+    'HTML',
     'Email',
     'DateTime',
     'Boolean',
@@ -136,6 +137,10 @@ class Text(Field):
             raise ValidationError(self.NO_REGEX_MATCH)
             
         return value
+        
+        
+class HTML(Text):
+    pass
 
 
 class Email(Text):
@@ -466,19 +471,12 @@ class URL(Text):
     
     Regex from http://daringfireball.net/2010/07/improved_regex_for_matching_urls.
     """
-    NOT_A_URL = "Not a URL"
+    NO_REGEX_MATCH = "Not a URL"
     
     def __init__(self, **kwargs):
-        super(URL, self).__init__(**kwargs)
-        self.pattern = re.compile('((?:[a-z][\w-]+:(?:/{1,3}|[a-z0-9%])|www\d{0,3}[.]|[a-z0-9.\-]+[.][a-z]{2,4}/)(?:[^\s()<>]+|\(([^\s()<>]+|(\([^\s()<>]+\)))*\))+(?:\(([^\s()<>]+|(\([^\s()<>]+\)))*\)|[^\s`!()\[\]{};:\'".,<>?\xc2\xab\xc2\xbb\xe2\x80\x9c\xe2\x80\x9d\xe2\x80\x98\xe2\x80\x99]))')
-        
-        
-    def _validate(self, value):
-        value = super(URL, self)._validate(value)
-        
-        if not self.pattern.match(value):
-            raise ValidationError(self.NOT_A_URL)
-        return value
+        super(URL, self).__init__(
+            regex='((?:[a-z][\w-]+:(?:/{1,3}|[a-z0-9%])|www\d{0,3}[.]|[a-z0-9.\-]+[.][a-z]{2,4}/)(?:[^\s()<>]+|\(([^\s()<>]+|(\([^\s()<>]+\)))*\))+(?:\(([^\s()<>]+|(\([^\s()<>]+\)))*\)|[^\s`!()\[\]{};:\'".,<>?\xc2\xab\xc2\xbb\xe2\x80\x9c\xe2\x80\x9d\xe2\x80\x98\xe2\x80\x99]))',
+            **kwargs)
         
         
 class OneOf(Field):
@@ -526,6 +524,8 @@ class ListOf(Field):
     EMPTY_LIST = "This field is required"
     
     def __init__(self, field, **kwargs):
+        if 'default' not in kwargs:
+            kwargs['default'] = []
         super(ListOf, self).__init__(**kwargs)
         self.field = field
         
@@ -534,7 +534,7 @@ class ListOf(Field):
         if not isinstance(values, list):
             raise ValidationError(self.NOT_A_LIST)
             
-        if len(values) == 0:
+        if self.required and len(values) == 0:
             raise ValidationError(self.EMPTY_LIST)
         
         for v in values:
@@ -597,7 +597,7 @@ class Compound(Field):
                     continue
                 else:
                     unvalidated_value = v.default
-            if unvalidated_value is not None:
+            if unvalidated_value is not None and unvalidated_value != []:
                 try:
                     validated[k] = v.validate(unvalidated_value)
                 except ValidationError, e:
@@ -638,9 +638,18 @@ class Reference(Text):
     
     UNKNOWN = 'No item found with this ID.'
     
-    def __init__(self, entity, embedded=False, *args, **kwargs):
+    # Reverse delete options
+    NULL = 1
+    DELETE = 2
+    
+    def __init__(self, entity, 
+            embeddable=False, embed_by_default=True, embedded_fields=None, ondelete=NULL,
+            *args, **kwargs):
         self.entity = entity
-        self.embedded = embedded
+        self.embeddable = embeddable
+        self.embed_by_default = embed_by_default
+        self.embedded_fields = embedded_fields
+        self.ondelete = ondelete
         self.storage = None
         
         super(Reference, self).__init__(*args, **kwargs)
@@ -663,10 +672,14 @@ class Link(object):
     Links define a foreign key relationship. They are read-only.
     """
     
-    def __init__(self, entity, field, embedded=False, multiple=True, hidden=False, help=None):
+    def __init__(self, entity, field, 
+            embeddable=False, embed_by_default=True, embedded_fields=None, 
+            multiple=True, hidden=False, help=None):
         self.entity = entity
         self.field = field
-        self.embedded = embedded
+        self.embeddable = embeddable
+        self.embed_by_default = embed_by_default
+        self.embedded_fields = embedded_fields
         self.multiple = multiple
         self.hidden = hidden
         self.storage = None
@@ -680,6 +693,7 @@ class EntityMeta(type):
             return super(EntityMeta, cls).__new__(cls, name, bases, attrs)
         
         hierarchy = []
+        all_attrs = {}
         entity_base_found = False
         for b in bases:
             if issubclass(b, Entity):
@@ -688,37 +702,56 @@ class EntityMeta(type):
                 entity_base_found = True
                 if b != Entity:
                     hierarchy = list(b.hierarchy)
+            elif issubclass(b, EntityMixin):
+                all_attrs.update(b.__dict__)
         attrs['hierarchy'] = hierarchy
         
         fields = {}
         links = []
         references = []
-        hidden_fields = []
-        for k,v in attrs.items():
+        hidden_fields = set()
+        all_attrs.update(attrs)
+        
+        for k,v in all_attrs.items():
             if isinstance(v, Field):
                 fields[k] = v
                 if v.hidden:
-                    hidden_fields.append(k)
+                    hidden_fields.add(k)
             if isinstance(v, Reference):
                 references.append((k,v))
             elif isinstance(v, ListOf) and isinstance(v.field, Reference):
                 references.append((k, v.field))
             elif isinstance(v, Link):
                 links.append((k,v))
-        
+         
         attrs['fields'] = fields
         attrs['references'] = references
         attrs['links'] = links
         attrs['links_and_references'] = links + references
         attrs['hidden_fields'] = hidden_fields
         
+        embeddable = set()
+        embed_by_default = set()
+        
+        for k,v in attrs['links_and_references']:
+            if v.embeddable:
+                embeddable.add(k)
+                if v.embed_by_default:
+                    embed_by_default.add(k)
+                
+        attrs['embeddable'] = embeddable
+        attrs['embed_by_default'] = embed_by_default
+        
         for entity_cls in attrs['hierarchy']:
             attrs['fields'].update(entity_cls.fields)
             attrs['references'] += entity_cls.references
             attrs['links'] += entity_cls.links
             attrs['links_and_references'] += entity_cls.links_and_references
-            attrs['hidden_fields'] += entity_cls.hidden_fields
+            attrs['hidden_fields'].update(entity_cls.hidden_fields)
+            attrs['embeddable'].update(entity_cls.embeddable)
+            attrs['embed_by_default'].update(entity_cls.embed_by_default)
         
+        attrs['visible_fields'] = attrs['hidden_fields'].difference(attrs['fields'].keys())
         attrs['validator'] = Compound(**fields)
         
         new_cls = super(EntityMeta, cls).__new__(cls, name, bases, attrs)
@@ -737,6 +770,14 @@ class Entity(object):
         for base in self.__class__.__bases__:
             if issubclass(base, EntityMixin):
                 base.setup(self)
+                
+                
+    def is_multiple_link(self, link):
+        if isinstance(link, ListOf) or isinstance(link, Link) and link.multiple:
+            return True
+        else:
+            return False
+    
 
 
 class Model(object):
@@ -773,3 +814,4 @@ class Model(object):
                 if not self.has_entity(reference.entity):
                     raise Exception, "Attempting to reference to an entity '%s' that is outside the model" % reference.entity.__name__
                 reference.storage = self.storage
+                

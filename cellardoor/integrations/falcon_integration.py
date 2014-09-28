@@ -47,32 +47,36 @@ class Resource(object):
 			
 	
 	def list(self, req, resp):
-		filter, sort, offset, limit, show_hidden = self.get_list_params(req)
-		items = self.collection.list(filter=filter, sort=sort, offset=offset, limit=limit, show_hidden=show_hidden, context=self.get_context(req))
+		kwargs = self.get_kwargs(req)
+		items = self.collection.list(**kwargs)
 		self.send_list(req, resp, items)
 		
 		
 	def create(self, req, resp):
 		fields = self.get_fields_from_request(req)
-		item = self.collection.create(fields, show_hidden=self.get_show_hidden(req), context=self.get_context(req))
+		kwargs = self.get_kwargs(req, 'show_hidden', 'context', 'embedded')
+		item = self.collection.create(fields, **kwargs)
 		resp.status = falcon.HTTP_201
 		self.send_one(req, resp, item)
 		
 	
 	def get(self, req, resp, id):
-		item = self.collection.get(id, show_hidden=self.get_show_hidden(req), context=self.get_context(req))
+		kwargs = self.get_kwargs(req, 'show_hidden', 'context', 'embedded')
+		item = self.collection.get(id, **kwargs)
 		self.send_one(req, resp, item)
 		
 		
 	def update(self, req, resp, id):
 		fields = self.get_fields_from_request(req)
-		item = self.collection.update(id, fields, show_hidden=self.get_show_hidden(req), context=self.get_context(req))
+		kwargs = self.get_kwargs(req, 'show_hidden', 'context', 'embedded')
+		item = self.collection.update(id, fields, **kwargs)
 		self.send_one(req, resp, item)
 		
 		
 	def replace(self, req, resp, id):
 		fields = self.get_fields_from_request(req)
-		item = self.collection.replace(id, fields, show_hidden=self.get_show_hidden(req), context=self.get_context(req))
+		kwargs = self.get_kwargs(req, 'show_hidden', 'context', 'embedded')
+		item = self.collection.replace(id, fields, **kwargs)
 		self.send_one(req, resp, item)
 		
 		
@@ -81,8 +85,8 @@ class Resource(object):
 		
 		
 	def get_link_or_reference(self, req, resp, id, reference_name):
-		filter, sort, offset, limit, show_hidden = self.get_list_params(req)
-		result = self.collection.link(id, reference_name, filter=filter, sort=sort, offset=offset, limit=limit, show_hidden=show_hidden, context=self.get_context(req))
+		kwargs = self.get_kwargs(req)
+		result = self.collection.link(id, reference_name, **kwargs)
 		if isinstance(result, dict):
 			self.send_one(req, resp, result)
 		else:
@@ -134,19 +138,33 @@ class Resource(object):
 			'The supported types are: %s' % ', '.join([x.mimetype for x in self.accept_serializers]))
 		
 		
-	def get_list_params(self, req):
-		"""Parse out the filter, sort, offset and limit parameters from a request"""
-		return (
-			self.get_param(req, 'filter', json.loads),
-			self.get_param(req, 'sort', json.loads),
-			self.get_param(req, 'offset', int, default=0),
-			self.get_param(req, 'limit', int, default=0),
-			self.get_show_hidden(req)
+	def get_kwargs(self, req, *include):
+		"""Parse out the filter, sort, etc., parameters from a request"""
+		params = (
+			('embedded', json.loads, None),
+			('filter', json.loads, None),
+			('sort', json.loads, None),
+			('offset', int, 0),
+			('limit', int, 0),
+			('show_hidden', self.bool_field, False)
 		)
+		results = {}
+		if len(include) > 0:
+			include = set(include)
+		else:
+			include = None
+		for name, fn, default in params:
+			if include and name not in include:
+				continue
+			results[name] = self.get_param(req, name, fn, default=default)
+			
+		if not include or 'context' in include:
+			results['context'] = self.get_context(req)
+		return results
 		
 		
-	def get_show_hidden(self, req):
-		return self.get_param(req, 'show_hidden', lambda x: True if x.lower() == 'true' or x == '1' else False, default=False)
+	def bool_field(self, value):
+		return True if value.lower() == 'true' or value == '1' else False
 		
 		
 	def get_param(self, req, param_name, parsing_fn, required=False, default=None):
@@ -158,7 +176,7 @@ class Resource(object):
 			return default
 		try:
 			return parsing_fn(param)
-		except:
+		except Exception, e:
 			raise falcon.HTTPBadRequest("Bad Request", "Could not parse %s parameter" % param_name)
 			
 			

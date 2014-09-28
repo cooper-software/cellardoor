@@ -126,7 +126,7 @@ class TestResource(TestBase):
 		created_foo = json.loads(''.join(result))
 		self.assertEquals(created_foo, foo)
 		self.assertEquals(self.srmock.status, '201 Created')
-		self.cellardoor.foos.create.assert_called_with({'name':'foo'}, show_hidden=False, context={})
+		self.cellardoor.foos.create.assert_called_with({'name':'foo'}, show_hidden=False, embedded=None, context={})
 		
 		
 	def test_create_msgpack(self):
@@ -144,7 +144,7 @@ class TestResource(TestBase):
 		created_foo = msgpack.unpackb(''.join(result))
 		self.assertEquals(created_foo, foo)
 		self.assertEquals(self.srmock.status, '201 Created')
-		self.cellardoor.foos.create.assert_called_with({'name':'foo'}, show_hidden=False, context={})
+		self.cellardoor.foos.create.assert_called_with({'name':'foo'}, show_hidden=False, embedded=None, context={})
 		
 		
 	def test_not_found(self):
@@ -152,7 +152,7 @@ class TestResource(TestBase):
 		self.cellardoor.foos.get = Mock(side_effect=errors.NotFoundError())
 		self.simulate_request('/foos/123', method='GET')
 		self.assertEquals(self.srmock.status, '404 Not Found')
-		self.cellardoor.foos.get.assert_called_with('123', show_hidden=False, context={})
+		self.cellardoor.foos.get.assert_called_with('123', show_hidden=False, embedded=None, context={})
 		
 		
 	def test_method_not_allowed(self):
@@ -211,7 +211,7 @@ class TestResource(TestBase):
 		result = json.loads(''.join(data))
 		self.assertEquals(self.srmock.status, '200 OK')
 		self.assertEquals(result, foos)
-		self.cellardoor.foos.list.assert_called_with(sort=['+name'], filter={'foo':23}, offset=7, limit=10, show_hidden=True, context={})
+		self.cellardoor.foos.list.assert_called_with(sort=['+name'], filter={'foo':23}, offset=7, limit=10, show_hidden=True, embedded=None, context={})
 		
 		
 	def test_get(self):
@@ -221,7 +221,7 @@ class TestResource(TestBase):
 		result = json.loads(''.join(data))
 		self.assertEquals(self.srmock.status, '200 OK')
 		self.assertEquals(result, {'name':'foo', '_id':'123'})
-		self.cellardoor.foos.get.assert_called_with('123', show_hidden=False, context={})
+		self.cellardoor.foos.get.assert_called_with('123', show_hidden=False, embedded=None, context={})
 		
 		
 	def test_update_fail_validation(self):
@@ -257,7 +257,7 @@ class TestResource(TestBase):
 		result = json.loads(''.join(data))
 		self.assertEquals(self.srmock.status, '200 OK')
 		self.assertEquals(result, {'name':'bar', '_id':'123'})
-		self.cellardoor.foos.update.assert_called_with('123', {'name':'bar'}, show_hidden=False, context={})
+		self.cellardoor.foos.update.assert_called_with('123', {'name':'bar'}, show_hidden=False, embedded=None, context={})
 		
 		
 	def test_replace(self):
@@ -275,7 +275,7 @@ class TestResource(TestBase):
 		result = json.loads(''.join(data))
 		self.assertEquals(self.srmock.status, '200 OK')
 		self.assertEquals(result, {'name':'bar', '_id':'123'})
-		self.cellardoor.foos.replace.assert_called_with('123', {'name':'bar'}, show_hidden=False, context={})
+		self.cellardoor.foos.replace.assert_called_with('123', {'name':'bar'}, show_hidden=False, embedded=None, context={})
 		
 		
 	def test_delete(self):
@@ -293,7 +293,7 @@ class TestResource(TestBase):
 		result = json.loads(''.join(data))
 		self.assertEquals(self.srmock.status, '200 OK')
 		self.assertEquals(result, {'_id':'123'})
-		self.cellardoor.foos.link.assert_called_with('123', 'bar', filter=None, sort=None, offset=0, limit=0, show_hidden=False, context={})
+		self.cellardoor.foos.link.assert_called_with('123', 'bar', filter=None, sort=None, offset=0, limit=0, show_hidden=False, embedded=None, context={})
 		
 		
 	def test_get_multiple_link(self):
@@ -314,7 +314,7 @@ class TestResource(TestBase):
 		result = json.loads(''.join(data))
 		self.assertEquals(self.srmock.status, '200 OK')
 		self.assertEquals(result, {'_id':'123'})
-		self.cellardoor.foos.link.assert_called_with('123', 'bazes', sort=['+name'], filter={'foo':23}, offset=7, limit=10, show_hidden=True, context={})
+		self.cellardoor.foos.link.assert_called_with('123', 'bazes', sort=['+name'], filter={'foo':23}, offset=7, limit=10, show_hidden=True, embedded=None, context={})
 		
 		
 	def test_pass_identity(self):
@@ -322,7 +322,7 @@ class TestResource(TestBase):
 		environ = create_environ('/foos')
 		environ['cellardoor.identity'] = 'foo'
 		self.api(environ, lambda *args, **kwargs: [])
-		self.cellardoor.foos.list.assert_called_with(sort=None, filter=None, offset=0, limit=0, show_hidden=False, context={'identity': 'foo'})
+		self.cellardoor.foos.list.assert_called_with(sort=None, filter=None, offset=0, limit=0, show_hidden=False, embedded=None, context={'identity': 'foo'})
 		
 		
 	def test_show_hidden(self):
@@ -332,10 +332,13 @@ class TestResource(TestBase):
 		self.cellardoor.foos.get = Mock(return_value=None)
 		
 		self.simulate_request('/foos', query_string='show_hidden=1')
+		self.assertEquals(self.srmock.status, '200 OK')
 		self.simulate_request('/foos', method='POST', headers={'content-type':'application/json'}, body='{}', query_string='show_hidden=1')
+		self.assertEquals(self.srmock.status, '201 Created')
 		self.simulate_request('/foos/123', query_string='show_hidden=1')
+		self.assertEquals(self.srmock.status, '200 OK')
 		
-		self.cellardoor.foos.list.assert_called_with(sort=None, filter=None, offset=0, limit=0, show_hidden=True, context={})
-		self.cellardoor.foos.create.assert_called_with({}, show_hidden=True, context={})
-		self.cellardoor.foos.get.assert_called_with('123', show_hidden=True, context={})
+		self.cellardoor.foos.list.assert_called_with(sort=None, filter=None, offset=0, limit=0, show_hidden=True, embedded=None, context={})
+		self.cellardoor.foos.create.assert_called_with({}, show_hidden=True, embedded=None, context={})
+		self.cellardoor.foos.get.assert_called_with('123', show_hidden=True, embedded=None, context={})
 		
