@@ -751,7 +751,7 @@ class EntityMeta(type):
             attrs['embeddable'].update(entity_cls.embeddable)
             attrs['embed_by_default'].update(entity_cls.embed_by_default)
         
-        attrs['visible_fields'] = attrs['hidden_fields'].difference(attrs['fields'].keys())
+        attrs['visible_fields'] = set(attrs['fields'].keys()).difference(attrs['hidden_fields'])
         attrs['validator'] = Compound(**fields)
         
         new_cls = super(EntityMeta, cls).__new__(cls, name, bases, attrs)

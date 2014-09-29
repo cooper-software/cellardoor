@@ -692,3 +692,18 @@ class CollectionTest(unittest.TestCase):
 		result = api.foos.get('123', fields=())
 		self.assertEquals(result, {'_id':'123'})
 		
+		
+	def test_fields_empty(self):
+		"""All of an item's visible fields are returned if the fields list is omitted"""
+		foo = {'_id':'123', 'stuff':123, 'optional_stuff':456}
+		storage.get_by_id = CopyingMock(return_value=foo)
+		result = api.foos.get('123')
+		self.assertEquals(result, foo)
+		
+		
+	def test_fields_empty_hidden_field(self):
+		"""All of an item's visible fields are returned if the fields list is omitted when an entity has hidden fields"""
+		storage.get_by_id = CopyingMock(return_value={'_id':'123', 'name':'hidden', 'foo':23})
+		result = api.hiddens.get('123')
+		self.assertEquals(result, {'_id':'123', 'foo':23})
+		

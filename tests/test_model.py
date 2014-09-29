@@ -891,6 +891,16 @@ class TestEntity(unittest.TestCase):
         self.assertEquals(result, {'a':'1','b':'2','c':'3'})
         
         
+    def test_visible_fields(self):
+        """Has sets for visible and hidden fields"""
+        class Foo(Entity):
+            a = Text()
+            b = Text()
+            c = Text(hidden=True)
+        
+        self.assertEquals(Foo.hidden_fields, {'c'})
+        self.assertEquals(Foo.visible_fields, {'a', 'b'})
+        
         
 class TestMixins(unittest.TestCase):
     
