@@ -8,11 +8,11 @@ class Storage(object):
 		pass
 		
 	
-	def get(self, entity, filter=None, fields=None, sort=None, offset=0, limit=0, versions=False):
+	def get(self, entity, filter=None, fields=None, sort=None, offset=0, limit=0, versions=False, count=False):
 		raise NotImplementedError
 		
 		
-	def get_by_ids(self, entity, ids, filter=None, fields=None, sort=None, offset=0, limit=0, versions=False):
+	def get_by_ids(self, entity, ids, filter=None, fields=None, sort=None, offset=0, limit=0, versions=False, count=False):
 		raise NotImplementedError
 		
 		

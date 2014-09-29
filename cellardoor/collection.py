@@ -147,6 +147,7 @@ class ListOptionsProcessor(BaseOptionsProcessor):
 		new_options['offset'] = options.get('offset', 0)
 		new_options['limit'] = options.get('limit', 0)
 		new_options['limit'] = min(new_options['limit'] if new_options['limit'] else self.default_limit, self.max_limit)
+		new_options['count'] = options.get('count', False)
 		
 		self.check_filter(new_options)
 		self.check_sort(new_options)
@@ -290,14 +291,18 @@ class Collection(object):
 		if not options['bypass_authorization']:
 			self.rules.enforce_non_item_rules(LIST, options['context'])
 		
-		items = self.storage.get(self.entity.__class__, 
+		result = self.storage.get(self.entity.__class__, 
 							filter=options['filter'], sort=options['sort'], 
-							offset=options['offset'], limit=options['limit'])
+							offset=options['offset'], limit=options['limit'],
+							count=options['count'])
+		
+		if options['count']:
+			return result
 		
 		if not options['bypass_authorization']:
-			self.rules.enforce_item_rules(LIST, items, options['context'])
+			self.rules.enforce_item_rules(LIST, result, options['context'])
 				
-		return self.post(LIST, options, items)
+		return self.post(LIST, options, result)
 		
 		
 	def create(self, fields, **kwargs):
@@ -438,11 +443,14 @@ class Collection(object):
 		
 		if link_field.multiple:
 			self.rules.enforce_non_item_rules(LIST, options['context'])
-			items = list(self.storage.get(self.entity.__class__, 
+			result = self.storage.get(self.entity.__class__, 
 							filter=options['filter'], sort=options['sort'], 
-							offset=options['offset'], limit=options['limit']))
-			self.rules.enforce_item_rules(LIST, items, options['context'])
-			return self.post(LIST, options, items)
+							offset=options['offset'], limit=options['limit'],
+							count=options['count'])
+			if options['count']:
+				return result
+			self.rules.enforce_item_rules(LIST, result, options['context'])
+			return self.post(LIST, options, result)
 		else:
 			try:
 				if not options['bypass_authorization']:
@@ -464,12 +472,15 @@ class Collection(object):
 		if isinstance(reference_field, ListOf):
 			if not options['bypass_authorization']:
 				self.rules.enforce_non_item_rules(LIST, options['context'])
-			items = list(self.storage.get_by_ids(self.entity.__class__, reference_value,
+			result = self.storage.get_by_ids(self.entity.__class__, reference_value,
 								filter=options['filter'], sort=options['sort'], 
-								offset=options['offset'], limit=options['limit']))
+								offset=options['offset'], limit=options['limit'],
+								count=options['count'])
+			if options['count']:
+				return result
 			if not options['bypass_authorization']:
-				self.rules.enforce_item_rules(LIST, items, options['context'])
-			return self.post(LIST, options, items)
+				self.rules.enforce_item_rules(LIST, result, options['context'])
+			return self.post(LIST, options, result)
 		else:
 			self.rules.enforce_non_item_rules(GET, options['context'])
 			item = self.storage.get_by_id(self.entity.__class__, reference_value)

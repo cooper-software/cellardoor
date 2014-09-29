@@ -167,7 +167,7 @@ class CollectionTest(unittest.TestCase):
 		
 		storage.get = CopyingMock(return_value=saved_foos)
 		fetched_foos = api.foos.list()
-		storage.get.assert_called_once_with(Foo, sort=(), filter=None, limit=0, offset=0)
+		storage.get.assert_called_once_with(Foo, sort=(), filter=None, limit=0, offset=0, count=False)
 		self.assertEquals(fetched_foos, saved_foos)
 		
 		
@@ -317,7 +317,7 @@ class CollectionTest(unittest.TestCase):
 		
 		linked_bazes = api.foos.link(foo['_id'], 'bazes', sort=('+name',), filter={'name':'foo'}, offset=10, limit=20)
 		self.assertEquals(linked_bazes, created_bazes)
-		api.bazes.storage.get_by_ids.assert_called_once_with(Baz, baz_ids, sort=('+name',), filter={'name':'foo'}, offset=10, limit=20)
+		api.bazes.storage.get_by_ids.assert_called_once_with(Baz, baz_ids, sort=('+name',), filter={'name':'foo'}, offset=10, limit=20, count=False)
 		
 		
 	def test_multiple_reference_get_embedded(self):
@@ -409,7 +409,7 @@ class CollectionTest(unittest.TestCase):
 		
 		linked_bars = api.foos.link(foo['_id'], 'bars', sort=('-name',), filter={'number':'7'}, limit=10, offset=20)
 		api.foos.storage.get_by_id.assert_called_once_with(Foo, foo['_id'])
-		api.bars.storage.get.assert_called_once_with(Bar, sort=('-name',), filter={'foo': '123', 'number':'7'}, limit=10, offset=20)
+		api.bars.storage.get.assert_called_once_with(Bar, sort=('-name',), filter={'foo': '123', 'number':'7'}, limit=10, offset=20, count=False)
 		self.assertEquals(linked_bars, bars)
 		
 		
@@ -427,7 +427,7 @@ class CollectionTest(unittest.TestCase):
 		"""
 		storage.get = Mock(return_value=[])
 		api.bars.list()
-		storage.get.assert_called_once_with(Bar, sort=('+name',), filter=None, limit=0, offset=0)
+		storage.get.assert_called_once_with(Bar, sort=('+name',), filter=None, limit=0, offset=0, count=False)
 		
 		
 	def test_auth_required_not_present(self):
@@ -518,7 +518,7 @@ class CollectionTest(unittest.TestCase):
 		"""Can bypass authorization for methods, filters and sort."""
 		storage.get = Mock(return_value=[{'name':'zoomy', 'foo':23}])
 		results = api.hiddens.list(filter={'name':'zoomy'}, sort=('+name',), bypass_authorization=True, show_hidden=True)
-		storage.get.assert_called_once_with(Hidden, sort=('+name',), filter={'name':'zoomy'}, limit=0, offset=0)
+		storage.get.assert_called_once_with(Hidden, sort=('+name',), filter={'name':'zoomy'}, limit=0, offset=0, count=False)
 		self.assertEquals(results, [{'name':'zoomy', 'foo':23}])
 		
 		
@@ -639,14 +639,14 @@ class CollectionTest(unittest.TestCase):
 		"""A default limit is used when limit is not passed"""
 		storage.get = Mock(return_value=[])
 		api.bazes.list()
-		storage.get.assert_called_once_with(Baz, sort=(), filter=None, offset=0, limit=10)
+		storage.get.assert_called_once_with(Baz, sort=(), filter=None, offset=0, limit=10, count=False)
 		
 		
 	def test_max_limit(self):
 		"""Limit can't exceed max_limit"""
 		storage.get = Mock(return_value=[])
 		api.bazes.list(limit=50)
-		storage.get.assert_called_once_with(Baz, sort=(), filter=None, offset=0, limit=20)
+		storage.get.assert_called_once_with(Baz, sort=(), filter=None, offset=0, limit=20, count=False)
 		
 		
 	def test_default_embedded_not_default(self):
@@ -662,7 +662,7 @@ class CollectionTest(unittest.TestCase):
 		storage.get = Mock(return_value=[{'_id':'123', 'embedded_foos':['1','2','3']}])
 		storage.get_by_ids = Mock(return_value=[])
 		api.foos.list(embed=['embedded_foos'])
-		storage.get_by_ids.assert_called_once_with(Foo, ['1','2','3'], sort=(), filter=None, limit=0, offset=0)
+		storage.get_by_ids.assert_called_once_with(Foo, ['1','2','3'], sort=(), filter=None, limit=0, offset=0, count=False)
 		
 		
 	def test_embeddable_included_if_fields_set(self):
@@ -670,7 +670,7 @@ class CollectionTest(unittest.TestCase):
 		storage.get = Mock(return_value=[{'_id':'123', 'embedded_foos':['1','2','3']}])
 		storage.get_by_ids = Mock(return_value=[])
 		api.foos.list(fields=['embedded_foos'])
-		storage.get_by_ids.assert_called_once_with(Foo, ['1','2','3'], sort=(), filter=None, limit=0, offset=0)
+		storage.get_by_ids.assert_called_once_with(Foo, ['1','2','3'], sort=(), filter=None, limit=0, offset=0, count=False)
 		
 		
 	def test_embeddable_fields(self):
@@ -716,4 +716,40 @@ class CollectionTest(unittest.TestCase):
 		result = api.foos.list()
 		self.assertEquals(result, [{'_id':'123', 'stuff':'foo'}])
 		
+		
+	def test_count(self):
+		"""Can get a count instead of a list of items"""
+		storage.get = Mock(return_value=42)
+		result = api.foos.list(count=True)
+		self.assertEquals(result, 42)
+		storage.get.assert_called_once_with(Foo, filter=None, sort=(), offset=0, limit=0, count=True)
+		
+		
+	def test_count_reference(self):
+		"""Can count a list reference instead of getting the items"""
+		storage.get_by_id = Mock(return_value={'_id':'123', 'bazes':['1','2','3']})
+		storage.get_by_ids = Mock(return_value=42)
+		result = api.foos.link('123', 'bazes', count=True)
+		self.assertEquals(result, 42)
+		storage.get_by_ids.assert_called_with(Baz, ['1','2','3'], filter=None, sort=(), offset=0, limit=10, count=True)
+		
+		
+	def test_count_link(self):
+		"""Can count a multiple link instead of getting the items"""
+		foo = {'stuff':'foo', '_id':'123'}
+		
+		bars = []
+		for i in range(0,3):
+			bar = {'foo':foo['_id'], '_id':'%s' % i}
+			bars.append(bar)
+		
+		api.foos.set_storage(Storage())
+		api.bars.set_storage(Storage())
+		api.foos.storage.get_by_id = Mock(return_value=foo)
+		api.bars.storage.get = Mock(return_value=3)
+		api.bars.storage.check_filter = Mock(return_value=None)
+		
+		result = api.foos.link(foo['_id'], 'bars', count=True)
+		self.assertEquals(result, 3)
+		api.bars.storage.get.assert_called_once_with(Bar, filter={'foo':'123'}, sort=('+name',), offset=0, limit=0, count=True)
 		

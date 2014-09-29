@@ -49,13 +49,13 @@ class TestMongoDBStorage(unittest.TestCase):
 		"""
 		Should be able to create a document
 		"""
-		results = list(self.storage.get(Foo))
+		results = self.storage.get(Foo)
 		self.assertEquals(len(results), 0)
 		
 		foo_id = self.storage.create(Foo, {'a':'cat', 'b':123})
 		self.assertIsInstance(foo_id, basestring)
 		
-		results = list(self.storage.get(Foo))
+		results = self.storage.get(Foo)
 		self.assertEquals(len(results), 1)
 		self.assertEquals(results[0], {'_id':foo_id, 'a':'cat', 'b':123})
 		
@@ -66,7 +66,7 @@ class TestMongoDBStorage(unittest.TestCase):
 		"""
 		foo_id = self.storage.create(Foo, {'a':'cat', 'b':123})
 		self.storage.update(Foo, foo_id, {'a':'dog'}, replace=True)
-		results = list(self.storage.get(Foo))
+		results = self.storage.get(Foo)
 		self.assertEquals(results[0], {'_id':foo_id, 'a':'dog'})
 		
 		
@@ -78,7 +78,7 @@ class TestMongoDBStorage(unittest.TestCase):
 		
 		result = self.storage.update(Foo, foo_id, {'a':'dog'})
 		
-		results = list(self.storage.get(Foo))
+		results = self.storage.get(Foo)
 		self.assertEquals(len(results), 1)
 		self.assertEquals(results[0], {'_id':foo_id, 'a':'dog', 'b':123})
 		
@@ -97,7 +97,7 @@ class TestMongoDBStorage(unittest.TestCase):
 			doc['_id'] = self.storage.create(Foo, doc)
 			
 		self.storage.delete(Foo, docs[1]['_id'])
-		results = list(self.storage.get(Foo))
+		results = self.storage.get(Foo)
 		
 		self.assertEquals(results, [docs[0], docs[2]])
 		
@@ -115,13 +115,13 @@ class TestMongoDBStorage(unittest.TestCase):
 		for doc in docs:
 			doc['_id'] = self.storage.create(Foo, doc)
 		
-		results = list(self.storage.get(Foo, filter={'_id':docs[0]['_id']}))
+		results = self.storage.get(Foo, filter={'_id':docs[0]['_id']})
 		self.assertEquals(results,[docs[0]])
 		
-		results = list(self.storage.get(Foo, filter={'b':2}))
+		results = self.storage.get(Foo, filter={'b':2})
 		self.assertEquals(results,[docs[1]])
 		
-		results = list(self.storage.get(Foo, filter={'a':'skidoo', 'b':2}))
+		results = self.storage.get(Foo, filter={'a':'skidoo', 'b':2})
 		self.assertEquals(results,[])
 		
 		
@@ -138,7 +138,7 @@ class TestMongoDBStorage(unittest.TestCase):
 		for doc in docs:
 			doc['_id'] = self.storage.create(Foo, doc)
 		
-		results = list(self.storage.get(Foo, filter={'b':{'$gt':1}}))
+		results = self.storage.get(Foo, filter={'b':{'$gt':1}})
 		self.assertEquals(results,docs[1:])
 		
 		
@@ -156,10 +156,10 @@ class TestMongoDBStorage(unittest.TestCase):
 		for doc in docs:
 			doc['_id'] = self.storage.create(Foo, doc)
 		
-		results = list(self.storage.get(Foo, sort=('+a',)))
+		results = self.storage.get(Foo, sort=('+a',))
 		self.assertEquals(results, [docs[3], docs[0], docs[2], docs[1]])
 		
-		results = list(self.storage.get(Foo, sort=('-b','-a')))
+		results = self.storage.get(Foo, sort=('-b','-a'))
 		self.assertEquals(results, [docs[2], docs[3], docs[1], docs[0]])
 		
 		
@@ -169,13 +169,13 @@ class TestMongoDBStorage(unittest.TestCase):
 		"""
 		foo_id = self.storage.create(Foo, {'a':'one', 'b':1})
 		
-		result = next(self.storage.get(Foo, fields=('a',)))
+		result = self.storage.get(Foo, fields=('a',))[0]
 		self.assertEquals(result, {'_id':foo_id, 'a':'one'})
 		
-		result = next(self.storage.get(Foo, fields=('b',)))
+		result = self.storage.get(Foo, fields=('b',))[0]
 		self.assertEquals(result, {'_id':foo_id, 'b':1})
 		
-		result = next(self.storage.get(Foo, fields=()))
+		result = self.storage.get(Foo, fields=())[0]
 		self.assertEquals(result, {'_id':foo_id})
 		
 		
@@ -194,13 +194,13 @@ class TestMongoDBStorage(unittest.TestCase):
 			doc['_id'] = self.storage.create(Foo, doc)
 			
 			
-		results = list(self.storage.get(Foo))
+		results = self.storage.get(Foo)
 		self.assertEquals(len(results), 4)
 		
-		results = list(self.storage.get(Foo, limit=2))
+		results = self.storage.get(Foo, limit=2)
 		self.assertEquals(len(results), 2)
 		
-		results = list(self.storage.get(Foo, offset=1, limit=2))
+		results = self.storage.get(Foo, offset=1, limit=2)
 		self.assertEquals(results, docs[1:3])
 		
 		
@@ -213,7 +213,7 @@ class TestMongoDBStorage(unittest.TestCase):
 			ids.append(self.storage.create(Foo, {'b':i}))
 		
 		subset_of_ids = ids[0:5]
-		results = list(self.storage.get_by_ids(Foo, subset_of_ids, fields={}))
+		results = self.storage.get_by_ids(Foo, subset_of_ids, fields={})
 		self.assertEquals([r['_id'] for r in results], subset_of_ids)
 		
 		
@@ -258,9 +258,9 @@ class TestMongoDBStorage(unittest.TestCase):
 		"""
 		foo_id = self.storage.create(Foo, {'a':'cat', 'b':123})
 		self.storage.update(Foo, foo_id, {'a':'b'})
-		results = list(self.storage.get(Foo))
+		results = self.storage.get(Foo)
 		self.assertEquals(len(results), 1)
-		results = list(self.storage.get(Foo, versions=True))
+		results = self.storage.get(Foo, versions=True)
 		self.assertEquals(len(results), 0)
 		
 		
@@ -270,9 +270,9 @@ class TestMongoDBStorage(unittest.TestCase):
 		"""
 		foo_id = self.storage.create(Foo, {'a':'cat', 'b':123})
 		self.storage.update(Foo, foo_id, {'a':'b'})
-		results = list(self.storage.get_by_ids(Foo, [foo_id]))
+		results = self.storage.get_by_ids(Foo, [foo_id])
 		self.assertEquals(len(results), 1)
-		results = list(self.storage.get_by_ids(Foo, [foo_id], versions=True))
+		results = self.storage.get_by_ids(Foo, [foo_id], versions=True)
 		self.assertEquals(len(results), 0)
 		
 		
@@ -322,7 +322,7 @@ class TestMongoDBStorage(unittest.TestCase):
 		bar_id = self.storage.create(Bar, {'a':'car', 'b':123})
 		self.storage.update(Bar, bar_id, {'_version':1, 'a':'bike'})
 		self.storage.update(Bar, bar_id, {'_version':2, 'a':'unicycle'})
-		results = list(self.storage.get(Bar, versions=True))
+		results = self.storage.get(Bar, versions=True)
 		self.assertEquals(
 			results,
 			[
@@ -339,7 +339,7 @@ class TestMongoDBStorage(unittest.TestCase):
 		bar_id = self.storage.create(Bar, {'a':'bike', 'b':123})
 		bar = self.storage.get_by_id(Bar, bar_id)
 		self.storage.delete(Bar, bar_id, deleted_by='The Grinch')
-		results = list(self.storage.get(Bar, versions=True))
+		results = self.storage.get(Bar, versions=True)
 		self.assertEquals(results[0], bar)
 		delete_record = results[1]
 		self.assertIn('_deleted_on', delete_record)
@@ -365,7 +365,7 @@ class TestMongoDBStorage(unittest.TestCase):
 		sean = self.storage.get_by_id(Scotsman, sean_id)
 		base_sean = self.storage.get_by_id(Human, sean_id)
 		self.assertEquals(base_sean, sean)
-		humans = list(self.storage.get(Human))
+		humans = self.storage.get(Human)
 		self.assertEquals(humans, [sean])
 		
 		
@@ -381,8 +381,8 @@ class TestMongoDBStorage(unittest.TestCase):
 		sean_id = self.storage.create(Scotsman, {'name':'Sean Connery'})
 		sean = self.storage.get_by_id(Scotsman, sean_id)
 		
-		primate_results = list(self.storage.get(Primate))
-		human_results = list(self.storage.get(Human))
+		primate_results = self.storage.get(Primate)
+		human_results = self.storage.get(Human)
 		self.assertEquals(primate_results, [bobo, sean])
 		self.assertEquals(human_results, [sean])
 		
@@ -425,3 +425,19 @@ class TestMongoDBStorage(unittest.TestCase):
 		fetched_baz = self.storage.get_by_id(Baz, '123')
 		self.assertEquals(fetched_baz, None)
 		
+		
+	def test_get_count(self):
+		"""
+		Can get a count instead of a list of results
+		"""
+		docs = [
+			{'a':'one', 'b':1},
+			{'a':'two', 'b':2},
+			{'a':'three', 'b':3}
+		]
+		
+		for doc in docs:
+			doc['_id'] = self.storage.create(Foo, doc)
+		
+		result = self.storage.get(Foo, count=True)
+		self.assertEquals(result, 3)

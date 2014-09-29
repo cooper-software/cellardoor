@@ -24,10 +24,10 @@ class MongoDBStorage(Storage):
 					self.unique_fields_by_index[index_name] = k
 		
 	
-	def get(self, entity, filter=None, fields=None, sort=None, offset=0, limit=0, versions=False):
+	def get(self, entity, filter=None, fields=None, sort=None, offset=0, limit=0, versions=False, count=False):
 		if versions:
 			if not entity.versioned:
-				return
+				return []
 			to_dict = self.versioned_document_to_dict
 			if filter:
 				if '_id' in filter:
@@ -60,19 +60,21 @@ class MongoDBStorage(Storage):
 								  sort=sort, 
 								  skip=offset, 
 								  limit=limit)
+		
+		if count:
+			return results.count()
+		else:
+			return map(to_dict, results)
 			
-		for result in results:
-			yield to_dict(result)
 			
-			
-	def get_by_ids(self, entity, ids, filter=None, fields=None, sort=None, offset=0, limit=0, versions=False):
+	def get_by_ids(self, entity, ids, filter=None, fields=None, sort=None, offset=0, limit=0, versions=False, count=False):
 		if versions and not entity.versioned:
 			return []
 			
 		if not filter:
 			filter = {}
 		filter['_id'] = {'$in':map(self._objectid, ids)}
-		return self.get(entity, filter=filter, fields=fields, sort=sort, offset=offset, limit=limit, versions=versions)
+		return self.get(entity, filter=filter, fields=fields, sort=sort, offset=offset, limit=limit, versions=versions, count=count)
 		
 		
 	def get_by_id(self, entity, id, filter=None, fields=None):
