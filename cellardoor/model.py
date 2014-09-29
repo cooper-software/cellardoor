@@ -616,8 +616,8 @@ class EntityMixin(object):
     
     
 class Timestamped(EntityMixin):
-    created = DateTime()
-    modified = DateTime()
+    created = DateTime(help="Created")
+    modified = DateTime(help="Modified")
     
     def setup(self):
         self.hooks.pre('create', self.on_create)
