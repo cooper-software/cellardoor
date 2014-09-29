@@ -237,12 +237,12 @@ class MongoDBStorage(Storage):
 			return {'_type':{'$regex':'^%s' % re.escape(type_name)}}
 			
 		
-	def check_filter(self, filter, allowed_fields):
+	def check_filter(self, filter, allowed_fields, context):
 		allowed_fields = set(allowed_fields)
-		return self._check_filter(filter, allowed_fields)
+		return self._check_filter(filter, allowed_fields, context)
 		
 		
-	def _check_filter(self, filter, allowed_fields):
+	def _check_filter(self, filter, allowed_fields, context):
 		if not isinstance(filter, dict):
 			return
 		for k,v in filter.items():
@@ -252,12 +252,30 @@ class MongoDBStorage(Storage):
 					continue
 			elif k not in allowed_fields:
 				raise errors.DisabledFieldError('You cannot filter by the "%s" field' % k)
-				
-			if isinstance(v, (list, tuple)):
+			
+			identity_value = self._get_identity_value(v, context)
+			if identity_value:
+				filter[k] = identity_value
+			elif isinstance(v, (list, tuple)):
+				new_v = []
 				for x in v:
-					self._check_filter(x, allowed_fields)
+					identity_value = self._get_identity_value(x, context)
+					if identity_value:
+						new_v.append(identity_value)
+					else:
+						new_v.append(x)
+					self._check_filter(x, allowed_fields, context)
+					filter[k] = new_v
 			elif isinstance(v, dict):
-				self._check_filter(v, allowed_fields)
+				self._check_filter(v, allowed_fields, context)
+				
+	def _get_identity_value(self, key, context):
+		if isinstance(key, basestring):
+			if key.startswith('$identity'):
+				try:
+					return reduce(dict.get, key[1:].split("."), context)
+				except KeyError:
+					raise errors.CompoundValidationError({'filter': 'Attempting to use a non-existent context variable: %s' % key})
 				
 				
 	def _raise_dupe_error(self, orig_exc):

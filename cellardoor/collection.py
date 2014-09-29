@@ -163,7 +163,7 @@ class ListOptionsProcessor(BaseOptionsProcessor):
 			allowed_fields = self.enabled_filters
 		else:
 			allowed_fields = self.enabled_filters_no_hidden
-		self.storage.check_filter(options['filter'], allowed_fields)
+		self.storage.check_filter(options['filter'], allowed_fields, options['context'])
 		
 		
 	def check_sort(self, options):

@@ -227,8 +227,29 @@ class TestMongoDBStorage(unittest.TestCase):
 			'd': {'$where':'foo()'}
 		}
 		with self.assertRaises(errors.DisabledFieldError) as cm:
-			self.storage.check_filter(filter, ('a','b', 'd'))
+			self.storage.check_filter(filter, ('a','b', 'd'), {})
 		self.assertEquals(cm.exception.message, 'You cannot filter by the "c" field')
+		
+		
+	def test_filter_identity_fail(self):
+		"""An error is raised if the context's identity doesn't have the specified attribute"""
+		filter = {'stuff': '$identity.things'}
+		self.storage.check_filter(filter, ('stuff',), {'identity':{'things':123}})
+		self.assertEquals(filter, {'stuff':123})
+		
+		
+	def test_filter_identity(self):
+		"""$identity is replaced with the context's identity when checking the filter"""
+		filter = {'stuff': '$identity.things'}
+		self.storage.check_filter(filter, ('stuff',), {'identity':{'things':123}})
+		self.assertEquals(filter, {'stuff':123})
+		
+		
+	def test_filter_identity_list(self):
+		"""$identity is replaced with the context's identity when checking the filter"""
+		filter = {'stuff': ['foo', '$identity.things']}
+		self.storage.check_filter(filter, ('stuff',), {'identity':{'things':123}})
+		self.assertEquals(filter, {'stuff':['foo', 123]})
 		
 		
 	def test_get_versioned_fail(self):

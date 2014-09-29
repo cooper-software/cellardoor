@@ -496,7 +496,7 @@ class CollectionTest(unittest.TestCase):
 		storage.check_filter = Mock(side_effect=errors.DisabledFieldError)
 		with self.assertRaises(errors.DisabledFieldError):
 			api.hiddens.list(filter={'name':'zoomy'}, context={'identity':{}})
-		storage.check_filter.assert_called_once_with({'name':'zoomy'}, set())
+		storage.check_filter.assert_called_once_with({'name':'zoomy'}, set(), {'identity': {}})
 		
 		
 	def test_hidden_filter_authorized(self):
@@ -504,7 +504,7 @@ class CollectionTest(unittest.TestCase):
 		storage.check_filter = Mock(return_value=None)
 		storage.get = Mock(return_value=[])
 		api.hiddens.list(filter={'name':'zoomy'}, context={'identity':{'foo':'bar'}})
-		storage.check_filter.assert_called_once_with({'name':'zoomy'}, set(['name']))
+		storage.check_filter.assert_called_once_with({'name':'zoomy'}, set(['name']),  {'item': [], 'identity': {'foo': 'bar'}})
 		
 		
 	def test_hidden_sort_fail(self):
@@ -711,7 +711,9 @@ class CollectionTest(unittest.TestCase):
 		
 		
 	def test_fields_empty_hidden_list(self):
+		"""All of an item's visible fields are returned when listing items"""
 		storage.get = CopyingMock(return_value=[{'_id':'123', 'stuff':'foo', 'secret':'i like valuer'}])
 		result = api.foos.list()
 		self.assertEquals(result, [{'_id':'123', 'stuff':'foo'}])
+		
 		
