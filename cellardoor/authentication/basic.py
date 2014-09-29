@@ -9,6 +9,7 @@ class BasicAuthIdentifier(Identifier):
 	
 	The credentials take the form `{'username':'foo', 'password':'bar'}`
 	"""
+	type = 'Basic'
 	
 	def identify(self, environ):
 		data = environ.get('HTTP_AUTHORIZATION')
@@ -17,7 +18,7 @@ class BasicAuthIdentifier(Identifier):
 		parts = data.split()
 		if len(parts) != 2:
 			return None
-		if parts[0] != 'Basic':
+		if parts[0] != self.type:
 			return None
 		try:
 			decoded_data = base64.standard_b64decode(parts[1])
