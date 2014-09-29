@@ -897,9 +897,21 @@ class TestEntity(unittest.TestCase):
             a = Text()
             b = Text()
             c = Text(hidden=True)
+            d = Reference('Bar')
         
         self.assertEquals(Foo.hidden_fields, {'c'})
-        self.assertEquals(Foo.visible_fields, {'a', 'b'})
+        self.assertEquals(Foo.visible_fields, {'a', 'b', 'd'})
+        
+        
+    def test_embeddable(self):
+        """Has sets for embeddable and default embedded references"""
+        class Foo(Entity):
+            a = Reference('Bar')
+            b = Reference('Bar', embeddable=True)
+            c = Reference('Bar', embeddable=True, embed_by_default=False)
+        
+        self.assertEquals(Foo.embeddable, {'b', 'c'})
+        self.assertEquals(Foo.embed_by_default, {'b'})
         
         
 class TestMixins(unittest.TestCase):

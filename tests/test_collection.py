@@ -25,6 +25,7 @@ class Foo(Entity):
 	bazes = ListOf(Reference('Baz'))
 	embedded_bazes = ListOf(Reference('Baz', embeddable=True))
 	embedded_foos = ListOf(Reference('Foo', embeddable=True, embed_by_default=False, embedded_fields=('stuff',)))
+	secret = Text(hidden=True)
 	
 	
 class Bar(Entity):
@@ -59,6 +60,7 @@ class FoosCollection(Collection):
 	}
 	enabled_filters = ('stuff',)
 	enabled_sort = ('stuff',)
+	hidden_field_authorization = auth.identity.role == 'admin'
 	
 	
 class BarsCollection(Collection):
@@ -537,7 +539,7 @@ class CollectionTest(unittest.TestCase):
 		hooks.post('delete', post_delete)
 		
 		context = {'foo':23}
-		options = {'bypass_authorization': False, 'fields': None, 'allow_embedding': True, 'show_hidden': False, 'context': {'foo': 23}, 'embed': None, 'can_show_hidden': True}
+		options = {'bypass_authorization': False, 'fields': {'optional_stuff', 'bazes', 'stuff', 'embedded_foos', 'embedded_bazes', '_id'}, 'allow_embedding': True, 'show_hidden': False, 'context': {'foo': 23}, 'embed': {'embedded_bazes'}, 'can_show_hidden': False}
 		
 		storage.create = Mock(return_value='123')
 		storage.update = Mock(return_value={'_id':'123', 'stuff':'nothings'})
@@ -585,7 +587,7 @@ class CollectionTest(unittest.TestCase):
 		hooks.pre('delete', pre_delete)
 		hooks.post('delete', post_delete)
 		context = {'foo':23}
-		options = {'bypass_authorization': False, 'fields': None, 'allow_embedding': True, 'show_hidden': False, 'context': {'foo': 23}, 'embed': None, 'can_show_hidden': True}
+		options = {'bypass_authorization': False, 'fields': {'optional_stuff', 'bazes', 'stuff', 'embedded_foos', 'embedded_bazes', '_id'}, 'allow_embedding': True, 'show_hidden': False, 'context': {'foo': 23}, 'embed': {'embedded_bazes'}, 'can_show_hidden': False}
 		
 		storage.create = Mock(return_value='123')
 		storage.update = Mock(return_value={'_id':'123', 'stuff':'nothings'})
@@ -706,4 +708,10 @@ class CollectionTest(unittest.TestCase):
 		storage.get_by_id = CopyingMock(return_value={'_id':'123', 'name':'hidden', 'foo':23})
 		result = api.hiddens.get('123')
 		self.assertEquals(result, {'_id':'123', 'foo':23})
+		
+		
+	def test_fields_empty_hidden_list(self):
+		storage.get = CopyingMock(return_value=[{'_id':'123', 'stuff':'foo', 'secret':'i like valuer'}])
+		result = api.foos.list()
+		self.assertEquals(result, [{'_id':'123', 'stuff':'foo'}])
 		

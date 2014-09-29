@@ -738,7 +738,7 @@ class EntityMeta(type):
                 embeddable.add(k)
                 if v.embed_by_default:
                     embed_by_default.add(k)
-                
+        
         attrs['embeddable'] = embeddable
         attrs['embed_by_default'] = embed_by_default
         

@@ -31,6 +31,9 @@ class RuleSet(object):
 	def enforce_item_rules(self, method, item, context):
 		rules = self.item_rules.get(method)
 		if rules:
+			if isinstance(item, list):
+				for i in item:
+					self.enforce_rules(rules, i, context)
 			self.enforce_rules(rules, item, context)
 		
 		
@@ -55,8 +58,8 @@ class RuleSet(object):
 class BaseOptionsProcessor(object):
 	
 	
-	def __init__(self, visible_fields=set(), hidden_field_authorization=None):
-		self.visible_fields = visible_fields
+	def __init__(self, entity=None, hidden_field_authorization=None):
+		self.entity = entity
 		self.hidden_field_authorization = hidden_field_authorization
 		
 	
@@ -69,16 +72,33 @@ class BaseOptionsProcessor(object):
 		new_options['context'] = options.get('context', {})
 		new_options['bypass_authorization'] = options.get('bypass_authorization', False)
 		
+		# See if we can show hidden fields
 		if new_options['bypass_authorization']:
 			new_options['can_show_hidden'] = True
 		else:
 			new_options['can_show_hidden'] = self.can_show_hidden(new_options['context'])
 		
+		# Determine all the reference fields that we should embed
+		if new_options['embed']:
+			new_options['embed'] = self.entity.embeddable.intersection(new_options['embed'])
+		else:
+			new_options['embed'] = self.entity.embed_by_default.copy()
+		
+		if new_options['fields']:
+			new_options['embed'].update(
+				self.entity.embeddable.intersection(new_options['fields'])
+			)
+		
+		if not new_options['show_hidden'] or not new_options['can_show_hidden']:
+			new_options['embed'].difference_update(self.entity.hidden_fields)
+			
+		
+		# Determine all the other fields we should include in results
 		if not new_options['can_show_hidden']:
 			if new_options['fields'] is not None:
-				new_options['fields'] = self.visible_fields.intersection(new_options['fields'])
+				new_options['fields'] = self.entity.visible_fields.intersection(new_options['fields'])
 			else:
-				new_options['fields'] = self.visible_fields
+				new_options['fields'] = self.entity.visible_fields.copy()
 		
 		if new_options['fields'] is not None:
 			new_options['fields'] = set(new_options['fields'])
@@ -241,16 +261,17 @@ class Collection(object):
 		self.entity = self.entity()
 		self.hooks = EventManager('create', 'update', 'delete')
 		self.rules = RuleSet(self.method_authorization)
-		self.base_options_processor = BaseOptionsProcessor(visible_fields=self.entity.visible_fields,
+		self.base_options_processor = BaseOptionsProcessor(entity=self.entity,
 														   hidden_field_authorization=self.hidden_field_authorization)
 		self.list_options_processor = ListOptionsProcessor(storage=self.storage,
+														   entity=self.entity,
 														   hidden_fields=self.entity.hidden_fields, 
+														   hidden_field_authorization=self.hidden_field_authorization,
 														   enabled_filters=self.enabled_filters,
 														   enabled_sort=self.enabled_sort,
 														   default_sort=self.default_sort,
 														   default_limit=self.default_limit,
-														   max_limit=self.max_limit,
-														   hidden_field_authorization=self.hidden_field_authorization)
+														   max_limit=self.max_limit)
 		
 		for method in ALL:
 			if method not in self.rules.enabled_methods:
@@ -479,20 +500,7 @@ class Collection(object):
 		if not options['allow_embedding']:
 			return
 		
-		if options['embed']:
-			embed = self.entity.embeddable.intersection(options['embed'])
-		else:
-			embed = self.entity.embed_by_default
-			
-		if options['fields']:
-			embed.update(
-				self.entity.embeddable.intersection(options['fields'])
-			)
-		
-		if not options['show_hidden'] or not options['can_show_hidden']:
-			embed.difference_update(self.entity.hidden_fields)
-		
-		for reference_name in embed:
+		for reference_name in options['embed']:
 			referenced_collection = self.links.get(reference_name)
 			if not referenced_collection:
 				raise Exception, "No link defined in '%s' collection for embedded reference '%s'" % (self.plural_name, reference_name)
@@ -501,9 +509,12 @@ class Collection(object):
 			
 			link_options = {
 				'context': options['context'],
-				'allow_embedding': False,
-				'fields': reference_field.field.embedded_fields if isinstance(reference_field, ListOf) else reference_field.embedded_fields
+				'allow_embedding': False
 			}
+			
+			embedded_fields = reference_field.field.embedded_fields if isinstance(reference_field, ListOf) else reference_field.embedded_fields
+			if embedded_fields:
+				link_options['fields'] = embedded_fields
 			
 			result = referenced_collection.resolve_link_or_reference(item, reference_name, reference_field, link_options)
 			
