@@ -273,7 +273,17 @@ class APISerializer(object):
 			'rel': 'link',
 			'title': 'Link'
 		}
-		if collection.entity.is_multiple_link(getattr(collection.entity, link_name)):
+		
+		link = None
+		entities = [collection.entity] + collection.entity.children
+		for entity in entities:
+			if hasattr(entity, link_name):
+				link = getattr(entity, link_name)
+				break
+		if link is None:
+			raise Exception, "%s has no link %s" % (collection.entity.__class__.__name__, link_name)
+		
+		if collection.entity.is_multiple_link(link):
 			schema_link['targetSchema'] = {
 				'type': 'array',
 				'items': { '$ref': self.entity_schema_ref(link_collection) }
