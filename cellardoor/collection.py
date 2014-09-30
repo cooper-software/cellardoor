@@ -181,6 +181,8 @@ class BaseOptions(object):
 		
 		
 	def get_embed_for_type(self, base_entity, type):
+		type = type.split('.')[-1]
+		
 		if type in self._embed_by_class:
 			return self._embed_by_class[type]
 		
@@ -189,9 +191,8 @@ class BaseOptions(object):
 		if type == base_entity.__name__:
 			entity = base_entity
 		else:
-			entity_name = type.split('.')[-1]
 			for c in base_entity.children:
-				if c.__name__ == entity_name:
+				if c.__name__ == type:
 					entity = c
 					break
 		
@@ -541,7 +542,6 @@ class Collection(object):
 					item.pop(k, None)
 			
 		
-		
 	def add_embedded_references(self, item, options):
 		"""Add embedded references and links to an item"""
 		if not options.allow_embedding:
@@ -558,7 +558,8 @@ class Collection(object):
 			
 			link_options = {
 				'context': options.context,
-				'allow_embedding': False
+				'allow_embedding': False,
+				'show_hidden': options.show_hidden
 			}
 			
 			embedded_fields = reference_field.field.embedded_fields if isinstance(reference_field, ListOf) else reference_field.embedded_fields
