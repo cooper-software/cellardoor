@@ -52,6 +52,14 @@ class Resource(object):
 		self.send_list(req, resp, items)
 		
 		
+	def count(self, req, resp):
+		kwargs = self.get_kwargs(req)
+		kwargs['count'] = True
+		result = self.collection.list(**kwargs)
+		resp.content_type, _ = View.choose(req, self.views)
+		resp.set_header('X-Count', str(result))
+		
+		
 	def create(self, req, resp):
 		fields = self.get_fields_from_request(req)
 		kwargs = self.get_kwargs(req, 'show_hidden', 'context', 'embedded')
@@ -91,6 +99,15 @@ class Resource(object):
 			self.send_one(req, resp, result)
 		else:
 			self.send_list(req, resp, result)
+			
+			
+	def count_link_or_reference(self, req, resp, id, reference_name):
+		kwargs = self.get_kwargs(req)
+		kwargs['count'] = True
+		result = self.collection.link(id, reference_name, **kwargs)
+		resp.content_type, _ = View.choose(req, self.views)
+		if isinstance(result, int):
+			resp.set_header('X-Count', str(result))
 		
 		
 	def send_one(self, req, resp, item):
@@ -202,12 +219,18 @@ class Endpoint(object):
 			fn = getattr(self, method)
 			for http_method in get_http_methods(method):
 				setattr(self, 'on_%s' % http_method, fn)
+		if LIST in methods:
+			setattr(self, 'on_head', self.count)
 			
 
 class ListEndpoint(Endpoint):
 	
 	def list(self, req, resp):
 		return self.resource.list(req, resp)
+		
+		
+	def count(self, req, resp):
+		return self.resource.count(req, resp)
 		
 		
 	def create(self, req, resp):
@@ -242,6 +265,10 @@ class ReferenceEndpoint(object):
 		
 	def on_get(self, req, resp, id):
 		return self.resource.get_link_or_reference(req, resp, id, self.reference_name)
+		
+		
+	def on_head(self, req, resp, id):
+		return self.resource.count_link_or_reference(req, resp, id, self.reference_name)
 		
 		
 		

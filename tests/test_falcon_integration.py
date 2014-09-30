@@ -342,3 +342,18 @@ class TestResource(TestBase):
 		self.cellardoor.foos.create.assert_called_with({}, show_hidden=True, embedded=None, context={})
 		self.cellardoor.foos.get.assert_called_with('123', show_hidden=True, embedded=None, context={})
 		
+		
+	def test_count(self):
+		"""A HEAD request returns an X-Count header"""
+		self.cellardoor.foos.list = Mock(return_value=52)
+		self.simulate_request('/foos', method='HEAD')
+		self.assertEquals(self.srmock.headers_dict['x-count'], '52')
+		self.cellardoor.foos.list.assert_called_with(sort=None, filter=None, offset=0, limit=0, show_hidden=False, embedded=None, context={}, count=True)
+		
+		
+	def test_count_link(self):
+		self.cellardoor.foos.link = Mock(return_value=52)
+		self.simulate_request('/foos/123/bazes', method='HEAD')
+		self.assertEquals(self.srmock.headers_dict['x-count'], '52')
+		self.cellardoor.foos.link.assert_called_with('123', 'bazes', sort=None, filter=None, offset=0, limit=0, show_hidden=False, embedded=None, context={}, count=True)
+		
