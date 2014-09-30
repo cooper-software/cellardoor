@@ -276,7 +276,7 @@ class MongoDBStorage(Storage):
 			if key.startswith('$identity'):
 				try:
 					return reduce(dict.get, key[1:].split("."), context)
-				except KeyError:
+				except:
 					raise errors.CompoundValidationError({'filter': 'Attempting to use a non-existent context variable: %s' % key})
 				
 				

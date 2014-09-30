@@ -874,6 +874,8 @@ class TestEntity(unittest.TestCase):
             
         self.assertEquals(Baz.hierarchy, [Foo, Bar, Baz])
         self.assertEquals(Foo.hierarchy, [Foo])
+        self.assertEquals(Foo.children, [Bar, Baz])
+        self.assertEquals(Bar.children, [Baz])
         
         
     def test_inheritance_field_summing(self):

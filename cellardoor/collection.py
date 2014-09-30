@@ -1,3 +1,4 @@
+from copy import deepcopy
 from .methods import ALL, LIST, CREATE, GET, REPLACE, UPDATE, DELETE
 from .model import ListOf, Reference, Link
 from .events import EventManager
@@ -55,54 +56,53 @@ class RuleSet(object):
 				
 				
 				
-class BaseOptionsProcessor(object):
+class OptionsFactory(object):
 	
 	
-	def __init__(self, entity=None, hidden_field_authorization=None):
-		self.entity = entity
+	def __init__(self, storage=None,
+					   hidden_fields=(), 
+					   hidden_field_authorization=None,
+					   enabled_filters=(), 
+					   enabled_sort=(), 
+					   default_sort=(), 
+					   default_limit=0, 
+					   max_limit=0):
+		self.storage = storage
+		self.hidden_fields = set(hidden_fields)
 		self.hidden_field_authorization = hidden_field_authorization
+		self.enabled_filters = set(enabled_filters)
+		self.enabled_filters_no_hidden = self.enabled_filters.difference(self.hidden_fields)
+		self.enabled_sort = set(enabled_sort)
+		self.enabled_sort_no_hidden = self.enabled_sort.difference(self.hidden_fields)
+		self.default_sort = default_sort
+		self.default_limit = default_limit
+		self.max_limit = max_limit
 		
+		
+	def create(self, options_dict, list=False):
+		if list:
+			return ListOptions( self.process_list(options_dict) )
+		else:
+			return BaseOptions( self.process(options_dict) )
+			
 	
 	def process(self, options):
 		new_options = {}
 		new_options['embed'] = options.get('embed', None)
+		if new_options['embed']:
+			new_options['embed'] = set(new_options['embed'])
 		new_options['allow_embedding'] = options.get('allow_embedding', True)
 		new_options['fields'] = options.get('fields', None)
+		if new_options['fields']:
+			new_options['fields'] = set(new_options['fields'])
 		new_options['show_hidden'] = options.get('show_hidden', False)
 		new_options['context'] = options.get('context', {})
 		new_options['bypass_authorization'] = options.get('bypass_authorization', False)
 		
-		# See if we can show hidden fields
 		if new_options['bypass_authorization']:
 			new_options['can_show_hidden'] = True
 		else:
 			new_options['can_show_hidden'] = self.can_show_hidden(new_options['context'])
-		
-		# Determine all the reference fields that we should embed
-		if new_options['embed']:
-			new_options['embed'] = self.entity.embeddable.intersection(new_options['embed'])
-		else:
-			new_options['embed'] = self.entity.embed_by_default.copy()
-		
-		if new_options['fields']:
-			new_options['embed'].update(
-				self.entity.embeddable.intersection(new_options['fields'])
-			)
-		
-		if not new_options['show_hidden'] or not new_options['can_show_hidden']:
-			new_options['embed'].difference_update(self.entity.hidden_fields)
-			
-		
-		# Determine all the other fields we should include in results
-		if not new_options['can_show_hidden']:
-			if new_options['fields'] is not None:
-				new_options['fields'] = self.entity.visible_fields.intersection(new_options['fields'])
-			else:
-				new_options['fields'] = self.entity.visible_fields.copy()
-		
-		if new_options['fields'] is not None:
-			new_options['fields'] = set(new_options['fields'])
-			new_options['fields'].add('_id')
 		
 		return new_options
 			
@@ -114,33 +114,10 @@ class BaseOptionsProcessor(object):
 			elif not self.hidden_field_authorization(context):
 				return False
 		return True
-	    
-	    
-	    
-class ListOptionsProcessor(BaseOptionsProcessor):
-	
-	def __init__(self, storage=None,
-					   hidden_fields=(), 
-					   enabled_filters=(), 
-					   enabled_sort=(), 
-					   default_sort=(), 
-					   default_limit=0, 
-					   max_limit=0, 
-					   **kwargs):
-		self.storage = storage
-		self.hidden_fields = set(hidden_fields)
-		self.enabled_filters = set(enabled_filters)
-		self.enabled_filters_no_hidden = self.enabled_filters.difference(self.hidden_fields)
-		self.enabled_sort = set(enabled_sort)
-		self.enabled_sort_no_hidden = self.enabled_sort.difference(self.hidden_fields)
-		self.default_sort = default_sort
-		self.default_limit = default_limit
-		self.max_limit = max_limit
-		super(ListOptionsProcessor, self).__init__(**kwargs)
 		
 		
-	def process(self, options):
-		new_options = super(ListOptionsProcessor, self).process(options)
+	def process_list(self, options):
+		new_options = self.process(options)
 		new_options['filter'] = options.get('filter', None)
 		new_options['sort'] = options.get('sort', None)
 		new_options['sort'] = options['sort'] if options.get('sort') else self.default_sort
@@ -182,6 +159,63 @@ class ListOptionsProcessor(BaseOptionsProcessor):
 			if field_name not in allowed_fields:
 				raise errors.DisabledFieldError('The "%s" field cannot be used for sorting.' % field_name)
 
+
+class BaseOptions(object):
+	
+	def __init__(self, options):
+		self._options = options
+		self._embed_by_class = {}
+		
+		
+	def __getitem__(self, key):
+		return self._options[key]
+		
+		
+	def __getattr__(self, key):
+		return self.__getitem__(key)
+		
+		
+	def __deepcopy__(self, memo):
+		options = BaseOptions(deepcopy(self._options, memo))
+		options._embed_by_class = deepcopy(self._embed_by_class, memo)
+		
+		
+	def get_embed_for_type(self, base_entity, type):
+		if type in self._embed_by_class:
+			return self._embed_by_class[type]
+		
+		entity = None
+		
+		if type == base_entity.__name__:
+			entity = base_entity
+		else:
+			entity_name = type.split('.')[-1]
+			for c in base_entity.children:
+				if c.__name__ == entity_name:
+					entity = c
+					break
+		
+		if entity is None:
+			raise Exception, "Can't find the entity for '%s'" % type
+		
+		if self._options['embed']:
+			embed = self._options['embed'].intersection(entity.embeddable)
+		else:
+			embed = entity.embed_by_default
+		
+		if self._options['fields']:
+			embed.update( entity.embeddable.intersection( self._options['fields'] ) )
+		
+		if not self._options['show_hidden'] or not self._options['can_show_hidden']:
+			embed.difference_update(entity.hidden_fields)
+		
+		self._embed_by_class[type] = (entity, embed)
+		return entity, embed
+		
+		
+		
+class ListOptions(BaseOptions):
+	pass
 
 
 class CollectionMeta(type):
@@ -262,17 +296,21 @@ class Collection(object):
 		self.entity = self.entity()
 		self.hooks = EventManager('create', 'update', 'delete')
 		self.rules = RuleSet(self.method_authorization)
-		self.base_options_processor = BaseOptionsProcessor(entity=self.entity,
-														   hidden_field_authorization=self.hidden_field_authorization)
-		self.list_options_processor = ListOptionsProcessor(storage=self.storage,
-														   entity=self.entity,
-														   hidden_fields=self.entity.hidden_fields, 
-														   hidden_field_authorization=self.hidden_field_authorization,
-														   enabled_filters=self.enabled_filters,
-														   enabled_sort=self.enabled_sort,
-														   default_sort=self.default_sort,
-														   default_limit=self.default_limit,
-														   max_limit=self.max_limit)
+		
+		hidden_fields = set(self.entity.hidden_fields.copy())
+		for c in self.entity.children:
+			hidden_fields.update(c.hidden_fields)
+		
+		self.options_factory = OptionsFactory(
+			storage=self.storage,
+		    hidden_fields=hidden_fields, 
+		    hidden_field_authorization=self.hidden_field_authorization,
+		    enabled_filters=self.enabled_filters,
+		    enabled_sort=self.enabled_sort,
+		    default_sort=self.default_sort,
+		    default_limit=self.default_limit,
+		    max_limit=self.max_limit
+		)
 		
 		for method in ALL:
 			if method not in self.rules.enabled_methods:
@@ -281,83 +319,82 @@ class Collection(object):
 				
 	def set_storage(self, storage):
 		self.storage = storage
-		self.base_options_processor.storage = storage
-		self.list_options_processor.storage = storage
+		self.options_factory.storage = storage
 			
 			
 	def list(self, **kwargs):
-		options = self.list_options_processor.process(kwargs)
+		options = self.options_factory.create(kwargs, list=True)
 		
 		if not options['bypass_authorization']:
 			self.rules.enforce_non_item_rules(LIST, options['context'])
 		
 		result = self.storage.get(self.entity.__class__, 
-							filter=options['filter'], sort=options['sort'], 
-							offset=options['offset'], limit=options['limit'],
-							count=options['count'])
+							filter=options.filter, sort=options.sort, 
+							offset=options.offset, limit=options.limit,
+							count=options.count)
 		
-		if options['count']:
+		if options.count:
 			return result
 		
-		if not options['bypass_authorization']:
-			self.rules.enforce_item_rules(LIST, result, options['context'])
+		if not options.bypass_authorization:
+			self.rules.enforce_item_rules(LIST, result, options.context)
 				
 		return self.post(LIST, options, result)
 		
 		
 	def create(self, fields, **kwargs):
-		options = self.base_options_processor.process(kwargs)
+		options = self.options_factory.create(kwargs)
 		
-		if not options['bypass_authorization']:
-			self.rules.enforce_non_item_rules(CREATE, options['context'])
+		if not options.bypass_authorization:
+			self.rules.enforce_non_item_rules(CREATE, options.context)
 		
-		self.entity.hooks.trigger_pre('create', fields, options)
-		self.hooks.trigger_pre('create', fields, options)
+		self.entity.hooks.trigger_pre('create', fields, options.context)
+		self.hooks.trigger_pre('create', fields, options.context)
 		
 		item = self.entity.validator.validate(fields)
 		item['_id'] = self.storage.create(self.entity.__class__, item)
 		
-		if not options['bypass_authorization']:
-			self.rules.enforce_item_rules(CREATE, item, options['context'])
+		if not options.bypass_authorization:
+			self.rules.enforce_item_rules(CREATE, item, options.context)
 		
 		item = self.post(CREATE, options, item)
 		
-		self.entity.hooks.trigger_post('create', item, options)
-		self.hooks.trigger_post('create', item, options)
+		self.entity.hooks.trigger_post('create', item, options.context)
+		self.hooks.trigger_post('create', item, options.context)
 		
 		return item
 		
 		
 	def get(self, id, **kwargs):
-		options = self.base_options_processor.process(kwargs)
+		options = self.options_factory.create(kwargs)
 		
-		if not options['bypass_authorization']:
-			self.rules.enforce_non_item_rules(GET, options['context'])
+		if not options.bypass_authorization:
+			self.rules.enforce_non_item_rules(GET, options.context)
 		
 		item = self.storage.get_by_id(self.entity.__class__, id)
 		if item is None:
 			raise errors.NotFoundError("No %s with id '%s' was found" % (self.singular_name, id))
 		
-		if not options['bypass_authorization']:
-			self.rules.enforce_item_rules(GET, item, options['context'])
+		if not options.bypass_authorization:
+			self.rules.enforce_item_rules(GET, item, options.context)
 		
 		return self.post(GET, options, item)
 		
 		
 	def update(self, id, fields, _replace=False, _method=UPDATE, **kwargs):
-		options = self.base_options_processor.process(kwargs)
+		options = self.options_factory.create(kwargs)
 		
-		if not options['bypass_authorization']:
-			self.rules.enforce_non_item_rules(_method, options['context'])
+		if not options.bypass_authorization:
+			self.rules.enforce_non_item_rules(_method, options.context)
 		
-		self.entity.hooks.trigger_pre('update', id, fields, options)
-		self.hooks.trigger_pre('update', id, fields, options)
+		self.entity.hooks.trigger_pre('update', id, fields, options.context)
+		self.hooks.trigger_pre('update', id, fields, options.context)
 		
-		if not options['bypass_authorization'] and UPDATE in self.rules.item_rules:
+		if not options.bypass_authorization and UPDATE in self.rules.item_rules:
 			item = self.storage.get_by_id(self.entity.__class__, id)
 			if item is None:
 				raise errors.NotFoundError("No %s with id '%s' was found" % (self.singular_name, id))
-			self.rules.enforce_item_rules(_method, item, options['context'])
+			self.rules.enforce_item_rules(_method, item, options.context)
 		
 		version = fields.pop('_version', None)
 		fields = self.entity.validator.validate(fields, enforce_required=_replace)
@@ -369,8 +406,8 @@ class Collection(object):
 		
 		item = self.post(_method, options, item)
 		
-		self.entity.hooks.trigger_post('update', item, options)
-		self.hooks.trigger_post('update', item, options)
+		self.entity.hooks.trigger_post('update', item, options.context)
+		self.hooks.trigger_post('update', item, options.context)
 		
 		return item
 		
@@ -380,41 +417,41 @@ class Collection(object):
 		
 		
 	def delete(self, id, **kwargs):
-		options = self.base_options_processor.process(kwargs)
+		options = self.options_factory.create(kwargs)
 		
-		if not options['bypass_authorization']:
-			self.rules.enforce_non_item_rules(DELETE, options['context'])
+		if not options.bypass_authorization:
+			self.rules.enforce_non_item_rules(DELETE, options.context)
 		
 		item = self.storage.get_by_id(self.entity.__class__, id)
 		if item is None:
 			raise errors.NotFoundError("No %s with id '%s' was found" % (self.singular_name, id))
 		
-		if not options['bypass_authorization']:
-			self.rules.enforce_item_rules(DELETE, item, options['context'])
+		if not options.bypass_authorization:
+			self.rules.enforce_item_rules(DELETE, item, options.context)
 		
-		self.entity.hooks.trigger_pre('delete', id, options)
-		self.hooks.trigger_pre('delete', id, options)
+		self.entity.hooks.trigger_pre('delete', id, options.context)
+		self.hooks.trigger_pre('delete', id, options.context)
 		
 		self.storage.delete(self.entity.__class__, id)
 		self.post(DELETE, options)
 		
-		options['context']['item'] = item
-		self.entity.hooks.trigger_post('delete', id, options)
-		self.hooks.trigger_post('delete', id, options)
+		options.context['item'] = item
+		self.entity.hooks.trigger_post('delete', id, options.context)
+		self.hooks.trigger_post('delete', id, options.context)
 		
 		
 	def link(self, id, reference_name, **kwargs):
-		options = self.base_options_processor.process(kwargs)
+		options = self.options_factory.create(kwargs)
 		
-		if not options['bypass_authorization']:
-			self.rules.enforce_non_item_rules(GET, options['context'])
+		if not options.bypass_authorization:
+			self.rules.enforce_non_item_rules(GET, options.context)
 		
 		item = self.storage.get_by_id(self.entity.__class__, id)
 		if item is None:
 			raise errors.NotFoundError("No %s with id '%s' was found" % (self.singular_name, id))
 		
-		if not options['bypass_authorization']:
-			self.rules.enforce_item_rules(GET, item, options['context'])
+		if not options.bypass_authorization:
+			self.rules.enforce_item_rules(GET, item, options.context)
 			
 		target_collection = self.links.get(reference_name)
 		if target_collection is None:
@@ -426,7 +463,7 @@ class Collection(object):
 		
 	def resolve_link_or_reference(self, source_item, reference_name, reference_field, options):
 		"""Get the item(s) pointed to by a link or reference"""
-		options = self.list_options_processor.process(options)
+		options = self.options_factory.create(options, list=True)
 		
 		if isinstance(reference_field, Link):
 			return self.resolve_link(source_item, reference_field, options)
@@ -438,26 +475,26 @@ class Collection(object):
 		"""
 		Get the items for a single or multiple link
 		"""
-		options['filter'] = options['filter'] if options['filter'] else {}
-		options['filter'][link_field.field] = source_item['_id']
+		options.filter = options.filter if options.filter else {}
+		options.filter[link_field.field] = source_item['_id']
 		
 		if link_field.multiple:
-			self.rules.enforce_non_item_rules(LIST, options['context'])
+			self.rules.enforce_non_item_rules(LIST, options.context)
 			result = self.storage.get(self.entity.__class__, 
-							filter=options['filter'], sort=options['sort'], 
-							offset=options['offset'], limit=options['limit'],
-							count=options['count'])
-			if options['count']:
+							filter=options.filter, sort=options.sort, 
+							offset=options.offset, limit=options.limit,
+							count=options.count)
+			if options.count:
 				return result
-			self.rules.enforce_item_rules(LIST, result, options['context'])
+			self.rules.enforce_item_rules(LIST, result, options.context)
 			return self.post(LIST, options, result)
 		else:
 			try:
-				if not options['bypass_authorization']:
-					self.rules.enforce_non_item_rules(GET, options['context'])
-				item = next(iter(self.storage.get(self.entity.__class__, filter=options['filter'], limit=1)))
-				if not options['bypass_authorization']:
-					self.rules.enforce_item_rules(GET, item, options['context'])
+				if not options.bypass_authorization:
+					self.rules.enforce_non_item_rules(GET, options.context)
+				item = next(iter(self.storage.get(self.entity.__class__, filter=options.filter, limit=1)))
+				if not options.bypass_authorization:
+					self.rules.enforce_item_rules(GET, item, options.context)
 				return self.post(GET, options, item)
 			except StopIteration:
 				pass
@@ -470,21 +507,21 @@ class Collection(object):
 			return None
 		
 		if isinstance(reference_field, ListOf):
-			if not options['bypass_authorization']:
-				self.rules.enforce_non_item_rules(LIST, options['context'])
+			if not options.bypass_authorization:
+				self.rules.enforce_non_item_rules(LIST, options.context)
 			result = self.storage.get_by_ids(self.entity.__class__, reference_value,
-								filter=options['filter'], sort=options['sort'], 
-								offset=options['offset'], limit=options['limit'],
-								count=options['count'])
-			if options['count']:
+								filter=options.filter, sort=options.sort, 
+								offset=options.offset, limit=options.limit,
+								count=options.count)
+			if options.count:
 				return result
-			if not options['bypass_authorization']:
-				self.rules.enforce_item_rules(LIST, result, options['context'])
+			if not options.bypass_authorization:
+				self.rules.enforce_item_rules(LIST, result, options.context)
 			return self.post(LIST, options, result)
 		else:
-			self.rules.enforce_non_item_rules(GET, options['context'])
+			self.rules.enforce_non_item_rules(GET, options.context)
 			item = self.storage.get_by_id(self.entity.__class__, reference_value)
-			self.rules.enforce_item_rules(GET, item, options['context'])
+			self.rules.enforce_item_rules(GET, item, options.context)
 			return self.post(GET, options, item)
 		
 		
@@ -495,31 +532,32 @@ class Collection(object):
 		
 		
 	def remove_hidden_fields(self, item, options):
-		if options['show_hidden'] and options['can_show_hidden']:
-			return
-		if options['fields']:
-			for k in item.keys():
-				if k not in options['fields']:
-					item.pop(k, None)
-		else:
+		if not options.show_hidden or not options.can_show_hidden:
 			for k in self.entity.hidden_fields:
 				item.pop(k, None)
+		if options.fields is not None:
+			for k in item.keys():
+				if k not in options.fields and not k.startswith('_'):
+					item.pop(k, None)
+			
 		
 		
 	def add_embedded_references(self, item, options):
 		"""Add embedded references and links to an item"""
-		if not options['allow_embedding']:
+		if not options.allow_embedding:
 			return
 		
-		for reference_name in options['embed']:
+		entity, embed = options.get_embed_for_type(self.entity.__class__, item.get('_type', self.entity.__class__.__name__))
+		
+		for reference_name in embed:
 			referenced_collection = self.links.get(reference_name)
 			if not referenced_collection:
 				raise Exception, "No link defined in '%s' collection for embedded reference '%s'" % (self.plural_name, reference_name)
 			
-			reference_field = getattr(self.entity, reference_name)
+			reference_field = getattr(entity, reference_name)
 			
 			link_options = {
-				'context': options['context'],
+				'context': options.context,
 				'allow_embedding': False
 			}
 			
@@ -546,10 +584,10 @@ class Collection(object):
 				new_results.append(
 					self.prepare_item(item, options)
 				)
-			options['context']['item'] = result
+			options.context['item'] = result
 			return new_results
 		else:
-			options['context']['item'] = result
+			options.context['item'] = result
 			return self.prepare_item(result, options)
 		
 		

@@ -1,7 +1,7 @@
 import unittest
 from copy import deepcopy
 from mock import Mock
-from cellardoor.model import Model, Entity, Reference, Link, Text, ListOf, TypeOf
+from cellardoor.model import Model, Entity, Reference, Link, Text, ListOf, Integer, Float, Enum
 from cellardoor.collection import Collection
 from cellardoor.methods import ALL, LIST, GET, CREATE
 from cellardoor.storage import Storage
@@ -32,7 +32,7 @@ class Bar(Entity):
 	foo = Reference(Foo)
 	embedded_foo = Reference(Foo, embeddable=True)
 	bazes = ListOf(Reference('Baz'))
-	number = TypeOf(int)
+	number = Integer()
 	name = Text()
 	
 	
@@ -40,11 +40,6 @@ class Baz(Entity):
 	name = Text(required=True)
 	foo = Link(Foo, 'bazes', multiple=False)
 	embedded_foo = Link(Foo, 'bazes', multiple=False, embeddable=True, embed_by_default=False)
-	
-	
-class Hidden(Entity):
-	name = Text(hidden=True)
-	foo = TypeOf(int)
 	
 
 class FoosCollection(Collection):
@@ -61,6 +56,14 @@ class FoosCollection(Collection):
 	enabled_filters = ('stuff',)
 	enabled_sort = ('stuff',)
 	hidden_field_authorization = auth.identity.role == 'admin'
+	
+	
+class ReadOnlyFoosCollection(Collection):
+	entity = Foo
+	singular_name = 'readonly_foo'
+	method_authorization = {
+		(LIST, GET): None
+	}
 	
 	
 class BarsCollection(Collection):
@@ -92,6 +95,11 @@ class BazesCollection(Collection):
 	}
 	default_limit = 10
 	max_limit = 20
+
+
+class Hidden(Entity):
+	name = Text(hidden=True)
+	foo = Integer
 	
 	
 class HiddenCollection(Collection):
@@ -104,16 +112,35 @@ class HiddenCollection(Collection):
 		GET: auth.item.foo == 23
 	}
 	hidden_field_authorization = auth.identity.foo == 'bar'
+
+
+class Littorina(Entity):
+	size = Float()
 	
 	
-class ReadOnlyFoosCollection(Collection):
-	entity = Foo
-	singular_name = 'readonly_foo'
+class LittorinaLittorea(Littorina):
+	shell = Reference('Shell', embeddable=True)
+	
+	
+class Shell(Entity):
+	color = Enum('Brown', 'Gray', 'Really brown')
+	
+	
+class LittorinasCollection(Collection):
+	entity = Littorina
 	method_authorization = {
-		LIST: None,
-		GET: None
+		ALL: None
 	}
-		
+	links = {
+		'shell': 'ShellsCollection'
+	}
+	
+	
+class ShellsCollection(Collection):
+	entity = Shell
+	method_authorization = {
+		ALL: None
+	}
 
 storage = None
 api = None
@@ -130,7 +157,9 @@ class CollectionTest(unittest.TestCase):
 				BarsCollection, 
 				BazesCollection, 
 				HiddenCollection, 
-				ReadOnlyFoosCollection
+				ReadOnlyFoosCollection,
+				LittorinasCollection,
+				ShellsCollection
 			),
 			storage=storage)
 		
@@ -413,6 +442,20 @@ class CollectionTest(unittest.TestCase):
 		self.assertEquals(linked_bars, bars)
 		
 		
+	def test_embed_polymorphic(self):
+		"""Collections properly embed references when fetching descendants of the collection's entity"""
+		api.littorinas.set_storage(Storage())
+		api.littorinas.storage.get = Mock(return_value=[
+			{'_id': '1', '_type':'Littorina.LittorinaLittorea', 'shell':'2'}])
+		
+		api.shells.set_storage(Storage())
+		api.shells.storage.get_by_id = Mock(return_value={'_id':'2', 'color': 'Really brown'})
+		
+		result = api.littorinas.list()
+		api.shells.storage.get_by_id.assert_called_once_with(Shell, '2')
+		self.assertEquals(result, [{'_id': '1', '_type':'Littorina.LittorinaLittorea', 'shell':{'_id':'2', 'color': 'Really brown'}}])
+		
+		
 	def test_sort_fail(self):
 		"""
 		Trying to sort by a sort-disabled field raises an error.
@@ -539,7 +582,6 @@ class CollectionTest(unittest.TestCase):
 		hooks.post('delete', post_delete)
 		
 		context = {'foo':23}
-		options = {'bypass_authorization': False, 'fields': {'optional_stuff', 'bazes', 'stuff', 'embedded_foos', 'embedded_bazes', '_id'}, 'allow_embedding': True, 'show_hidden': False, 'context': {'foo': 23}, 'embed': {'embedded_bazes'}, 'can_show_hidden': False}
 		
 		storage.create = Mock(return_value='123')
 		storage.update = Mock(return_value={'_id':'123', 'stuff':'nothings'})
@@ -547,28 +589,28 @@ class CollectionTest(unittest.TestCase):
 		storage.get_by_id = Mock(return_value={'_id':'123', 'stuff':'nothings'})
 		
 		foo = api.foos.create({'stuff':'things'}, context=context.copy())
-		create_options = deepcopy(options)
-		create_options['context']['item'] = foo
-		pre_create.assert_called_once_with({'stuff':'things'}, options)
-		post_create.assert_called_once_with(foo, create_options)
+		create_context = context.copy()
+		create_context['item'] = foo
+		pre_create.assert_called_once_with({'stuff':'things'}, context)
+		post_create.assert_called_once_with(foo, create_context)
 		
 		foo = api.foos.update(foo['_id'], {'stuff':'nothings'}, context=context.copy())
-		update_options = deepcopy(options)
-		update_options['context']['item'] = foo
-		pre_update.assert_called_with(foo['_id'], {'stuff':'nothings'}, options)
-		post_update.assert_called_with(foo, update_options)
+		update_context = context.copy()
+		update_context['item'] = foo
+		pre_update.assert_called_with(foo['_id'], {'stuff':'nothings'}, context)
+		post_update.assert_called_with(foo, update_context)
 		
 		foo = api.foos.replace(foo['_id'], {'stuff':'somethings'}, context=context.copy())
-		replace_options = deepcopy(options)
-		replace_options['context']['item'] = foo
-		pre_update.assert_called_with(foo['_id'], {'stuff':'somethings'}, options)
-		post_update.assert_called_with(foo, replace_options)
+		replace_context = context.copy()
+		replace_context['item'] = foo
+		pre_update.assert_called_with(foo['_id'], {'stuff':'somethings'}, context)
+		post_update.assert_called_with(foo, replace_context)
 		
 		api.foos.delete(foo['_id'], context=context.copy())
-		delete_options = deepcopy(options)
-		delete_options['context']['item'] = foo
-		pre_delete.assert_called_once_with(foo['_id'], options)
-		post_delete.assert_called_once_with(foo['_id'], delete_options)
+		delete_context = context.copy()
+		delete_context['item'] = foo
+		pre_delete.assert_called_once_with(foo['_id'], context)
+		post_delete.assert_called_once_with(foo['_id'], delete_context)
 		
 		
 	def test_collection_hooks(self):
@@ -586,8 +628,8 @@ class CollectionTest(unittest.TestCase):
 		hooks.post('update', post_update)
 		hooks.pre('delete', pre_delete)
 		hooks.post('delete', post_delete)
+		
 		context = {'foo':23}
-		options = {'bypass_authorization': False, 'fields': {'optional_stuff', 'bazes', 'stuff', 'embedded_foos', 'embedded_bazes', '_id'}, 'allow_embedding': True, 'show_hidden': False, 'context': {'foo': 23}, 'embed': {'embedded_bazes'}, 'can_show_hidden': False}
 		
 		storage.create = Mock(return_value='123')
 		storage.update = Mock(return_value={'_id':'123', 'stuff':'nothings'})
@@ -595,28 +637,28 @@ class CollectionTest(unittest.TestCase):
 		storage.get_by_id = Mock(return_value={'_id':'123', 'stuff':'nothings'})
 		
 		foo = api.foos.create({'stuff':'things'}, context=context.copy())
-		create_options = deepcopy(options)
-		create_options['context']['item'] = foo
-		pre_create.assert_called_once_with({'stuff':'things'}, options)
-		post_create.assert_called_once_with(foo, create_options)
+		create_context = context.copy()
+		create_context['item'] = foo
+		pre_create.assert_called_once_with({'stuff':'things'}, context)
+		post_create.assert_called_once_with(foo, create_context)
 		
 		foo = api.foos.update(foo['_id'], {'stuff':'nothings'}, context=context.copy())
-		update_options = deepcopy(options)
-		update_options['context']['item'] = foo
-		pre_update.assert_called_with(foo['_id'], {'stuff':'nothings'}, options)
-		post_update.assert_called_with(foo, update_options)
+		update_context = context.copy()
+		update_context['item'] = foo
+		pre_update.assert_called_with(foo['_id'], {'stuff':'nothings'}, context)
+		post_update.assert_called_with(foo, update_context)
 		
 		foo = api.foos.replace(foo['_id'], {'stuff':'somethings'}, context=context.copy())
-		replace_options = deepcopy(options)
-		replace_options['context']['item'] = foo
-		pre_update.assert_called_with(foo['_id'], {'stuff':'somethings'}, options)
-		post_update.assert_called_with(foo, replace_options)
+		replace_context = context.copy()
+		replace_context['item'] = foo
+		pre_update.assert_called_with(foo['_id'], {'stuff':'somethings'}, context)
+		post_update.assert_called_with(foo, replace_context)
 		
 		api.foos.delete(foo['_id'], context=context.copy())
-		delete_options = deepcopy(options)
-		delete_options['context']['item'] = foo
-		pre_delete.assert_called_once_with(foo['_id'], options)
-		post_delete.assert_called_once_with(foo['_id'], delete_options)
+		delete_context = context.copy()
+		delete_context['item'] = foo
+		pre_delete.assert_called_once_with(foo['_id'], context)
+		post_delete.assert_called_once_with(foo['_id'], delete_context)
 		
 		
 	def test_disabled_method(self):

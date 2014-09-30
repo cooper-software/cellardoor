@@ -713,7 +713,11 @@ class EntityMeta(type):
         all_attrs.update(attrs)
         
         for k,v in all_attrs.items():
+            if isinstance(v,type) and issubclass(v, Field):
+                v = v()
             if isinstance(v, Field):
+                if k.startswith('_'):
+                    raise Exception, "Fields starting with '_' are reserved."
                 fields[k] = v
                 if v.hidden:
                     hidden_fields.add(k)
@@ -753,9 +757,15 @@ class EntityMeta(type):
         
         attrs['visible_fields'] = set(attrs['fields'].keys()).difference(attrs['hidden_fields'])
         attrs['validator'] = Compound(**fields)
+        attrs['children'] = []
         
         new_cls = super(EntityMeta, cls).__new__(cls, name, bases, attrs)
+        
+        for b in new_cls.hierarchy:
+            b.children.append(new_cls)
+        
         new_cls.hierarchy.append(new_cls)
+        
         return new_cls
         
         
