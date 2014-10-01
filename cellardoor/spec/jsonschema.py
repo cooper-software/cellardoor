@@ -16,13 +16,12 @@ class EntitySerializer(object):
 			if v.required:
 				required_props.append(k)
 		definition =  {
-			'properties': props
+			'title': entity.__class__.__name__,
+			'properties': props,
+			'links': self.get_links(entity)
 		}
 		if required_props:
 			definition['required'] = required_props
-		links = self.get_links(entity)
-		if links:
-			definition['links'] = links
 		return definition
 			
 			
@@ -35,11 +34,14 @@ class EntitySerializer(object):
 					'href': '#/definitions/%s' % parent.__name__
 				}
 			}
+		else:
+			return {}
 			
 			
 	def get_property(self, field):
 		prop = {}
 		prop['default'] = field.default
+		prop['format'] = field.__class__.__name__
 		if field.help:
 			prop['description'] = field.help
 		type_name = field.__class__.__name__
@@ -64,11 +66,6 @@ class EntitySerializer(object):
 			prop['minLength'] = field.minlength
 		if field.regex:
 			prop['pattern'] = field.regex.pattern
-			
-			
-	def handle_HTML(self, field, prop):
-		self.handle_Text(field, prop)
-		prop['format'] = 'html'
 		
 		
 	def handle_Integer(self, field, prop):
@@ -86,18 +83,15 @@ class EntitySerializer(object):
 		
 	def handle_DateTime(self, field, prop):
 		prop['type'] = 'string'
-		prop['format'] = 'date-time'
 		
 		
 	def handle_Email(self, field, prop):
 		self.handle_Text(field, prop)
-		prop['format'] = 'email'
 		del prop['pattern']
 		
 		
 	def handle_URL(self, field, prop):
 		self.handle_Text(field, prop)
-		prop['format'] = 'uri'
 		del prop['pattern']
 		
 		
@@ -120,7 +114,7 @@ class EntitySerializer(object):
 		
 	def handle_Reference(self, field, prop):
 		self.handle_Text(field, prop)
-		prop['format'] = 'reference'
+		prop['format'] = 'Reference'
 		prop['schema'] = '#/definitions/%s' % field.entity.__name__
 		
 		
@@ -170,6 +164,12 @@ class APISerializer(object):
 		
 		resources = {}
 		for collection in api.collections:
+			entity_links = definitions[collection.entity.__class__.__name__]['links']
+			if 'resource' not in entity_links:
+				entity_links['resource'] = {
+					'rel': 'resource',
+					'href': '#/properties/%s' % collection.plural_name
+				}
 			resources[collection.plural_name] = self.get_resource_schema(collection)
 		
 		return {
@@ -192,6 +192,7 @@ class APISerializer(object):
 				links['link-%s' % k] = self.get_link_link(collection, k, v)
 		
 		return {
+			"title": collection.plural_name,
 			"links": links
 		}
 		

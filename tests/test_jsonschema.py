@@ -30,47 +30,56 @@ field_schema = {
 		'properties': {
 			'foo': {
 				'type': 'string',
-				'default': None
+				'default': None,
+				'format': 'Text'
 			}
 		},
-		'default': None
+		'default': None,
+		'format': 'Compound'
 	},
 	'b': {
 		'type': 'string',
 		'minLength': 100,
 		'maxLength': 5000,
 		'pattern': '^b',
-		'default': None
+		'default': None,
+		'format': 'Text'
 	},
 	'c': {
 		'type': 'string',
 		'description': 'Some stuff',
 		'format': 'html',
-		'default': None
+		'default': None,
+		'format': 'HTML'
 	},
 	'd': {
 		'type': 'string',
 		'format': 'email',
-		'default': None
+		'default': None,
+		'format': 'Email'
 	},
 	'e': {
 		'type': 'string',
 		'format': 'date-time',
-		'default': None
+		'default': None,
+		'format': 'DateTime'
 	},
 	'f': {
 		'type': 'boolean',
-		'default': None
+		'default': None,
+		'format': 'Boolean'
 	},
 	'g': {
 		'type': 'number',
 		'minimum': 5.331,
 		'maximum': 7.2,
-		'default': None
+		'default': None,
+		'format': 'Float'
 	},
 	'h': {
 		'type': 'integer',
-		'default': None
+		'default': None,
+		'format': 'Integer'
 	},
 	'i': {
 		'type': 'array',
@@ -81,7 +90,8 @@ field_schema = {
 			'maxItems': 4,
 			'minItems': 4
 		},
-		'default': None
+		'default': None,
+		'format': 'BoundingBox'
 	},
 	'j': {
 		'type': 'array',
@@ -92,41 +102,49 @@ field_schema = {
 			'maxItems': 2,
 			'minItems': 2
 		},
-		'default': None
+		'default': None,
+		'format': 'LatLng'
 	},
 	'k': {
 		'enum': ('a', 'b', 'c'),
-		'default': 'c'
+		'default': 'c',
+		'format': 'Enum'
 	},
 	'm': {
 		'type': 'string',
 		'format': 'uri',
-		'default': None
+		'default': None,
+		'format': 'URL'
 	},
 	'n': {
 		'anyOf': [
 			{
 				'type': 'integer',
-				'default': None
+				'default': None,
+				'format': 'Integer'
 			},
 			{
 				'type': 'number',
-				'default': None
+				'default': None,
+				'format': 'Float'
 			}
 		],
-		'default': None
+		'default': None,
+		'format': 'OneOf'
 	},
 	'o': {
 		'type': 'array',
 		'items': {
 			'type': 'string',
-			'default': None
+			'default': None,
+			'format': 'Text'
 		},
-		'default': []
+		'default': [],
+		'format': 'ListOf'
 	},
 	'p': {
 		'type': 'string',
-		'format': 'reference',
+		'format': 'Reference',
 		'schema': '#/definitions/Bar',
 		'default': None
 	}
