@@ -145,7 +145,7 @@ class Resource(object):
 	def get_fields_from_request(self, req):
 		"""Unserializes the request body based on the request's content type"""
 		for serializer in self.accept_serializers:
-			if serializer.mimetype == req.content_type:
+			if req.content_type.startswith( serializer.mimetype ):
 				try:
 					return serializer.unserialize(req.stream)
 				except Exception:
