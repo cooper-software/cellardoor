@@ -16,7 +16,7 @@ class EntitySerializer(object):
 			if v.required:
 				required_props.append(k)
 		definition =  {
-			'title': entity.__class__.__name__,
+			'title': entity.__name__,
 			'properties': props,
 			'links': self.get_links(entity)
 		}

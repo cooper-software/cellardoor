@@ -136,7 +136,7 @@ class OptionsFactory(object):
 		if not options['filter'] or options['bypass_authorization']:
 			return
 		if not self.enabled_filters:
-			raise CompoundValidationError({'filter':'Filtering is disabled.'})
+			raise errors.CompoundValidationError({'filter':'Filtering is disabled.'})
 		if options['can_show_hidden']:
 			allowed_fields = self.enabled_filters
 		else:
