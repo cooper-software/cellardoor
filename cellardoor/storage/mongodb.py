@@ -131,7 +131,7 @@ class MongoDBStorage(Storage):
 		obj_id = self._objectid(id)
 		current_doc = collection.find_one(obj_id)
 		
-		if not current_doc and not replace:
+		if not current_doc:
 			return None
 				
 		if current_doc['_version'] != current_version:
