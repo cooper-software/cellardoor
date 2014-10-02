@@ -775,6 +775,17 @@ class TestCompoundField(unittest.TestCase):
         self.assertEquals(result, obj)
         
         
+    def test_not_required_omitted(self):
+        """
+        When not enforcing required params, omit fields with a default 
+        value that are not in the fields to be validated.
+        """
+        field = Compound(bar=Text(required=True), baz=Integer(default=123), qux=Text())
+        obj = {'qux':'quiggle'}
+        result = field.validate(obj, enforce_required=False)
+        self.assertEquals(result, obj)
+        
+        
         
 class TestAnything(unittest.TestCase):
     

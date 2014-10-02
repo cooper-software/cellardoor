@@ -595,7 +595,7 @@ class Compound(Field):
                 if v.required and self.enforce_required:
                     errors[k] = 'This field is required.'
                     continue
-                else:
+                elif self.enforce_required:
                     unvalidated_value = v.default
             if unvalidated_value is not None and unvalidated_value != []:
                 try:
