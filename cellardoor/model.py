@@ -281,6 +281,7 @@ class Range(Field):
             raise ValidationError(self.TOO_SMALL % self.str_value(self.min))
         if self.max and self.max < value:
             raise ValidationError(self.TOO_BIG % self.str_value(self.max))
+        return value
             
             
     def str_value(self, value):
