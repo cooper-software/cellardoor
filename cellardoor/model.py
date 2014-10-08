@@ -624,13 +624,13 @@ class Timestamped(EntityMixin):
         self.hooks.pre('update', self.on_modify)
         
         
-    def on_create(self, fields):
+    def on_create(self, fields, *args, **kwargs):
         now = datetime.utcnow()
         fields['created'] = now
         fields['modified'] = now
         
         
-    def on_modify(self, id, fields, replace=False):
+    def on_modify(self, id, fields, *args, **kwargs):
         fields['modified'] = datetime.utcnow()
         
         
