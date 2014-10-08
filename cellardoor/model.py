@@ -243,13 +243,15 @@ class Boolean(Field):
     """
     NOT_BOOL = "Not a boolean"
     
+    true = {"true", "1", "yes"}
+    false = {"false", "0", "no", ""}
     
     def _validate(self, value):
         if isinstance(value, basestring):
             v = value.lower()
-            if v in ["true", "1", "yes"]:
+            if v in self.true:
                 return True
-            elif v in ["false", "0", "no"]:
+            elif v in self.false:
                 return False
             else:
                 raise ValidationError(self.NOT_BOOL)
