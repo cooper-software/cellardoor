@@ -71,6 +71,7 @@ class EntityMeta(type):
         hierarchy = []
         all_attrs = {}
         entity_base_found = False
+        mixins = set(attrs.get('mixins', []))
         for b in bases:
             if issubclass(b, Entity):
                 if entity_base_found:
@@ -78,13 +79,16 @@ class EntityMeta(type):
                 entity_base_found = True
                 if b != Entity:
                     hierarchy = list(b.hierarchy)
+                    if hasattr(b, 'mixins'):
+                        mixins.update(b.mixins)
         attrs['hierarchy'] = hierarchy
         
         attrs['hooks'] = EventManager('create', 'update', 'delete')
-        mixins = attrs.get('mixins')
         
         if mixins:
             for m in mixins:
+                if inspect.isclass(m):
+                    m = m()
                 for k,v in inspect.getmembers(m):
                     if k not in attrs and isinstance(v, (Field, Reference, Link)):
                         attrs[k] = v

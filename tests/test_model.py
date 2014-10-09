@@ -159,6 +159,54 @@ class TestEntity(unittest.TestCase):
         self.assertEquals(fields['foo'], 123)
         
         
+    def test_inherited_mixins(self):
+        """Mixin fields should be inherited"""
+        
+        class Fooable(object):
+            foo = Text()
+            
+            
+        class Barable(object):
+            bar = Text()
+            
+            
+        class Thing(Entity):
+            mixins = (Fooable,)
+            
+            
+        class SpecificThing(Thing):
+            mixins = (Barable,)
+            
+        st = SpecificThing()
+        self.assertTrue(hasattr(st, 'foo'))
+        self.assertTrue(hasattr(st, 'bar'))
+        
+        
+    def test_inherited_mixins(self):
+        """Mixin hooks should be inherited"""
+        
+        class Fooable(object):
+            def on_pre_create(self, fields):
+                fields['foo'] = 1
+            
+        class Barable(object):
+            def on_pre_create(self, fields):
+                fields['bar'] = 1
+            
+            
+        class Thing(Entity):
+            mixins = (Fooable,)
+            
+            
+        class SpecificThing(Thing):
+            mixins = (Barable,)
+            
+        st = SpecificThing()
+        fields = {}
+        st.hooks.trigger_pre('create', fields)
+        self.assertEquals(fields, {'foo':1, 'bar':1})
+        
+        
         
 class TestModel(unittest.TestCase):
     
