@@ -30,13 +30,12 @@ setup(
     url='http://github.com/cooper-software/cellardoor',
     license='MIT',
     packages=find_packages(exclude=['tests']),
-    install_requires=['falcon'],
-    extras_require={
-        'mongo_storage': ['pymongo'],
-        'timelib_parsing': ['timelib'],
-        'dateutil_parsing': ['python-dateutil'],
-        'msgpack': ['msgpack-python']
-    },
+    install_requires=[
+        'falcon',
+        'pymongo',
+        'timelib',
+        'msgpack-python'
+    ],
     tests_require=[
         'mock',
         'nose', 

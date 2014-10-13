@@ -5,6 +5,7 @@ import logging
 from ..methods import LIST, CREATE, GET, REPLACE, UPDATE, DELETE, get_http_methods
 from ..serializers import JSONSerializer, MsgPackSerializer
 from ..views import View
+from ..views.minimal import MinimalView
 from .. import errors
 
 __all__ = ['add_to_falcon']
@@ -302,7 +303,7 @@ def duplicate_field_error(views, exc, req, resp, params):
 	resp.status = falcon.HTTP_400
 		
 		
-def add_to_falcon(falcon_api, cellardoor_api, views):
+def add_to_falcon(falcon_api, cellardoor_api, views=(MinimalView,)):
 	views_by_type = []
 	
 	for v in views:
