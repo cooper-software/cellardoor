@@ -80,10 +80,11 @@ class OptionsFactory(object):
 		
 		
 	def create(self, options_dict, list=False):
+		copied_options_dict = deepcopy(options_dict)
 		if list:
-			return ListOptions( self.process_list(options_dict) )
+			return ListOptions( self.process_list(copied_options_dict) )
 		else:
-			return BaseOptions( self.process(options_dict) )
+			return BaseOptions( self.process(copied_options_dict) )
 			
 	
 	def process(self, options):
@@ -104,7 +105,7 @@ class OptionsFactory(object):
 		else:
 			new_options['can_show_hidden'] = self.can_show_hidden(new_options['context'])
 		
-		return deepcopy(new_options)
+		return new_options
 			
 			
 	def can_show_hidden(self, context):
