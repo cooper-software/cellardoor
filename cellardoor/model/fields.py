@@ -593,7 +593,7 @@ class Compound(Field):
         
         for k,v in self.fields.items():
             unvalidated_value = value.get(k)
-            if unvalidated_value is None or unvalidated_value == []:
+            if unvalidated_value is None or unvalidated_value == '' or unvalidated_value == []:
                 if v.required and self.enforce_required:
                     errors[k] = 'This field is required.'
                     continue
