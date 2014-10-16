@@ -104,7 +104,7 @@ class OptionsFactory(object):
 		else:
 			new_options['can_show_hidden'] = self.can_show_hidden(new_options['context'])
 		
-		return new_options
+		return deepcopy(new_options)
 			
 			
 	def can_show_hidden(self, context):
