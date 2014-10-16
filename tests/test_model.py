@@ -56,6 +56,59 @@ class TestEntity(unittest.TestCase):
         f.hooks.post('delete', lambda x: x)
         
         
+    def test_default_hooks(self):
+        """
+        on_* methods the entity defines are automatically registered as hooks
+        """
+        class Foo(Entity):
+            
+            def __init__(self, *args, **kwargs):
+                super(Foo, self).__init__(*args, **kwargs)
+                self.called_hook = None
+            
+            def on_pre_create(self, *args, **kwargs):
+                self.called_hook = 'pre_create'
+                
+            def on_post_create(self, *args, **kwargs):
+                self.called_hook = 'post_create'
+                
+            def on_pre_update(self, *args, **kwargs):
+                self.called_hook = 'pre_update'
+                
+            def on_post_update(self, *args, **kwargs):
+                self.called_hook = 'post_update'
+                
+            def on_pre_delete(self, *args, **kwargs):
+                self.called_hook = 'pre_delete'
+                
+            def on_post_delete(self, *args, **kwargs):
+                self.called_hook = 'post_delete'
+        
+        foo1 = Foo()
+        foo1.hooks.trigger_pre('create')
+        self.assertEquals(foo1.called_hook, 'pre_create')
+        
+        foo2 = Foo()
+        foo2.hooks.trigger_post('create')
+        self.assertEquals(foo2.called_hook, 'post_create')
+        
+        foo3 = Foo()
+        foo3.hooks.trigger_pre('update')
+        self.assertEquals(foo3.called_hook, 'pre_update')
+        
+        foo4 = Foo()
+        foo4.hooks.trigger_post('update')
+        self.assertEquals(foo4.called_hook, 'post_update')
+        
+        foo5 = Foo()
+        foo5.hooks.trigger_pre('delete')
+        self.assertEquals(foo5.called_hook, 'pre_delete')
+        
+        foo6 = Foo()
+        foo6.hooks.trigger_post('delete')
+        self.assertEquals(foo6.called_hook, 'post_delete')
+        
+        
     def test_multiple_inheritance_fail(self):
         """
         Raises an error when extending more than one Entity

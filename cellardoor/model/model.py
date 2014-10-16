@@ -166,7 +166,15 @@ class Entity(object):
     __metaclass__ = EntityMeta
     
     versioned = False
-                
+    
+    def __init__(self):
+        for k,v in inspect.getmembers(self):
+            if k.startswith('on_pre_') or k.startswith('on_post_'):
+                parts = k.split('_')
+                when, event = parts[1], '_'.join(parts[2:])
+                getattr(self.hooks, when)(event, v)
+        
+    
     def is_multiple_link(self, link):
         if isinstance(link, ListOf) or isinstance(link, Link) and link.multiple:
             return True
