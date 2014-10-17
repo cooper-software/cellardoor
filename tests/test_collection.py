@@ -539,7 +539,7 @@ class CollectionTest(unittest.TestCase):
 		storage.check_filter = Mock(side_effect=errors.DisabledFieldError)
 		with self.assertRaises(errors.DisabledFieldError):
 			api.hiddens.list(filter={'name':'zoomy'}, context={'identity':{}})
-		storage.check_filter.assert_called_once_with({'name':'zoomy'}, set(), {'identity': {}})
+		storage.check_filter.assert_called_once_with({'name':'zoomy'}, set(['_type', '_id']), {'identity': {}})
 		
 		
 	def test_hidden_filter_authorized(self):
@@ -547,7 +547,7 @@ class CollectionTest(unittest.TestCase):
 		storage.check_filter = Mock(return_value=None)
 		storage.get = Mock(return_value=[])
 		api.hiddens.list(filter={'name':'zoomy'}, context={'identity':{'foo':'bar'}})
-		storage.check_filter.assert_called_once_with({'name':'zoomy'}, set(['name']),  {'item': [], 'identity': {'foo': 'bar'}})
+		storage.check_filter.assert_called_once_with({'name':'zoomy'}, set(['name', '_type', '_id']),  {'item': [], 'identity': {'foo': 'bar'}})
 		
 		
 	def test_hidden_sort_fail(self):

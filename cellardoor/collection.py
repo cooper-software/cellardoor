@@ -78,6 +78,9 @@ class OptionsFactory(object):
 		self.default_limit = default_limit
 		self.max_limit = max_limit
 		
+		self.enabled_filters.update(('_id', '_type'))
+		self.enabled_filters_no_hidden.update(('_id', '_type'))
+		
 		
 	def create(self, options_dict, list=False):
 		copied_options_dict = deepcopy(options_dict)
