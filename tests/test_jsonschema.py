@@ -106,7 +106,7 @@ field_schema = {
 		'format': 'LatLng'
 	},
 	'k': {
-		'enum': ('a', 'b', 'c'),
+		'enum': tuple(set(('a', 'b', 'c'))),
 		'default': 'c',
 		'format': 'Enum'
 	},

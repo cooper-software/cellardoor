@@ -422,7 +422,7 @@ class Enum(Field):
     
     def __init__(self, *values, **kwargs):
         super(Enum, self).__init__(**kwargs)
-        self.values = values
+        self.values = set(values)
     
     
     def _validate(self, value):

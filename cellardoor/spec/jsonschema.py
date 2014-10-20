@@ -100,7 +100,7 @@ class EntitySerializer(object):
 		
 		
 	def handle_Enum(self, field, prop):
-		prop['enum'] = field.values
+		prop['enum'] = tuple(field.values)
 		
 		
 	def handle_ListOf(self, field, prop):
