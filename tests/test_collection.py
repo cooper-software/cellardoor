@@ -169,7 +169,7 @@ class CollectionTest(unittest.TestCase):
 		Fails if the request fields don't pass validation.
 		"""
 		with self.assertRaises(errors.CompoundValidationError):
-			api.foos.create({})
+			api.collections['foos'].create({})
 	
 	
 	def test_create_succeed(self):
@@ -178,7 +178,7 @@ class CollectionTest(unittest.TestCase):
 		"""
 		foo_id = 123
 		storage.create = CopyingMock(return_value=foo_id)
-		foo = api.foos.create({'stuff':'foo'})
+		foo = api.collections['foos'].create({'stuff':'foo'})
 		storage.create.assert_called_once_with(Foo, {'stuff':'foo'})
 		self.assertEquals(foo, {'_id':foo_id, 'stuff':'foo'})
 		
@@ -195,7 +195,7 @@ class CollectionTest(unittest.TestCase):
 			)
 		
 		storage.get = CopyingMock(return_value=saved_foos)
-		fetched_foos = api.foos.list()
+		fetched_foos = api.collections['foos'].list()
 		storage.get.assert_called_once_with(Foo, sort=(), filter=None, limit=0, offset=0, count=False)
 		self.assertEquals(fetched_foos, saved_foos)
 		
@@ -206,7 +206,7 @@ class CollectionTest(unittest.TestCase):
 		"""
 		foo = {'_id':123, 'stuff':'foo'}
 		storage.get_by_id = CopyingMock(return_value=foo)
-		fetched_foo = api.foos.get(foo['_id'])
+		fetched_foo = api.collections['foos'].get(foo['_id'])
 		storage.get_by_id.assert_called_once_with(Foo, foo['_id'])
 		self.assertEquals(fetched_foo, foo)
 		
@@ -217,7 +217,7 @@ class CollectionTest(unittest.TestCase):
 		"""
 		storage.get_by_id = Mock(return_value=None)
 		with self.assertRaises(errors.NotFoundError):
-			api.foos.get(123)
+			api.collections['foos'].get(123)
 		
 		
 	def test_update(self):
@@ -226,7 +226,7 @@ class CollectionTest(unittest.TestCase):
 		"""
 		foo = {'_id':123, 'stuff':'baz'}
 		storage.update = Mock(return_value=foo)
-		updated_foo = api.foos.update(123, {'stuff':'baz'})
+		updated_foo = api.collections['foos'].update(123, {'stuff':'baz'})
 		storage.update.assert_called_once_with(Foo, 123, {'stuff':'baz'}, replace=False)
 		self.assertEquals(updated_foo, foo)
 		
@@ -237,7 +237,7 @@ class CollectionTest(unittest.TestCase):
 		"""
 		storage.update = Mock(return_value=None)
 		with self.assertRaises(errors.NotFoundError):
-			api.foos.update(123, {})
+			api.collections['foos'].update(123, {})
 		
 		
 	def test_replace(self):
@@ -246,7 +246,7 @@ class CollectionTest(unittest.TestCase):
 		"""
 		foo = {'_id':123, 'stuff':'baz'}
 		storage.update = Mock(return_value=foo)
-		updated_foo = api.foos.replace(123, {'stuff':'baz'})
+		updated_foo = api.collections['foos'].replace(123, {'stuff':'baz'})
 		storage.update.assert_called_once_with(Foo, 123, {'stuff':'baz'}, replace=True)
 		self.assertEquals(updated_foo, foo)
 		
@@ -257,7 +257,7 @@ class CollectionTest(unittest.TestCase):
 		"""
 		storage.update = Mock(return_value=None)
 		with self.assertRaises(errors.NotFoundError):
-			api.foos.replace(123, {'stuff':'foo'})
+			api.collections['foos'].replace(123, {'stuff':'foo'})
 		
 		
 	def test_delete_nonexistent(self):
@@ -266,7 +266,7 @@ class CollectionTest(unittest.TestCase):
 		"""
 		storage.get_by_id = Mock(return_value=None)
 		with self.assertRaises(errors.NotFoundError):
-			api.foos.delete(123)
+			api.collections['foos'].delete(123)
 		
 		
 	def test_delete(self):
@@ -275,7 +275,7 @@ class CollectionTest(unittest.TestCase):
 		"""
 		storage.get_by_id = Mock({'_id':123, 'stuff':'foo'})
 		storage.delete = Mock(return_value=None)
-		api.foos.delete(123)
+		api.collections['foos'].delete(123)
 		storage.get_by_id.assert_called_once_with(Foo, 123)
 		storage.delete.assert_called_once_with(Foo, 123)
 		
@@ -286,7 +286,7 @@ class CollectionTest(unittest.TestCase):
 		"""
 		storage.get_by_id = Mock(return_value=None)
 		with self.assertRaises(errors.CompoundValidationError):
-			bar = api.bars.create({'foo':'123'})
+			bar = api.collections['bars'].create({'foo':'123'})
 		
 		
 	def test_single_reference(self):
@@ -296,15 +296,15 @@ class CollectionTest(unittest.TestCase):
 		foo = {'_id':'123', 'stuff':'foo'}
 		bar = {'_id':'321', 'foo':'123'}
 		
-		api.foos.storage = Storage()
-		api.bars.storage = Storage()
-		api.foos.storage.get_by_id = Mock(return_value=foo)
-		api.bars.storage.get_by_id = Mock(return_value=bar)
+		api.collections['foos'].storage = Storage()
+		api.collections['bars'].storage = Storage()
+		api.collections['foos'].storage.get_by_id = Mock(return_value=foo)
+		api.collections['bars'].storage.get_by_id = Mock(return_value=bar)
 		
-		linked_foo = api.bars.link('321', 'foo')
+		linked_foo = api.collections['bars'].link('321', 'foo')
 		self.assertEquals(linked_foo, foo)
-		api.bars.storage.get_by_id.assert_called_once_with(Bar, '321')
-		api.foos.storage.get_by_id.assert_called_once_with(Foo, '123')
+		api.collections['bars'].storage.get_by_id.assert_called_once_with(Bar, '321')
+		api.collections['foos'].storage.get_by_id.assert_called_once_with(Foo, '123')
 		
 		
 	def test_single_reference_get_embedded(self):
@@ -315,12 +315,12 @@ class CollectionTest(unittest.TestCase):
 		foo = {'_id':'123', 'stuff':'foo'}
 		bar = {'_id':'321', 'embedded_foo':'123'}
 		
-		api.foos.storage = Storage()
-		api.bars.storage = Storage()
-		api.foos.storage.get_by_id = Mock(return_value=foo)
-		api.bars.storage.get_by_id = Mock(return_value=bar)
+		api.collections['foos'].storage = Storage()
+		api.collections['bars'].storage = Storage()
+		api.collections['foos'].storage.get_by_id = Mock(return_value=foo)
+		api.collections['bars'].storage.get_by_id = Mock(return_value=bar)
 		
-		bar = api.bars.get('321')
+		bar = api.collections['bars'].get('321')
 		self.assertEquals(bar['embedded_foo'], foo)
 		
 		
@@ -337,16 +337,16 @@ class CollectionTest(unittest.TestCase):
 			
 		foo = {'_id':'123', 'bazes':baz_ids}
 		
-		api.foos.set_storage(Storage())
-		api.bazes.set_storage(Storage())
-		api.foos.storage.get_by_id = Mock(return_value=foo)
-		api.foos.storage.check_filter = Mock(return_value=None)
-		api.bazes.storage.get_by_ids = Mock(return_value=created_bazes)
-		api.bazes.storage.check_filter = Mock(return_value=None)
+		api.collections['foos'].set_storage(Storage())
+		api.collections['bazes'].set_storage(Storage())
+		api.collections['foos'].storage.get_by_id = Mock(return_value=foo)
+		api.collections['foos'].storage.check_filter = Mock(return_value=None)
+		api.collections['bazes'].storage.get_by_ids = Mock(return_value=created_bazes)
+		api.collections['bazes'].storage.check_filter = Mock(return_value=None)
 		
-		linked_bazes = api.foos.link(foo['_id'], 'bazes', sort=('+name',), filter={'name':'foo'}, offset=10, limit=20)
+		linked_bazes = api.collections['foos'].link(foo['_id'], 'bazes', sort=('+name',), filter={'name':'foo'}, offset=10, limit=20)
 		self.assertEquals(linked_bazes, created_bazes)
-		api.bazes.storage.get_by_ids.assert_called_once_with(Baz, baz_ids, sort=('+name',), filter={'name':'foo'}, offset=10, limit=20, count=False)
+		api.collections['bazes'].storage.get_by_ids.assert_called_once_with(Baz, baz_ids, sort=('+name',), filter={'name':'foo'}, offset=10, limit=20, count=False)
 		
 		
 	def test_multiple_reference_get_embedded(self):
@@ -362,12 +362,12 @@ class CollectionTest(unittest.TestCase):
 			
 		foo = {'_id':'123', 'embedded_bazes':baz_ids}
 		
-		api.foos.storage = Storage()
-		api.bazes.storage = Storage()
-		api.foos.storage.get_by_id = Mock(return_value=foo)
-		api.bazes.storage.get_by_ids = Mock(return_value=created_bazes)
+		api.collections['foos'].storage = Storage()
+		api.collections['bazes'].storage = Storage()
+		api.collections['foos'].storage.get_by_id = Mock(return_value=foo)
+		api.collections['bazes'].storage.get_by_ids = Mock(return_value=created_bazes)
 		
-		fetched_foo = api.foos.get(foo['_id'])
+		fetched_foo = api.collections['foos'].get(foo['_id'])
 		self.assertEquals(fetched_foo['embedded_bazes'], created_bazes)
 		
 		
@@ -384,14 +384,14 @@ class CollectionTest(unittest.TestCase):
 			
 		foo = {'_id':'123', 'bazes':baz_ids}
 		
-		api.foos.storage = Storage()
-		api.bazes.storage = Storage()
-		api.foos.storage.get = Mock(return_value=[foo])
-		api.bazes.storage.get_by_id = Mock(return_value=created_bazes[0])
+		api.collections['foos'].storage = Storage()
+		api.collections['bazes'].storage = Storage()
+		api.collections['foos'].storage.get = Mock(return_value=[foo])
+		api.collections['bazes'].storage.get_by_id = Mock(return_value=created_bazes[0])
 		
-		linked_foo = api.bazes.link(baz_ids[0], 'foo')
-		api.bazes.storage.get_by_id.assert_called_once_with(Baz, baz_ids[0])
-		api.foos.storage.get.assert_called_once_with(Foo, filter={'bazes':baz_ids[0]}, limit=1)
+		linked_foo = api.collections['bazes'].link(baz_ids[0], 'foo')
+		api.collections['bazes'].storage.get_by_id.assert_called_once_with(Baz, baz_ids[0])
+		api.collections['foos'].storage.get.assert_called_once_with(Foo, filter={'bazes':baz_ids[0]}, limit=1)
 		self.assertEquals(linked_foo, foo)
 		
 		
@@ -408,12 +408,12 @@ class CollectionTest(unittest.TestCase):
 			
 		foo = {'_id':'123', 'bazes':baz_ids}
 		
-		api.foos.storage = Storage()
-		api.bazes.storage = Storage()
-		api.foos.storage.get = Mock(return_value=[foo])
-		api.bazes.storage.get_by_id = Mock(return_value=created_bazes[0])
+		api.collections['foos'].storage = Storage()
+		api.collections['bazes'].storage = Storage()
+		api.collections['foos'].storage.get = Mock(return_value=[foo])
+		api.collections['bazes'].storage.get_by_id = Mock(return_value=created_bazes[0])
 		
-		baz = api.bazes.get(baz_ids[0], embed=('embedded_foo',))
+		baz = api.collections['bazes'].get(baz_ids[0], embed=('embedded_foo',))
 		self.assertEquals(baz['embedded_foo'], foo)
 		
 		
@@ -430,29 +430,29 @@ class CollectionTest(unittest.TestCase):
 			bars.append(bar)
 			bar_ids.append(bar['_id'])
 		
-		api.foos.set_storage(Storage())
-		api.bars.set_storage(Storage())
-		api.foos.storage.get_by_id = Mock(return_value=foo)
-		api.bars.storage.get = Mock(return_value=bars)
-		api.bars.storage.check_filter = Mock(return_value=None)
+		api.collections['foos'].set_storage(Storage())
+		api.collections['bars'].set_storage(Storage())
+		api.collections['foos'].storage.get_by_id = Mock(return_value=foo)
+		api.collections['bars'].storage.get = Mock(return_value=bars)
+		api.collections['bars'].storage.check_filter = Mock(return_value=None)
 		
-		linked_bars = api.foos.link(foo['_id'], 'bars', sort=('-name',), filter={'number':'7'}, limit=10, offset=20)
-		api.foos.storage.get_by_id.assert_called_once_with(Foo, foo['_id'])
-		api.bars.storage.get.assert_called_once_with(Bar, sort=('-name',), filter={'foo': '123', 'number':'7'}, limit=10, offset=20, count=False)
+		linked_bars = api.collections['foos'].link(foo['_id'], 'bars', sort=('-name',), filter={'number':'7'}, limit=10, offset=20)
+		api.collections['foos'].storage.get_by_id.assert_called_once_with(Foo, foo['_id'])
+		api.collections['bars'].storage.get.assert_called_once_with(Bar, sort=('-name',), filter={'foo': '123', 'number':'7'}, limit=10, offset=20, count=False)
 		self.assertEquals(linked_bars, bars)
 		
 		
 	def test_embed_polymorphic(self):
 		"""Collections properly embed references when fetching descendants of the collection's entity"""
-		api.littorinas.set_storage(Storage())
-		api.littorinas.storage.get = Mock(return_value=[
+		api.collections['littorinas'].set_storage(Storage())
+		api.collections['littorinas'].storage.get = Mock(return_value=[
 			{'_id': '1', '_type':'Littorina.LittorinaLittorea', 'shell':'2'}])
 		
-		api.shells.set_storage(Storage())
-		api.shells.storage.get_by_id = Mock(return_value={'_id':'2', 'color': 'Really brown'})
+		api.collections['shells'].set_storage(Storage())
+		api.collections['shells'].storage.get_by_id = Mock(return_value={'_id':'2', 'color': 'Really brown'})
 		
-		result = api.littorinas.list()
-		api.shells.storage.get_by_id.assert_called_once_with(Shell, '2')
+		result = api.collections['littorinas'].list()
+		api.collections['shells'].storage.get_by_id.assert_called_once_with(Shell, '2')
 		self.assertEquals(result, [{'_id': '1', '_type':'Littorina.LittorinaLittorea', 'shell':{'_id':'2', 'color': 'Really brown'}}])
 		
 		
@@ -461,7 +461,7 @@ class CollectionTest(unittest.TestCase):
 		Trying to sort by a sort-disabled field raises an error.
 		"""
 		with self.assertRaises(errors.DisabledFieldError) as cm:
-			api.foos.list(sort=('+optional_stuff',))
+			api.collections['foos'].list(sort=('+optional_stuff',))
 		
 		
 	def test_sort_default(self):
@@ -469,68 +469,68 @@ class CollectionTest(unittest.TestCase):
 		If no sort is set, the default is used.
 		"""
 		storage.get = Mock(return_value=[])
-		api.bars.list()
+		api.collections['bars'].list()
 		storage.get.assert_called_once_with(Bar, sort=('+name',), filter=None, limit=0, offset=0, count=False)
 		
 		
 	def test_auth_required_not_present(self):
 		"""Raise NotAuthenticatedError if authorization requires authentication and it is not present."""
 		with self.assertRaises(errors.NotAuthenticatedError):
-			api.hiddens.list()
+			api.collections['hiddens'].list()
 			
 			
 	def test_auth_required_present(self):
 		"""Don't raise NotAuthenticatedError if authentication is required and present."""
 		storage.get = Mock(return_value=[])
-		api.hiddens.list(context={'identity':{'foo':'bar'}})
+		api.collections['hiddens'].list(context={'identity':{'foo':'bar'}})
 		
 		
 	def test_auth_failed(self):
 		"""Raises NotAuthorizedError if the authorization rule fails"""
 		with self.assertRaises(errors.NotAuthorizedError):
-			api.hiddens.create({}, context={'identity':{}})
+			api.collections['hiddens'].create({}, context={'identity':{}})
 			
 		with self.assertRaises(errors.NotAuthorizedError):
-			api.hiddens.create({}, context={'identity':{'role':'foo'}})
+			api.collections['hiddens'].create({}, context={'identity':{'role':'foo'}})
 			
 			
 	def test_auth_pass(self):
 		"""Does not raise NotAuthorizedError if the authorization rule passes"""
 		storage.create = Mock(return_value={})
-		api.hiddens.create({}, context={'identity':{'role':'admin'}})
+		api.collections['hiddens'].create({}, context={'identity':{'role':'admin'}})
 		
 		
 	def test_auth_result_fail(self):
 		"""Raises NotAuthorizedError if a result rule doesn't pass."""
-		api.hiddens.storage.get_by_id = Mock(return_value={'foo':700})
+		api.collections['hiddens'].storage.get_by_id = Mock(return_value={'foo':700})
 		with self.assertRaises(errors.NotAuthorizedError):
-			api.hiddens.get(123)
+			api.collections['hiddens'].get(123)
 		
 		
 	def test_auth_result_pass(self):
 		"""Does not raise NotAuthorizedError if a result rule passes."""
-		api.hiddens.storage.get_by_id = Mock(return_value={'foo':23})
-		api.hiddens.get(123)
+		api.collections['hiddens'].storage.get_by_id = Mock(return_value={'foo':23})
+		api.collections['hiddens'].get(123)
 		
 		
 	def test_hidden_result(self):
 		"""Hidden fields aren't shown in results."""
 		storage.create = Mock(return_value={'_id':'123', 'name':'foo'})
-		obj = api.hiddens.create({'name':'foo'}, context={'identity':{'role':'admin'}})
+		obj = api.collections['hiddens'].create({'name':'foo'}, context={'identity':{'role':'admin'}})
 		self.assertNotIn('name', obj)
 		
 		
 	def test_hidden_show_fail(self):
 		"""Hidden fields aren't shown in results even when show_hidden=True if the user is not authorized."""
 		storage.get_by_id = Mock(return_value={'_id':'123', 'name':'foo', 'foo':23})
-		obj = api.hiddens.get('123', show_hidden=True)
+		obj = api.collections['hiddens'].get('123', show_hidden=True)
 		self.assertNotIn('name', obj)
 		
 		
 	def test_hidden_succeed(self):
 		"""Hidden fields are shown when show_hidden=True and the user is authorized."""
 		storage.get_by_id = Mock(return_value={'_id':'123', 'name':'foo', 'foo':23})
-		obj = api.hiddens.get('123', show_hidden=True, context={'identity':{'foo':'bar'}})
+		obj = api.collections['hiddens'].get('123', show_hidden=True, context={'identity':{'foo':'bar'}})
 		self.assertIn('name', obj)
 		
 		
@@ -538,7 +538,7 @@ class CollectionTest(unittest.TestCase):
 		"""Can't filter by a hidden field without authorization."""
 		storage.check_filter = Mock(side_effect=errors.DisabledFieldError)
 		with self.assertRaises(errors.DisabledFieldError):
-			api.hiddens.list(filter={'name':'zoomy'}, context={'identity':{}})
+			api.collections['hiddens'].list(filter={'name':'zoomy'}, context={'identity':{}})
 		storage.check_filter.assert_called_once_with({'name':'zoomy'}, set(['_type', '_id']), {'identity': {}})
 		
 		
@@ -546,21 +546,21 @@ class CollectionTest(unittest.TestCase):
 		"""Can filter by a hidden field when authorized."""
 		storage.check_filter = Mock(return_value=None)
 		storage.get = Mock(return_value=[])
-		api.hiddens.list(filter={'name':'zoomy'}, context={'identity':{'foo':'bar'}})
+		api.collections['hiddens'].list(filter={'name':'zoomy'}, context={'identity':{'foo':'bar'}})
 		storage.check_filter.assert_called_once_with({'name':'zoomy'}, set(['name', '_type', '_id']),  {'item': [], 'identity': {'foo': 'bar'}})
 		
 		
 	def test_hidden_sort_fail(self):
 		"""Can't sort by a hidden field without authorization."""
 		with self.assertRaises(errors.DisabledFieldError) as cm:
-			api.hiddens.list(sort=('+name',), context={'identity':{}})
+			api.collections['hiddens'].list(sort=('+name',), context={'identity':{}})
 		self.assertEquals(cm.exception.message, 'The "name" field cannot be used for sorting.')
 		
 		
 	def test_authorization_bypass(self):
 		"""Can bypass authorization for methods, filters and sort."""
 		storage.get = Mock(return_value=[{'name':'zoomy', 'foo':23}])
-		results = api.hiddens.list(filter={'name':'zoomy'}, sort=('+name',), bypass_authorization=True, show_hidden=True)
+		results = api.collections['hiddens'].list(filter={'name':'zoomy'}, sort=('+name',), bypass_authorization=True, show_hidden=True)
 		storage.get.assert_called_once_with(Hidden, sort=('+name',), filter={'name':'zoomy'}, limit=0, offset=0, count=False)
 		self.assertEquals(results, [{'name':'zoomy', 'foo':23}])
 		
@@ -573,7 +573,7 @@ class CollectionTest(unittest.TestCase):
 		post_update = CopyingMock()
 		pre_delete = CopyingMock()
 		post_delete = CopyingMock()
-		hooks = api.foos.entity.hooks
+		hooks = api.collections['foos'].entity.hooks
 		hooks.pre('create', pre_create)
 		hooks.post('create', post_create)
 		hooks.pre('update', pre_update)
@@ -588,25 +588,25 @@ class CollectionTest(unittest.TestCase):
 		storage.delete = Mock(return_value=None)
 		storage.get_by_id = Mock(return_value={'_id':'123', 'stuff':'nothings'})
 		
-		foo = api.foos.create({'stuff':'things'}, context=context.copy())
+		foo = api.collections['foos'].create({'stuff':'things'}, context=context.copy())
 		create_context = context.copy()
 		create_context['item'] = foo
 		pre_create.assert_called_once_with({'stuff':'things'}, context)
 		post_create.assert_called_once_with(foo, create_context)
 		
-		foo = api.foos.update(foo['_id'], {'stuff':'nothings'}, context=context.copy())
+		foo = api.collections['foos'].update(foo['_id'], {'stuff':'nothings'}, context=context.copy())
 		update_context = context.copy()
 		update_context['item'] = foo
 		pre_update.assert_called_with(foo['_id'], {'stuff':'nothings'}, context)
 		post_update.assert_called_with(foo, update_context)
 		
-		foo = api.foos.replace(foo['_id'], {'stuff':'somethings'}, context=context.copy())
+		foo = api.collections['foos'].replace(foo['_id'], {'stuff':'somethings'}, context=context.copy())
 		replace_context = context.copy()
 		replace_context['item'] = foo
 		pre_update.assert_called_with(foo['_id'], {'stuff':'somethings'}, context)
 		post_update.assert_called_with(foo, replace_context)
 		
-		api.foos.delete(foo['_id'], context=context.copy())
+		api.collections['foos'].delete(foo['_id'], context=context.copy())
 		delete_context = context.copy()
 		delete_context['item'] = foo
 		pre_delete.assert_called_once_with(foo['_id'], context)
@@ -621,7 +621,7 @@ class CollectionTest(unittest.TestCase):
 		post_update = CopyingMock()
 		pre_delete = CopyingMock()
 		post_delete = CopyingMock()
-		hooks = api.foos.hooks
+		hooks = api.collections['foos'].hooks
 		hooks.pre('create', pre_create)
 		hooks.post('create', post_create)
 		hooks.pre('update', pre_update)
@@ -636,25 +636,25 @@ class CollectionTest(unittest.TestCase):
 		storage.delete = Mock(return_value=None)
 		storage.get_by_id = Mock(return_value={'_id':'123', 'stuff':'nothings'})
 		
-		foo = api.foos.create({'stuff':'things'}, context=context.copy())
+		foo = api.collections['foos'].create({'stuff':'things'}, context=context.copy())
 		create_context = context.copy()
 		create_context['item'] = foo
 		pre_create.assert_called_once_with({'stuff':'things'}, context)
 		post_create.assert_called_once_with(foo, create_context)
 		
-		foo = api.foos.update(foo['_id'], {'stuff':'nothings'}, context=context.copy())
+		foo = api.collections['foos'].update(foo['_id'], {'stuff':'nothings'}, context=context.copy())
 		update_context = context.copy()
 		update_context['item'] = foo
 		pre_update.assert_called_with(foo['_id'], {'stuff':'nothings'}, context)
 		post_update.assert_called_with(foo, update_context)
 		
-		foo = api.foos.replace(foo['_id'], {'stuff':'somethings'}, context=context.copy())
+		foo = api.collections['foos'].replace(foo['_id'], {'stuff':'somethings'}, context=context.copy())
 		replace_context = context.copy()
 		replace_context['item'] = foo
 		pre_update.assert_called_with(foo['_id'], {'stuff':'somethings'}, context)
 		post_update.assert_called_with(foo, replace_context)
 		
-		api.foos.delete(foo['_id'], context=context.copy())
+		api.collections['foos'].delete(foo['_id'], context=context.copy())
 		delete_context = context.copy()
 		delete_context['item'] = foo
 		pre_delete.assert_called_once_with(foo['_id'], context)
@@ -664,30 +664,30 @@ class CollectionTest(unittest.TestCase):
 	def test_disabled_method(self):
 		"""An error is raised when attempting to call a disabled method."""
 		with self.assertRaises(errors.DisabledMethodError):
-			api.readonly_foos.create({})
+			api.collections['readonly_foos'].create({})
 		
 		
 	def test_passes_version(self):
 		"""When updating, the _version field is passed through to the storage method"""
 		storage.update = Mock(return_value={'_id':'123'})
 		storage.get_by_id = Mock(return_value={'_id':'123'})
-		api.foos.update('123', {'_version':57})
+		api.collections['foos'].update('123', {'_version':57})
 		storage.update.assert_called_with(Foo, '123', {'_version':57}, replace=False)
-		api.foos.replace('123', {'stuff':'things', '_version':57})
+		api.collections['foos'].replace('123', {'stuff':'things', '_version':57})
 		storage.update.assert_called_with(Foo, '123', {'stuff':'things', '_version':57}, replace=True)
 		
 		
 	def test_default_limit(self):
 		"""A default limit is used when limit is not passed"""
 		storage.get = Mock(return_value=[])
-		api.bazes.list()
+		api.collections['bazes'].list()
 		storage.get.assert_called_once_with(Baz, sort=(), filter=None, offset=0, limit=10, count=False)
 		
 		
 	def test_max_limit(self):
 		"""Limit can't exceed max_limit"""
 		storage.get = Mock(return_value=[])
-		api.bazes.list(limit=50)
+		api.collections['bazes'].list(limit=50)
 		storage.get.assert_called_once_with(Baz, sort=(), filter=None, offset=0, limit=20, count=False)
 		
 		
@@ -695,7 +695,7 @@ class CollectionTest(unittest.TestCase):
 		"""A reference can be embeddable but not embedded"""
 		storage.get = Mock(return_value=[{'_id':'123', 'embedded_foos':['1','2','3']}])
 		storage.get_by_ids = Mock(return_value=[])
-		api.foos.list()
+		api.collections['foos'].list()
 		self.assertFalse(storage.get_by_ids.called)
 		
 		
@@ -703,7 +703,7 @@ class CollectionTest(unittest.TestCase):
 		"""A reference that is not embedded by default can still be embedded"""
 		storage.get = Mock(return_value=[{'_id':'123', 'embedded_foos':['1','2','3']}])
 		storage.get_by_ids = Mock(return_value=[])
-		api.foos.list(embed=['embedded_foos'])
+		api.collections['foos'].list(embed=['embedded_foos'])
 		storage.get_by_ids.assert_called_once_with(Foo, ['1','2','3'], sort=(), filter=None, limit=0, offset=0, count=False)
 		
 		
@@ -711,7 +711,7 @@ class CollectionTest(unittest.TestCase):
 		"""An embeddable field is included if it is in the fields argument"""
 		storage.get = Mock(return_value=[{'_id':'123', 'embedded_foos':['1','2','3']}])
 		storage.get_by_ids = Mock(return_value=[])
-		api.foos.list(fields=['embedded_foos'])
+		api.collections['foos'].list(fields=['embedded_foos'])
 		storage.get_by_ids.assert_called_once_with(Foo, ['1','2','3'], sort=(), filter=None, limit=0, offset=0, count=False)
 		
 		
@@ -719,21 +719,21 @@ class CollectionTest(unittest.TestCase):
 		"""Only fields in an entity's embedded_fields list are included"""
 		storage.get = Mock(return_value=[{'_id':'123', 'embedded_foos':['1','2','3']}])
 		storage.get_by_ids = Mock(return_value=[{'_id':'666', 'stuff':123, 'optional_stuff':456}])
-		result = api.foos.list(embed=('embedded_foos',))
+		result = api.collections['foos'].list(embed=('embedded_foos',))
 		self.assertEquals(result, [{'_id':'123', 'embedded_foos':[{'_id':'666', 'stuff':123}]}])
 		
 		
 	def test_field_subset(self):
 		"""Can fetch only a subset of fields"""
 		storage.get_by_id = CopyingMock(return_value={'_id':'123', 'stuff':123, 'optional_stuff':456})
-		result = api.foos.get('123', fields=('optional_stuff',))
+		result = api.collections['foos'].get('123', fields=('optional_stuff',))
 		self.assertEquals(result, {'_id':'123', 'optional_stuff':456})
 		
 		
 	def test_no_fields(self):
 		"""Only an item's ID is included if fields is an empty list"""
 		storage.get_by_id = CopyingMock(return_value={'_id':'123', 'stuff':123, 'optional_stuff':456})
-		result = api.foos.get('123', fields=())
+		result = api.collections['foos'].get('123', fields=())
 		self.assertEquals(result, {'_id':'123'})
 		
 		
@@ -741,28 +741,28 @@ class CollectionTest(unittest.TestCase):
 		"""All of an item's visible fields are returned if the fields list is omitted"""
 		foo = {'_id':'123', 'stuff':123, 'optional_stuff':456}
 		storage.get_by_id = CopyingMock(return_value=foo)
-		result = api.foos.get('123')
+		result = api.collections['foos'].get('123')
 		self.assertEquals(result, foo)
 		
 		
 	def test_fields_empty_hidden_field(self):
 		"""All of an item's visible fields are returned if the fields list is omitted when an entity has hidden fields"""
 		storage.get_by_id = CopyingMock(return_value={'_id':'123', 'name':'hidden', 'foo':23})
-		result = api.hiddens.get('123')
+		result = api.collections['hiddens'].get('123')
 		self.assertEquals(result, {'_id':'123', 'foo':23})
 		
 		
 	def test_fields_empty_hidden_list(self):
 		"""All of an item's visible fields are returned when listing items"""
 		storage.get = CopyingMock(return_value=[{'_id':'123', 'stuff':'foo', 'secret':'i like valuer'}])
-		result = api.foos.list()
+		result = api.collections['foos'].list()
 		self.assertEquals(result, [{'_id':'123', 'stuff':'foo'}])
 		
 		
 	def test_count(self):
 		"""Can get a count instead of a list of items"""
 		storage.get = Mock(return_value=42)
-		result = api.foos.list(count=True)
+		result = api.collections['foos'].list(count=True)
 		self.assertEquals(result, 42)
 		storage.get.assert_called_once_with(Foo, filter=None, sort=(), offset=0, limit=0, count=True)
 		
@@ -771,7 +771,7 @@ class CollectionTest(unittest.TestCase):
 		"""Can count a list reference instead of getting the items"""
 		storage.get_by_id = Mock(return_value={'_id':'123', 'bazes':['1','2','3']})
 		storage.get_by_ids = Mock(return_value=42)
-		result = api.foos.link('123', 'bazes', count=True)
+		result = api.collections['foos'].link('123', 'bazes', count=True)
 		self.assertEquals(result, 42)
 		storage.get_by_ids.assert_called_with(Baz, ['1','2','3'], filter=None, sort=(), offset=0, limit=10, count=True)
 		
@@ -785,13 +785,13 @@ class CollectionTest(unittest.TestCase):
 			bar = {'foo':foo['_id'], '_id':'%s' % i}
 			bars.append(bar)
 		
-		api.foos.set_storage(Storage())
-		api.bars.set_storage(Storage())
-		api.foos.storage.get_by_id = Mock(return_value=foo)
-		api.bars.storage.get = Mock(return_value=3)
-		api.bars.storage.check_filter = Mock(return_value=None)
+		api.collections['foos'].set_storage(Storage())
+		api.collections['bars'].set_storage(Storage())
+		api.collections['foos'].storage.get_by_id = Mock(return_value=foo)
+		api.collections['bars'].storage.get = Mock(return_value=3)
+		api.collections['bars'].storage.check_filter = Mock(return_value=None)
 		
-		result = api.foos.link(foo['_id'], 'bars', count=True)
+		result = api.collections['foos'].link(foo['_id'], 'bars', count=True)
 		self.assertEquals(result, 3)
-		api.bars.storage.get.assert_called_once_with(Bar, filter={'foo':'123'}, sort=('+name',), offset=0, limit=0, count=True)
+		api.collections['bars'].storage.get.assert_called_once_with(Bar, filter={'foo':'123'}, sort=('+name',), offset=0, limit=0, count=True)
 		
