@@ -7,7 +7,7 @@ execfile(os.path.join('cellardoor', 'version.py'))
 setup(
 	name='cellardoor',
 	version=__version__,
-	description='Create ReST APIs how you\'ve always wanted.',
+	description='Create CRUD APIs how you\'ve always wanted.',
 	long_description=io.open('README.rst', mode='r', encoding='utf-8').read(),
 	classifiers=[
         'Development Status :: 1 - Planning',
