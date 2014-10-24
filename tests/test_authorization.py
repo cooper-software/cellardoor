@@ -1,4 +1,5 @@
 import unittest
+from mock import Mock
 from cellardoor.authorization import *
 
 class TestAuthorization(unittest.TestCase):
@@ -116,7 +117,7 @@ class TestAuthorization(unittest.TestCase):
 		
 		
 	def test_object_proxy_nonexistent(self):
-		"""An object project value returns None for a non-existint context item"""
+		"""An object project value returns None for a non-existent context item"""
 		proxy = ObjectProxy('foo')
 		proxy_value = proxy.bar
 		result = proxy_value.get_value({})
@@ -133,7 +134,7 @@ class TestAuthorization(unittest.TestCase):
 		
 		
 	def test_object_proxy_value_nonexistent(self):
-		"""An object project value returns None for a non-existint context item key"""
+		"""An object project value returns None for a non-existent context item key"""
 		proxy = ObjectProxy('foo')
 		proxy_value = proxy.bar
 		result = proxy_value.get_value({'foo':{'baz':23}})
@@ -149,7 +150,7 @@ class TestAuthorization(unittest.TestCase):
 		
 		
 	def test_uses(self):
-		"""True if a particular context object is used by thge auth expr"""
+		"""True if a particular context object is used by the auth expr"""
 		foo = ObjectProxy('foo')
 		bar = ObjectProxy('bar')
 		expr = (foo.x >= 32) & (bar.x != foo.x)
@@ -344,4 +345,74 @@ class TestAuthorization(unittest.TestCase):
 		expr_one = foo.exists() & (foo.baz == bar.baz) | (foo.skidoo == 23)
 		expr_two = foo.exists() & (foo.baz == bar.baz) | (foo.skidoo == 23)
 		self.assertEquals(expr_one, expr_two)
+		
+		
+	def test_item_proxy_is_object_proxy(self):
+		"""An ItemProxy should be a kind of ObjectProxy"""
+		foo = ItemProxy(None, None)
+		self.assertIsInstance(foo, ObjectProxy)
+		
+		
+	def test_item_proxy_attr_error(self):
+		"""Raises an AttributeError if the requested field isn't defined by the collection's entity"""
+		collection = Mock()
+		collection.entity = Mock()
+		collection.entity.fields = {}
+		foo = ItemProxy(collection, 'foo')
+		
+		with self.assertRaises(AttributeError):
+			foo.bar
+		
+		
+	def test_item_proxy_link_attr(self):
+		"""An item proxy returns a LinkProxy if the requested field is a link"""
+		collection = Mock()
+		collection.entity = Mock()
+		collection.entity.fields = { 'bar': 'BarField' }
+		collection.links = { 'bar': 'BarLink' }
+		
+		foo = ItemProxy(collection, 'foo')
+		link = foo.bar
+		self.assertIsInstance(link, LinkProxy)
+		self.assertEquals(link._proxy, foo)
+		self.assertEquals(link._collection, 'BarLink')
+		self.assertEquals(link._name, 'bar')
+		
+		
+	def test_item_proxy_value_attr(self):
+		"""An item proxy returns an ObjectProxyValue if the requested field is not a link"""
+		collection = Mock()
+		collection.entity = Mock()
+		collection.entity.fields = { 'bar': 'BarField' }
+		collection.links = None
+		
+		foo = ItemProxy(collection, 'foo')
+		value = foo.bar
+		self.assertIsInstance(value, ObjectProxyValue)
+		self.assertNotIsInstance(value, LinkProxy)
+		self.assertEquals(value._proxy, foo)
+		self.assertEquals(value._key, 'bar')
+		
+		
+	def test_link_proxy_is_item_and_value(self):
+		"""A link proxy is both an item proxy and a value proxy"""
+		link = LinkProxy(None, None, None)
+		self.assertIsInstance(link, ObjectProxyValue)
+		self.assertIsInstance(link, ItemProxy)
+		
+		
+	def test_link_proxy_get(self):
+		"""Returns the result of the proxy collection's link"""
+		proxy = Mock()
+		proxy.get = Mock(return_value={'_id':'123'})
+		proxy._collection = Mock()
+		proxy._collection.link = Mock(return_value='123-link')
+		
+		link = LinkProxy(proxy, None, 'link-name')
+		result = link.get(None)
+		self.assertEquals(result, '123-link')
+		proxy.get.assert_called_once_with(None)
+		proxy._collection.link.assert_called_once_with(
+			'123', 'link-name', bypass_authorization=True, show_hidden=True
+		)
 		

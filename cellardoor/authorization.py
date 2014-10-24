@@ -1,4 +1,4 @@
-import functools
+from functools import partial
 
 
 class AuthenticationExpression(object):
@@ -72,11 +72,11 @@ class OrExpression(BinaryExpression):
 class ObjectProxy(AuthenticationExpression):
 	
 	def __init__(self, name):
-		self.name = name
+		self._name = name
 		
 		
 	def __eq__(self, other):
-		return isinstance(other, ObjectProxy) and other.name == self.name
+		return isinstance(other, ObjectProxy) and other._name == self._name
 		
 		
 	def __getattr__(self, key):
@@ -88,11 +88,11 @@ class ObjectProxy(AuthenticationExpression):
 		
 		
 	def __call__(self, context):
-		return self.name in context
+		return self._name in context
 		
 		
 	def __repr__(self):
-		return 'ObjectProxy(%s)' % self.name
+		return 'ObjectProxy(%s)' % self._name
 		
 		
 	def match(self, fn):
@@ -104,53 +104,57 @@ class ObjectProxy(AuthenticationExpression):
 		
 		
 	def uses(self, key):
-		return self.name == key
+		return self._name == key
+		
+		
+	def get(self, context):
+		return context.get(self._name, {})
 		
 		
 		
 class ObjectProxyMatch(AuthenticationExpression):
 	
 	def __init__(self, proxy, fn):
-		self.proxy = proxy
+		self._proxy = proxy
 		self.fn = fn
 		
 		
 	def __repr__(self):
-		return 'ObjectProxyMatch(%s, %s)' % (repr(self.proxy), repr(self.fn))
+		return 'ObjectProxyMatch(%s, %s)' % (repr(self._proxy), repr(self.fn))
 		
 		
 	def __eq__(self, other):
-		return isinstance(other, ObjectProxyMatch) and other.proxy == self.proxy and other.fn == self.fn
+		return isinstance(other, ObjectProxyMatch) and other._proxy == self._proxy and other.fn == self.fn
 		
 		
 	def __call__(self, context):
-		obj = context.get(self.proxy.name)
+		obj = self._proxy.get(context)
 		return self.fn(obj)
 		
 		
 	def uses(self, key):
-		return self.proxy.uses(key)
+		return self._proxy.uses(key)
 		
 		
 		
 class ObjectProxyValue(AuthenticationExpression):
 	
 	def __init__(self, proxy, key):
-		self.proxy = proxy
-		self.key = key
+		self._proxy = proxy
+		self._key = key
 		
 		
 	def __repr__(self):
-		return 'ObjectProxyValue(%s, %s)' % (repr(self.proxy), self.key)
+		return 'ObjectProxyValue(%s, %s)' % (repr(self._proxy), self._key)
 		
 		
 	def __eq__(self, other):
-		return isinstance(other, ObjectProxyValue) and other.proxy == self.proxy and other.key == self.key
+		return isinstance(other, ObjectProxyValue) and other._proxy == self._proxy and other._key == self._key
 		
 		
 	def get_value(self, context):
-		obj = context.get(self.proxy.name, {})
-		val = obj.get(self.key)
+		obj = self._proxy.get(context)
+		val = obj.get(self._key)
 		return val
 		
 		
@@ -159,11 +163,11 @@ class ObjectProxyValue(AuthenticationExpression):
 		
 		
 	def uses(self, key):
-		return self.proxy.uses(key)
+		return self._proxy.uses(key)
 		
 		
 	def __call__(self, context):
-		return self.proxy(context) and self.key in context[self.proxy.name]
+		return self._proxy(context) and self._key in self._proxy.get(context)
 		
 		
 	def __eq__(self, other):
@@ -199,20 +203,20 @@ class ObjectProxyValueComparison(AuthenticationExpression):
 	opstr = ''
 	
 	def __init__(self, proxy, other):
-		self.proxy = proxy
+		self._proxy = proxy
 		self.other = other
 		
 		
 	def __repr__(self):
-		return '%s %s %s' % (repr(self.proxy), self.opstr, repr(self.other))
+		return '%s %s %s' % (repr(self._proxy), self.opstr, repr(self.other))
 		
 	
 	def __eq__(self, other):
-		return isinstance(other, self.__class__) and other.proxy == self.proxy and other.other == self.other
+		return isinstance(other, self.__class__) and other._proxy == self._proxy and other.other == self.other
 		
 		
 	def __call__(self, context):
-		a = self.proxy.get_value(context)
+		a = self._proxy.get_value(context)
 		
 		if isinstance(self.other, ObjectProxyValue):
 			b = self.other.get_value(context)
@@ -228,9 +232,9 @@ class ObjectProxyValueComparison(AuthenticationExpression):
 		
 	def uses(self, key):
 		if isinstance(self.other, AuthenticationExpression):
-			return self.proxy.uses(key) or self.other.uses(key)
+			return self._proxy.uses(key) or self.other.uses(key)
 		else:
-			return self.proxy.uses(key)
+			return self._proxy.uses(key)
 		
 		
 		
@@ -283,5 +287,41 @@ class ContainsComparison(ObjectProxyValueComparison):
 		return a in b
 		
 		
-identity = ObjectProxy('identity')
-item = ObjectProxy('item')
+		
+class ItemProxy(ObjectProxy):
+	
+	def __init__(self, collection, name):
+		super(ItemProxy, self).__init__(name)
+		self._collection = collection
+		
+		
+	def __getattr__(self, key):
+		if key not in self._collection.entity.fields:
+			raise AttributeError, key
+		if self._collection.links and key in self._collection.links:
+			return LinkProxy(self, self._collection.links[key], key)
+		else:
+			return ObjectProxyValue(self, key)
+		
+		
+	def __repr__(self):
+		return 'ItemProxy(%s, %s)' % (self._collection.plural_name, self._name)
+		
+	
+	
+class LinkProxy(ObjectProxyValue, ItemProxy):
+	
+	def __init__(self, proxy, collection, name):
+		ItemProxy.__init__(self, collection, name)
+		ObjectProxyValue.__init__(self, proxy, name)
+		
+		
+	def get(self, context):
+		item = self._proxy.get(context)
+		return self._proxy._collection.link(item['_id'], self._name, 
+							bypass_authorization=True, show_hidden=True)
+		
+		
+	def __repr__(self):
+		return 'LinkProxy(%s, %s)' % (self._proxy._name, self._name)
+		

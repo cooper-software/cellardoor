@@ -6,7 +6,10 @@ from cellardoor.collection import Collection
 from cellardoor.methods import ALL, LIST, GET, CREATE
 from cellardoor.storage import Storage
 from cellardoor import errors, CellarDoor
-from cellardoor import authorization as auth
+from cellardoor.authorization import ObjectProxy
+
+identity = ObjectProxy('identity')
+item = ObjectProxy('item')
 
 
 class CopyingMock(Mock):
@@ -55,7 +58,7 @@ class FoosCollection(Collection):
 	}
 	enabled_filters = ('stuff',)
 	enabled_sort = ('stuff',)
-	hidden_field_authorization = auth.identity.role == 'admin'
+	hidden_field_authorization = identity.role == 'admin'
 	
 	
 class ReadOnlyFoosCollection(Collection):
@@ -107,11 +110,11 @@ class HiddenCollection(Collection):
 	enabled_filters = ('name',)
 	enabled_sort = ('name',)
 	method_authorization = {
-		LIST: auth.identity.exists(),
-		CREATE: auth.identity.role == 'admin',
-		GET: auth.item.foo == 23
+		LIST: identity.exists(),
+		CREATE: identity.role == 'admin',
+		GET: item.foo == 23
 	}
-	hidden_field_authorization = auth.identity.foo == 'bar'
+	hidden_field_authorization = identity.foo == 'bar'
 
 
 class Littorina(Entity):
