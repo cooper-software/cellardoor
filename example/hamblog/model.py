@@ -5,32 +5,38 @@ from .storage import storage
 from .hash_password import hash_password
 
 
+model = Model(storage)
+
+
 class Slug(Text):
 	
 	def __init__(self, *args, **kwargs):
 		super(Slug, self).__init__(maxlength=50, regex=re.compile('^[\w\-]+$', re.UNICODE))
 
 
-class Person(Entity, Timestamped):
+class Person(model.Entity):
+	mixins = (Timestamped,)
 	first_name = Text(maxlength=50, required=True)
 	last_name = Text(maxlength=50, required=True)
 	email = Email(required=True, hidden=True)
 	password = Text(maxlength=50, hidden=True, required=True)
 	role = Enum('anonymous', 'normal', 'admin', default='anonymous')
 	
-	def __init__(self, *args, **kwargs):
-		super(Person, self).__init__(*args, **kwargs)
-		self.hooks.pre('create', self.hash_password)
-		self.hooks.pre('update', self.hash_password)
+	
+	def before_create(self, fields, context):
+		self.hash_password(fields)
 		
+	def before_update(self, id, fields, context):
+		self.hash_password(fields)
 		
 	def hash_password(self, fields):
 		if 'password' in fields:
 			fields['password'] = hash_password(fields['password'])
 	
 	
-class Post(Entity, Timestamped):
+class Post(model.Entity):
 	versioned = True
+	mixins = (Timestamped,)
 	status = Enum('draft', 'published', default='draft')
 	publish_date = DateTime()
 	slug = Slug(required=True),
@@ -40,7 +46,7 @@ class Post(Entity, Timestamped):
 	tags = ListOf(Reference('Tag', storage=storage))
 	
 	
-class Tag(Entity):
+class Tag(model.Entity):
 	name = Text(maxlength=50, required=True)
 	slug = Slug(required=True)
 	

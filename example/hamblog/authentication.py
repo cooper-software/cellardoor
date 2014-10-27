@@ -15,4 +15,3 @@ class UsernamePasswordAuthenticator(Authenticator):
 			return None
 		return results[0]
 		
-		

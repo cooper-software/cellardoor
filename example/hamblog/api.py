@@ -1,15 +1,12 @@
-from cellardoor.collection import Collection
-from cellardoor.methods import LIST, GET, CREATE, UPDATE, DELETE, ALL
+from cellardoor.api import API
+from cellardoor.api.interfaces import LIST, GET, CREATE, UPDATE, DELETE, ALL
 from . import model
 from .authorization import admin_or_self, admin_or_user
 
 
-class PeopleCollection(Collection):
+class People(api.Interface):
 	entity = model.Person
 	plural_name = 'people'
-	links = {
-		'posts': 'PostCollection'
-	}
 	method_authorization = {
 		(LIST, GET, CREATE): None,
 		(UPDATE, DELETE): admin_or_self),
@@ -20,7 +17,7 @@ class PeopleCollection(Collection):
 	hidden_field_authorization = admin_or_self
 	
 	
-class TagsCollection(Collection):
+class Tags(api.Interface):
 	entity = model.Tag
 	method_authorization = {
 		(LIST, GET): None,
@@ -31,7 +28,7 @@ class TagsCollection(Collection):
 	default_sort = ('+name',)
 	
 	
-class PostsCollection(Collection):
+class Posts(api.Interface):
 	entity = model.Post
 	method_authorization = {
 		(LIST, GET): None,

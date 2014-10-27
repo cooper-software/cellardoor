@@ -1,16 +1,5 @@
-import falcon
-from cellardoor import CellarDoor
-from cellardoor.falcon import add_to_falcon
-from cellardoor.views import MinimalView
-from . import collections
-from .storage import storage
-
+from .api import api
+from cellardoor.wsgi.falcon_app import FalconApp
 
 def create_app():
-	app = falcon.API()
-	api = CellarDoor(
-			collections=collections
-			storage=storage)
-
-	add_to_falcon(app, api)
-	return app
+	return FalconApp(api)
