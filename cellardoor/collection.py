@@ -1,6 +1,6 @@
 from copy import deepcopy
 from .methods import ALL, LIST, CREATE, GET, REPLACE, UPDATE, DELETE
-from .model import ListOf, Reference, Link
+from .model import ListOf, InverseLink
 from .events import EventManager
 from . import errors
 
@@ -463,20 +463,20 @@ class Collection(object):
 			raise errors.NotFoundError("The %s collection has no link '%s' defined" % (self.plural_name, reference_name))
 		reference_field = getattr(self.entity.__class__, reference_name)
 		
-		return target_collection.resolve_link_or_reference(item, reference_name, reference_field, kwargs)
+		return target_collection.resolve_link(item, reference_name, reference_field, kwargs)
 		
 		
-	def resolve_link_or_reference(self, source_item, reference_name, reference_field, options):
+	def resolve_link(self, source_item, reference_name, reference_field, options):
 		"""Get the item(s) pointed to by a link or reference"""
 		options = self.options_factory.create(options, list=True)
 		
-		if isinstance(reference_field, Link):
-			return self.resolve_link(source_item, reference_field, options)
+		if isinstance(reference_field, InverseLink):
+			return self._resolve_inverse_link(source_item, reference_field, options)
 		else:
-			return self.resolve_reference(source_item, reference_name, reference_field, options)
+			return self._resolve_link(source_item, reference_name, reference_field, options)
 		
 		
-	def resolve_link(self, source_item, link_field, options):
+	def _resolve_inverse_link(self, source_item, link_field, options):
 		"""
 		Get the items for a single or multiple link
 		"""
@@ -505,7 +505,7 @@ class Collection(object):
 				pass
 		
 	
-	def resolve_reference(self, source_item, reference_name, reference_field, options):
+	def _resolve_link(self, source_item, reference_name, reference_field, options):
 		"""Get the items for a single or multiple reference"""
 		reference_value = source_item.get(reference_name)
 		if reference_value is None:
@@ -570,7 +570,7 @@ class Collection(object):
 			if embedded_fields:
 				link_options['fields'] = embedded_fields
 			
-			result = referenced_collection.resolve_link_or_reference(item, reference_name, reference_field, link_options)
+			result = referenced_collection.resolve_link(item, reference_name, reference_field, link_options)
 			
 			if result:
 				item[reference_name] = result

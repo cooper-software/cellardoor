@@ -5,25 +5,24 @@ import unittest
 from cellardoor.model import *
 
 
-class TestReference(unittest.TestCase):
-    pass
-
-
 class TestEntity(unittest.TestCase):
+        
     
     def test_can_validate(self):
         """
         Should validate against a compound validator of its field attributes.
         """
-        class Foo(Entity):
+        model = Model()
+        
+        class Foo(model.Entity):
             bar = Text(required=True)
             baz = Text(maxlength=10)
         
         with self.assertRaises(CompoundValidationError):
-            Foo.validator.validate({'baz':'x'*11})
+            model.Foo.validator.validate({'baz':'x'*11})
         
         obj = {'bar':'x', 'baz':'y'}
-        result = Foo.validator.validate(obj)
+        result = model.Foo.validator.validate(obj)
         self.assertEquals(result, obj)
         
         
@@ -31,12 +30,14 @@ class TestEntity(unittest.TestCase):
         """
         Should be able to turn off enforcement of required fields
         """
-        class Foo(Entity):
+        model = Model()
+        
+        class Foo(model.Entity):
             bar = Text(required=True)
             baz = Text()
         
         obj = {'baz':'y'}
-        result = Foo.validator.validate(obj, enforce_required=False)
+        result = model.Foo.validator.validate(obj, enforce_required=False)
         self.assertEquals(result, obj)
         
         
@@ -44,7 +45,9 @@ class TestEntity(unittest.TestCase):
         """
         Entities have an event manager with create, update and delete events
         """
-        class Foo(Entity):
+        model = Model()
+        
+        class Foo(model.Entity):
             pass
                 
         f = Foo()
@@ -60,63 +63,61 @@ class TestEntity(unittest.TestCase):
         """
         on_* methods the entity defines are automatically registered as hooks
         """
-        class Foo(Entity):
+        model = Model()
+        called_hooks = {}
+        
+        class Foo(model.Entity):
             
-            def __init__(self, *args, **kwargs):
-                super(Foo, self).__init__(*args, **kwargs)
-                self.called_hook = None
-            
-            def on_pre_create(self, *args, **kwargs):
-                self.called_hook = 'pre_create'
+            def on_pre_create(cls, *args, **kwargs):
+                called_hooks['pre_create'] = 1
                 
-            def on_post_create(self, *args, **kwargs):
-                self.called_hook = 'post_create'
+            def on_post_create(cls, *args, **kwargs):
+                called_hooks['post_create'] = 1
                 
-            def on_pre_update(self, *args, **kwargs):
-                self.called_hook = 'pre_update'
+            def on_pre_update(cls, *args, **kwargs):
+                called_hooks['pre_update'] = 1
                 
-            def on_post_update(self, *args, **kwargs):
-                self.called_hook = 'post_update'
+            def on_post_update(cls, *args, **kwargs):
+                called_hooks['post_update'] = 1
                 
-            def on_pre_delete(self, *args, **kwargs):
-                self.called_hook = 'pre_delete'
+            def on_pre_delete(cls, *args, **kwargs):
+                called_hooks['pre_delete'] = 1
                 
-            def on_post_delete(self, *args, **kwargs):
-                self.called_hook = 'post_delete'
+            def on_post_delete(cls, *args, **kwargs):
+                called_hooks['post_delete'] = 1
         
-        foo1 = Foo()
-        foo1.hooks.trigger_pre('create')
-        self.assertEquals(foo1.called_hook, 'pre_create')
         
-        foo2 = Foo()
-        foo2.hooks.trigger_post('create')
-        self.assertEquals(foo2.called_hook, 'post_create')
+        Foo.hooks.trigger_pre('create')
+        self.assertTrue(called_hooks['pre_create'])
         
-        foo3 = Foo()
-        foo3.hooks.trigger_pre('update')
-        self.assertEquals(foo3.called_hook, 'pre_update')
+        Foo.hooks.trigger_post('create')
+        self.assertTrue(called_hooks['post_create'])
         
-        foo4 = Foo()
-        foo4.hooks.trigger_post('update')
-        self.assertEquals(foo4.called_hook, 'post_update')
+        Foo.hooks.trigger_pre('update')
+        self.assertTrue(called_hooks['pre_update'])
         
-        foo5 = Foo()
-        foo5.hooks.trigger_pre('delete')
-        self.assertEquals(foo5.called_hook, 'pre_delete')
+        Foo.hooks.trigger_post('update')
+        self.assertTrue(called_hooks['post_update'])
         
-        foo6 = Foo()
-        foo6.hooks.trigger_post('delete')
-        self.assertEquals(foo6.called_hook, 'post_delete')
+        Foo.hooks.trigger_pre('delete')
+        self.assertTrue(called_hooks['pre_delete'])
+        
+        Foo.hooks.trigger_post('delete')
+        self.assertTrue(called_hooks['post_delete'])
         
         
     def test_multiple_inheritance_fail(self):
         """
         Raises an error when extending more than one Entity
         """
-        class Foo(Entity):
+        model = Model()
+        
+        
+        class Foo(model.Entity):
             pass
-            
-        class Bar(Entity):
+        
+         
+        class Bar(model.Entity):
             pass
             
         with self.assertRaises(Exception) as cm:
@@ -128,28 +129,32 @@ class TestEntity(unittest.TestCase):
         
     def test_get_entity_hierarchy(self):
         """Can get a list including the entity and all its bases in hierarchical order"""
-        class Foo(Entity):
+        model = Model()
+        
+        
+        class Foo(model.Entity):
             pass
             
         class Bar(Foo):
             pass
             
-            
         class Baz(Bar):
             pass
             
-        self.assertEquals(Baz.hierarchy, [Foo, Bar, Baz])
-        self.assertEquals(Foo.hierarchy, [Foo])
-        self.assertEquals(Foo.children, [Bar, Baz])
+        self.assertEquals(Baz.hierarchy, [Foo, Bar])
+        self.assertEquals(model.Foo.hierarchy, [])
+        self.assertEquals(model.Foo.children, [Bar, Baz])
         self.assertEquals(Bar.children, [Baz])
         
         
     def test_inheritance_field_summing(self):
         """A descendant should have it's ancestor's fields as well as its own."""
-        class Foo(Entity):
+        model = Model()
+        
+        class Foo(model.Entity):
             a = Text()
             b = Text()
-            
+        
         class Bar(Foo):
             c = Text()
             
@@ -161,33 +166,43 @@ class TestEntity(unittest.TestCase):
         
     def test_visible_fields(self):
         """Has sets for visible and hidden fields"""
-        class Foo(Entity):
+        model = Model()
+        
+        
+        class Foo(model.Entity):
             a = Text()
             b = Text()
             c = Text(hidden=True)
-            d = Reference('Bar')
+            d = Link('Bar')
         
-        self.assertEquals(Foo.hidden_fields, {'c'})
-        self.assertEquals(Foo.visible_fields, {'a', 'b', 'd'})
+        self.assertEquals(model.Foo.hidden_fields, {'c'})
+        self.assertEquals(model.Foo.visible_fields, {'a', 'b', 'd'})
         
         
     def test_embeddable(self):
         """Has sets for embeddable and default embedded references"""
-        class Foo(Entity):
-            a = Reference('Bar')
-            b = Reference('Bar', embeddable=True)
-            c = Reference('Bar', embeddable=True, embed_by_default=False)
+        model = Model()
         
-        self.assertEquals(Foo.embeddable, {'b', 'c'})
-        self.assertEquals(Foo.embed_by_default, {'b'})
+        
+        class Foo(model.Entity):
+            a = Link('Bar')
+            b = Link('Bar', embeddable=True)
+            c = Link('Bar', embeddable=True, embed_by_default=False)
+        
+        self.assertEquals(model.Foo.embeddable, {'b', 'c'})
+        self.assertEquals(model.Foo.embed_by_default, {'b'})
         
         
     def test_mixins(self):
         """Can have a list of mixins that add additional fields"""
-        class Named(object):
+        model = Model()
+        
+        
+        class Named(model.Entity):
             name = Text()
+        
             
-        class Foo(Entity):
+        class Foo(model.Entity):
             mixins = (Named,)
             
         foo = Foo()
@@ -197,12 +212,16 @@ class TestEntity(unittest.TestCase):
         
     def test_mixin_hooks(self):
         """Mixins can have hooks that are registered on an entity"""
-        class Fooable(object):
+        model = Model()
+        
+        
+        class Fooable(model.Entity):
             
             def on_pre_create(self, fields, *args, **kwargs):
                 fields['foo'] = 123
+        
                 
-        class Bar(Entity):
+        class Bar(model.Entity):
             mixins = (Fooable(),)
             
         bar = Bar()
@@ -212,21 +231,23 @@ class TestEntity(unittest.TestCase):
         self.assertEquals(fields['foo'], 123)
         
         
-    def test_inherited_mixins(self):
+    def test_inherited_mixin_fields(self):
         """Mixin fields should be inherited"""
+        model = Model()
+        
         
         class Fooable(object):
             foo = Text()
             
-            
+        
         class Barable(object):
             bar = Text()
             
-            
-        class Thing(Entity):
+        
+        class Thing(model.Entity):
             mixins = (Fooable,)
             
-            
+        
         class SpecificThing(Thing):
             mixins = (Barable,)
             
@@ -235,22 +256,25 @@ class TestEntity(unittest.TestCase):
         self.assertTrue(hasattr(st, 'bar'))
         
         
-    def test_inherited_mixins(self):
+    def test_inherited_mixin_hooks(self):
         """Mixin hooks should be inherited"""
+        model = Model()
         
-        class Fooable(object):
+        
+        class Fooable(model.Entity):
             def on_pre_create(self, fields):
                 fields['foo'] = 1
-            
-        class Barable(object):
+                
+        
+        class Barable(model.Entity):
             def on_pre_create(self, fields):
                 fields['bar'] = 1
             
-            
-        class Thing(Entity):
+        
+        class Thing(model.Entity):
             mixins = (Fooable,)
             
-            
+        
         class SpecificThing(Thing):
             mixins = (Barable,)
             
@@ -263,48 +287,88 @@ class TestEntity(unittest.TestCase):
         
 class TestModel(unittest.TestCase):
     
+    def setUp(self):
+        model = Model()
+        
+    
     def test_unresolvable_link(self):
         """
         Should raise an error if a link can't be resolved
         """
+        model = Model()
         
-        class Foo(Entity):
-            bar = Reference('Bar')
+        class Foo(model.Entity):
+            bar = Link('Bar')
         
-        with self.assertRaises(Exception):
-            model = Model(Foo)
+        with self.assertRaises(InvalidModelException):
+            model.freeze()
             
             
     def test_foreign_link(self):
         """
         Should raise an error if a link points to an entity that isn't in the model
         """
-        class Foo(Entity):
+        model = Model()
+        
+        class Foo(model.Entity):
             pass
+        
+        other_model = Model()
+        class Bar(other_model.Entity):
+            foo = Link(Foo)
             
-        class Bar(Entity):
-            foo = Reference(Foo)
-            
-        with self.assertRaises(Exception):
-            model = Model(Bar)
+        with self.assertRaises(InvalidModelException):
+            other_model.freeze()
             
             
     def test_pass(self):
         """
         Should do nothing special when initialized with a well-defined model
         """
+        model = Model()
         
-        class Foo(Entity):
-            bar = Reference('Bar')
+        class Foo(model.Entity):
+            bar = Link('Bar')
+            
+        class Bar(model.Entity):
+            foos = ListOf(Link(Foo))
+            
+        model.freeze()
+        
+        
+    def test_fail_add_to_frozen(self):
+        """
+        Can't add an entity to a frozen model
+        """
+        model = Model()
+        
+        class Foo(model.Entity):
+            pass
+            
+        model.freeze()
+        
+        with self.assertRaises(Exception):
+            class Bar(model.Entity):
+                pass
+                
+                
+    def test_freeze_set_storage(self):
+        """
+        Freezing a model resolves all links and sets their storage attribute
+        """
+        model = Model(storage='foo')
+        
+        class Foo(model.Entity):
+            bar = Link('Bar')
             
             
-        class Bar(Entity):
-            foos = ListOf(Reference(Foo))
+        class Bar(model.Entity):
+            pass
             
-            
-        model = Model(None, (Foo, Bar))
-        self.assertTrue(model.has_entity(Foo))
-        self.assertTrue(model.has_entity(Bar))
+        model.freeze()
+        
+        self.assertEquals(Foo.bar.entity, Bar)
+        self.assertEquals(Foo.bar.storage, 'foo')
         
         
         

@@ -18,7 +18,6 @@ class CopyingMock(Mock):
 		args = deepcopy(args)
 		kwargs = deepcopy(kwargs)
 		return super(CopyingMock, self).__call__(*args, **kwargs)
-	
 
 
 class Foo(Entity):

@@ -228,7 +228,7 @@ class MongoDBStorage(Storage):
 			
 	def get_type_name(self, entity):
 		if len(entity.hierarchy) > 1:
-			return '.'.join([x.__name__ for x in entity.hierarchy])
+			return '.'.join([x.__name__ for x in entity.hierarchy]) + '.' + entity.__name__
 		else:
 			return None
 			

@@ -296,8 +296,6 @@ class ItemProxy(ObjectProxy):
 		
 		
 	def __getattr__(self, key):
-		if key not in self._collection.entity.fields:
-			raise AttributeError, key
 		if self._collection.links and key in self._collection.links:
 			return LinkProxy(self, self._collection.links[key], key)
 		else:

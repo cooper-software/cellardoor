@@ -4,13 +4,14 @@ from .fields import Field, ListOf, Compound, Text, ValidationError
 
 __all__ = [
     'Entity',
-    'Reference',
     'Link',
-    'Model'
+    'InverseLink',
+    'Model',
+    'InvalidModelException'
 ]
        
         
-class Reference(Text):
+class Link(Text):
     
     UNKNOWN = 'No item found with this ID.'
     
@@ -28,11 +29,11 @@ class Reference(Text):
         self.ondelete = ondelete
         self.storage = None
         
-        super(Reference, self).__init__(*args, **kwargs)
+        super(Link, self).__init__(*args, **kwargs)
         
         
     def validate(self, value):
-        value = super(Reference, self).validate(value)
+        value = super(Link, self).validate(value)
         
         if value is None:
             return None
@@ -43,10 +44,7 @@ class Reference(Text):
         return value
         
         
-class Link(object):
-    """
-    Links define a foreign key relationship. They are read-only.
-    """
+class InverseLink(object):
     
     def __init__(self, entity, field, 
             embeddable=False, embed_by_default=True, embedded_fields=None, 
@@ -61,50 +59,56 @@ class Link(object):
         self.storage = None
         self.help = help
     
-    
-class EntityMeta(type):
+
+
+class EntityType(type):
     
     def __new__(cls, name, bases, attrs):
         if name == 'Entity':
-            return super(EntityMeta, cls).__new__(cls, name, bases, attrs)
+            return super(EntityType, cls).__new__(cls, name, bases, attrs)
         
+        # Get all the mixins from the base classes and make
+        # sure we aren't inheriting from more than one entity
         hierarchy = []
-        all_attrs = {}
+        mixins = set(attrs['mixins']) if attrs.get('mixins') else set()
         entity_base_found = False
-        mixins = set(attrs.get('mixins', []))
-        for b in bases:
-            if issubclass(b, Entity):
+        
+        for base in bases:
+            if issubclass(base, Entity):
                 if entity_base_found:
                     raise Exception, "Cannot extend more than one Entity"
                 entity_base_found = True
-                if b != Entity:
-                    hierarchy = list(b.hierarchy)
-                    if hasattr(b, 'mixins'):
-                        mixins.update(b.mixins)
-        attrs['hierarchy'] = hierarchy
+                if base.__name__ != 'Entity':
+                    hierarchy = list(base.hierarchy)
+                    hierarchy.append(base)
+                    if hasattr(base, 'mixins') and base.mixins:
+                        mixins.update(base.mixins)
         
-        attrs['hooks'] = EventManager('create', 'update', 'delete')
+        
+        # Add fields and hooks from the mixins
+        hooks = EventManager('create', 'update', 'delete')
         
         if mixins:
-            for m in mixins:
-                if inspect.isclass(m):
-                    m = m()
-                for k,v in inspect.getmembers(m):
-                    if k not in attrs and isinstance(v, (Field, Reference, Link)):
+            for mixin in mixins:
+                if inspect.isclass(mixin):
+                    mixin = mixin()
+                for k,v in inspect.getmembers(mixin):
+                    if k not in attrs and isinstance(v, (Field, Link, InverseLink)):
                         attrs[k] = v
                     if k.startswith('on_pre_') or k.startswith('on_post_'):
                         parts = k.split('_')
                         when, event = parts[1], '_'.join(parts[2:])
-                        getattr(attrs['hooks'], when)(event, v)
+                        getattr(hooks, when)(event, v)
+        
         
         fields = {}
-        links = []
-        references = []
         hidden_fields = set()
-        all_attrs.update(attrs)
+        links = []
         
-        for k,v in all_attrs.items():
-            if isinstance(v,type) and issubclass(v, Field):
+        # Make sure all fields are instantiated, no fields are using a reserved name
+        # and put fields into their categorized buckets for quick lookup later.
+        for k,v in attrs.items():
+            if isinstance(v, type) and issubclass(v, Field):
                 v = v()
             if isinstance(v, Field):
                 if k.startswith('_'):
@@ -112,109 +116,123 @@ class EntityMeta(type):
                 fields[k] = v
                 if v.hidden:
                     hidden_fields.add(k)
-            if isinstance(v, Reference):
-                references.append((k,v))
-            elif isinstance(v, ListOf) and isinstance(v.field, Reference):
-                references.append((k, v.field))
-            elif isinstance(v, Link):
+            if isinstance(v, (Link, InverseLink)):
                 links.append((k,v))
-                
-         
-        attrs['fields'] = fields
-        attrs['references'] = references
-        attrs['links'] = links
-        attrs['links_and_references'] = links + references
-        attrs['hidden_fields'] = hidden_fields
+            elif isinstance(v, ListOf) and isinstance(v.field, (Link, InverseLink)):
+                links.append((k, v.field))
         
         embeddable = set()
         embed_by_default = set()
         
-        for k,v in attrs['links_and_references']:
+        for k,v in links:
             if v.embeddable:
                 embeddable.add(k)
                 if v.embed_by_default:
                     embed_by_default.add(k)
         
-        attrs['embeddable'] = embeddable
-        attrs['embed_by_default'] = embed_by_default
+        # Add all the fields from the base entities to the categorized buckets
+        for entity_cls in hierarchy:
+            fields.update(entity_cls.fields)
+            links += entity_cls.links
+            hidden_fields.update(entity_cls.hidden_fields)
+            embeddable.update(entity_cls.embeddable)
+            embed_by_default.update(entity_cls.embed_by_default)
         
-        for entity_cls in attrs['hierarchy']:
-            attrs['fields'].update(entity_cls.fields)
-            attrs['references'] += entity_cls.references
-            attrs['links'] += entity_cls.links
-            attrs['links_and_references'] += entity_cls.links_and_references
-            attrs['hidden_fields'].update(entity_cls.hidden_fields)
-            attrs['embeddable'].update(entity_cls.embeddable)
-            attrs['embed_by_default'].update(entity_cls.embed_by_default)
+        visible_fields = set(fields.keys()).difference(hidden_fields)
         
-        attrs['visible_fields'] = set(attrs['fields'].keys()).difference(attrs['hidden_fields'])
-        attrs['validator'] = Compound(**fields)
-        attrs['children'] = []
+        # Create the new class
+        attrs.update(dict(
+            hooks = hooks,
+            hierarchy = hierarchy,
+            fields = fields,
+            hidden_fields = hidden_fields,
+            visible_fields = visible_fields,
+            links = links,
+            embeddable = embeddable,
+            embed_by_default = embed_by_default,
+            children = [],
+            validator = Compound(**fields)
+        ))
         
-        new_cls = super(EntityMeta, cls).__new__(cls, name, bases, attrs)
+        new_cls = super(EntityType, cls).__new__(cls, name, bases, attrs)
         
-        for b in new_cls.hierarchy:
-            b.children.append(new_cls)
+        # Set up the default hooks, if any
+        for k,v in attrs.items():
+            if k.startswith('on_pre_') or k.startswith('on_post_'):
+                parts = k.split('_')
+                when, event = parts[1], '_'.join(parts[2:])
+                getattr(new_cls.hooks, when)(event, v.__get__(new_cls, new_cls.__class__))
         
-        new_cls.hierarchy.append(new_cls)
+        # Add the new class to the children list of its base entities
+        for base in hierarchy:
+            base.children.append(new_cls)
+        
+        # Register the class with its model
+        new_cls.model.add_entity(new_cls)
         
         return new_cls
         
         
+    def is_multiple_link(self):
+        return isinstance(link, ListOf) or isinstance(link, InverseLink) and link.multiple
+        
+        
+            
 class Entity(object):
     
-    __metaclass__ = EntityMeta
+    __metaclass__ = EntityType
     
+    mixins = []
     versioned = False
     
-    def __init__(self):
-        for k,v in inspect.getmembers(self):
-            if k.startswith('on_pre_') or k.startswith('on_post_'):
-                parts = k.split('_')
-                when, event = parts[1], '_'.join(parts[2:])
-                getattr(self.hooks, when)(event, v)
-        
-    
-    def is_multiple_link(self, link):
-        if isinstance(link, ListOf) or isinstance(link, Link) and link.multiple:
-            return True
-        else:
-            return False
-    
+            
 
+class InvalidModelException(Exception):
+    pass
+    
+    
 
 class Model(object):
     """
     A collection of linked entities.
     """
     
-    def __init__(self, storage, entities):
-        self.entities = set(entities)
-        self.entities_by_name = dict([(e.__name__, e) for e in entities])
+    def __init__(self, name=None, storage=None):
+        self.name = name
         self.storage = storage
-        if self.storage is not None:
-            self.storage.setup(self)
-        self.check_references()
+        self.Entity = type('Entity', (Entity,), {'model':self})
+        self.entities = {}
+        self.is_frozen = False
         
         
-    def has_entity(self, entity):
-        return entity in self.entities
+    def __repr__(self):
+        return 'Model(name=%s, storage=%s)' % (repr(self.name), repr(self.storage))
         
         
-    def check_references(self):
-        # First make sure all references have a reference to their entity class
-        for entity in self.entities:
-            for reference_name, reference in entity.links_and_references:
-                if isinstance(reference.entity, basestring):
-                    referenced_entity = self.entities_by_name.get(reference.entity)
-                    if not referenced_entity:
-                        raise Exception, "Can't resolve reference to entity '%s'" % reference.entity
-                    reference.entity = referenced_entity
+    def add_entity(self, entity):
+        if self.is_frozen:
+            raise Exception, "Attempting to add entity '%s' to a frozen model" % entity.__name__
+        if entity.__name__ in self.entities:
+            raise Exception, "Attempting to redefine the entity %s" % entity.__name__
+        self.entities[entity.__name__] = entity
         
-        for entity in self.entities:
-            # Disallow references to entities outside the model
-            for reference_name, reference in entity.links_and_references:
-                if not self.has_entity(reference.entity):
-                    raise Exception, "Attempting to reference to an entity '%s' that is outside the model" % reference.entity.__name__
-                reference.storage = self.storage
-                
+        
+    def __getattr__(self, name):
+        return self.entities[name]
+        
+        
+    def freeze(self):
+        if self.is_frozen:
+            return
+        for entity in self.entities.values():
+            for _, link in entity.links:
+                if isinstance(link.entity, basestring):
+                    if link.entity not in self.entities:
+                        raise InvalidModelException, "%s is not defined in this model" % link.entity
+                    else:
+                        link.entity = self.entities[link.entity]
+                elif link.entity.__name__ not in self.entities:
+                    raise InvalidModelException, "%s is from a different model" % link.entity.__name__
+                link.storage = self.storage
+        self.is_frozen = True
+        

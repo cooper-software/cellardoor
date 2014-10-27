@@ -37,15 +37,15 @@ class TestStandardOptionsMixin(unittest.TestCase):
 		self.assertEquals(merged_options, {'foo':1, 'bar':3})
 		
 		
-class TestCellarDoor(unittest.TestCase):
+class TestAPI(unittest.TestCase):
 	
 	def test_standard_options(self):
-		api = cellardoor.CellarDoor()
+		api = cellardoor.API()
 		self.assertTrue(hasattr(api, 'bypass_authorization'))
 		
 		
 	def test_getattr(self):
-		api = cellardoor.CellarDoor()
+		api = cellardoor.API()
 		api.collections['foo'] = Mock()
 		collection_proxy = api.foo
 		self.assertIsInstance(collection_proxy, cellardoor.CollectionProxy)
@@ -53,7 +53,7 @@ class TestCellarDoor(unittest.TestCase):
 		self.assertEquals(collection_proxy._api_options, api._options)
 		
 	def test_getitem(self):
-		api = cellardoor.CellarDoor()
+		api = cellardoor.API()
 		api.__getattr__ = Mock()
 		api['foo']
 		api.__getattr__.assert_called_once_with('foo')
