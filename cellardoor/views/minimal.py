@@ -11,7 +11,7 @@ class MinimalView(View):
 		('application/x-msgpack', MsgPackSerializer())
 	)
 	
-	def get_collection_response(self, req, objs):
+	def get_list_response(self, req, objs):
 		return self.serialize(req, objs)
 		
 		

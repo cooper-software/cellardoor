@@ -1,3 +1,6 @@
+from functools import partial
+
+
 class EventManager(object):
 	
 	def __init__(self, *event_names):

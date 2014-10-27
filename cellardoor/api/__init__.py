@@ -52,14 +52,30 @@ class API(StandardOptionsMixin):
 		self.model = model
 		self.Interface = type('Interface', (Interface,), {'api':self})
 		self.interfaces = {}
+		self.interfaces_by_entity = {}
 		
 		
 	def add_interface(self, interface):
-		self.interfaces[interface.__name__] = interface
+		if not self.model.is_frozen:
+			self.model.freeze()
+			
+		if interface.entity not in self.model:
+			raise Exception, "The %s entity is not defined in this API's model" % interface.entity.__name__
+			
+		interface_inst = interface()
+		self.interfaces[interface.plural_name] = interface_inst
+		if interface.entity.__name__ not in self.interfaces_by_entity:
+			self.interfaces_by_entity[interface.entity.__name__] = []
+		self.interfaces_by_entity[interface.entity.__name__].append(interface_inst)
+		
+		
+	def refresh(self):
+		for k, v in self.interfaces.items():
+			self.interfaces[k] = v.__class__()
 		
 		
 	def __getattr__(self, name):
-		return CollectionProxy(self.interfaces[name], self._options)
+		return InterfaceProxy(self.interfaces[name], self._options)
 		
 		
 	def __getitem__(self, key):
@@ -70,8 +86,11 @@ class API(StandardOptionsMixin):
 		return to_jsonschema(self, base_url)
 		
 		
+	def get_interface_for_entity(self, entity):
+		return self.interfaces_by_entity[entity.__name__][0]
 		
-class CollectionProxy(StandardOptionsMixin):
+		
+class InterfaceProxy(StandardOptionsMixin):
 	
 	def __init__(self, interface, options=None):
 		StandardOptionsMixin.__init__(self,
@@ -125,7 +144,7 @@ class CollectionProxy(StandardOptionsMixin):
 		
 		
 	def find(self, filter=None):
-		return ListProxy(self._interface, self._options, filter)
+		return FilterProxy(self._interface, self._options, filter)
 		
 		
 	def _get_options(self):
@@ -133,7 +152,7 @@ class CollectionProxy(StandardOptionsMixin):
 		
 		
 		
-class ListProxy(StandardOptionsMixin):
+class FilterProxy(StandardOptionsMixin):
 	
 	def __init__(self, interface, options, filter):
 		StandardOptionsMixin.__init__(self,

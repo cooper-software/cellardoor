@@ -3,6 +3,7 @@ Unit tests for data fields
 """
 import unittest
 from cellardoor.model import *
+from cellardoor.storage import Storage
 
 
 class TestEntity(unittest.TestCase):
@@ -51,59 +52,59 @@ class TestEntity(unittest.TestCase):
             pass
                 
         f = Foo()
-        f.hooks.pre('create', lambda x: x)
-        f.hooks.post('create', lambda x: x)
-        f.hooks.pre('update', lambda x: x)
-        f.hooks.post('update', lambda x: x)
-        f.hooks.pre('delete', lambda x: x)
-        f.hooks.post('delete', lambda x: x)
+        f.hooks.before_create(lambda x: x)
+        f.hooks.after_create(lambda x: x)
+        f.hooks.before_update(lambda x: x)
+        f.hooks.after_update(lambda x: x)
+        f.hooks.before_delete(lambda x: x)
+        f.hooks.after_delete(lambda x: x)
         
         
     def test_default_hooks(self):
         """
-        on_* methods the entity defines are automatically registered as hooks
+        before_* and after_* methods the entity defines are automatically registered as hooks
         """
         model = Model()
         called_hooks = {}
         
         class Foo(model.Entity):
             
-            def on_pre_create(cls, *args, **kwargs):
-                called_hooks['pre_create'] = 1
+            def before_create(cls, *args, **kwargs):
+                called_hooks['before_create'] = 1
                 
-            def on_post_create(cls, *args, **kwargs):
-                called_hooks['post_create'] = 1
+            def after_create(cls, *args, **kwargs):
+                called_hooks['after_create'] = 1
                 
-            def on_pre_update(cls, *args, **kwargs):
-                called_hooks['pre_update'] = 1
+            def before_update(cls, *args, **kwargs):
+                called_hooks['before_update'] = 1
                 
-            def on_post_update(cls, *args, **kwargs):
-                called_hooks['post_update'] = 1
+            def after_update(cls, *args, **kwargs):
+                called_hooks['after_update'] = 1
                 
-            def on_pre_delete(cls, *args, **kwargs):
-                called_hooks['pre_delete'] = 1
+            def before_delete(cls, *args, **kwargs):
+                called_hooks['before_delete'] = 1
                 
-            def on_post_delete(cls, *args, **kwargs):
-                called_hooks['post_delete'] = 1
+            def after_delete(cls, *args, **kwargs):
+                called_hooks['after_delete'] = 1
         
         
-        Foo.hooks.trigger_pre('create')
-        self.assertTrue(called_hooks['pre_create'])
+        Foo.hooks.fire_before_create()
+        self.assertTrue(called_hooks['before_create'])
         
-        Foo.hooks.trigger_post('create')
-        self.assertTrue(called_hooks['post_create'])
+        Foo.hooks.fire_after_create()
+        self.assertTrue(called_hooks['after_create'])
         
-        Foo.hooks.trigger_pre('update')
-        self.assertTrue(called_hooks['pre_update'])
+        Foo.hooks.fire_before_update()
+        self.assertTrue(called_hooks['before_update'])
         
-        Foo.hooks.trigger_post('update')
-        self.assertTrue(called_hooks['post_update'])
+        Foo.hooks.fire_after_update()
+        self.assertTrue(called_hooks['after_update'])
         
-        Foo.hooks.trigger_pre('delete')
-        self.assertTrue(called_hooks['pre_delete'])
+        Foo.hooks.fire_before_delete()
+        self.assertTrue(called_hooks['before_delete'])
         
-        Foo.hooks.trigger_post('delete')
-        self.assertTrue(called_hooks['post_delete'])
+        Foo.hooks.fire_after_delete()
+        self.assertTrue(called_hooks['after_delete'])
         
         
     def test_multiple_inheritance_fail(self):
@@ -217,7 +218,7 @@ class TestEntity(unittest.TestCase):
         
         class Fooable(model.Entity):
             
-            def on_pre_create(self, fields, *args, **kwargs):
+            def before_create(self, fields, *args, **kwargs):
                 fields['foo'] = 123
         
                 
@@ -226,7 +227,7 @@ class TestEntity(unittest.TestCase):
             
         bar = Bar()
         fields = {}
-        bar.hooks.trigger_pre('create', fields)
+        bar.hooks.fire_before_create(fields)
         self.assertIn('foo', fields)
         self.assertEquals(fields['foo'], 123)
         
@@ -262,12 +263,12 @@ class TestEntity(unittest.TestCase):
         
         
         class Fooable(model.Entity):
-            def on_pre_create(self, fields):
+            def before_create(self, fields):
                 fields['foo'] = 1
                 
         
         class Barable(model.Entity):
-            def on_pre_create(self, fields):
+            def before_create(self, fields):
                 fields['bar'] = 1
             
         
@@ -280,7 +281,7 @@ class TestEntity(unittest.TestCase):
             
         st = SpecificThing()
         fields = {}
-        st.hooks.trigger_pre('create', fields)
+        st.hooks.fire_before_create(fields)
         self.assertEquals(fields, {'foo':1, 'bar':1})
         
         
@@ -325,7 +326,7 @@ class TestModel(unittest.TestCase):
         """
         Should do nothing special when initialized with a well-defined model
         """
-        model = Model()
+        model = Model(storage=Storage())
         
         class Foo(model.Entity):
             bar = Link('Bar')
@@ -340,7 +341,7 @@ class TestModel(unittest.TestCase):
         """
         Can't add an entity to a frozen model
         """
-        model = Model()
+        model = Model(storage=Storage())
         
         class Foo(model.Entity):
             pass
@@ -356,7 +357,8 @@ class TestModel(unittest.TestCase):
         """
         Freezing a model resolves all links and sets their storage attribute
         """
-        model = Model(storage='foo')
+        storage = Storage()
+        model = Model(storage=storage)
         
         class Foo(model.Entity):
             bar = Link('Bar')
@@ -368,7 +370,7 @@ class TestModel(unittest.TestCase):
         model.freeze()
         
         self.assertEquals(Foo.bar.entity, Bar)
-        self.assertEquals(Foo.bar.storage, 'foo')
+        self.assertEquals(Foo.bar.storage, storage)
         
         
         

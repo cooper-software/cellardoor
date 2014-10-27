@@ -95,10 +95,11 @@ class EntityType(type):
                 for k,v in inspect.getmembers(mixin):
                     if k not in attrs and isinstance(v, (Field, Link, InverseLink)):
                         attrs[k] = v
-                    if k.startswith('on_pre_') or k.startswith('on_post_'):
+                    if k.startswith('before_') or k.startswith('after_'):
                         parts = k.split('_')
-                        when, event = parts[1], '_'.join(parts[2:])
-                        getattr(hooks, when)(event, v)
+                        when, event = parts[0], '_'.join(parts[1:])
+                        method_name = '%s_%s' % (when, event)
+                        getattr(hooks, method_name)(v)
         
         
         fields = {}
@@ -158,10 +159,11 @@ class EntityType(type):
         
         # Set up the default hooks, if any
         for k,v in attrs.items():
-            if k.startswith('on_pre_') or k.startswith('on_post_'):
+            if k.startswith('before_') or k.startswith('after_'):
                 parts = k.split('_')
-                when, event = parts[1], '_'.join(parts[2:])
-                getattr(new_cls.hooks, when)(event, v.__get__(new_cls, new_cls.__class__))
+                when, event = parts[0], '_'.join(parts[1:])
+                method_name = '%s_%s' % (when, event)
+                getattr(new_cls.hooks, method_name)(v.__get__(new_cls, new_cls.__class__))
         
         # Add the new class to the children list of its base entities
         for base in hierarchy:
@@ -217,6 +219,10 @@ class Model(object):
         self.entities[entity.__name__] = entity
         
         
+    def __contains__(self, entity):
+        return entity.__name__ in self.entities
+        
+        
     def __getattr__(self, name):
         return self.entities[name]
         
@@ -235,4 +241,5 @@ class Model(object):
                     raise InvalidModelException, "%s is from a different model" % link.entity.__name__
                 link.storage = self.storage
         self.is_frozen = True
+        self.storage.setup(self)
         

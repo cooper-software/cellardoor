@@ -3,10 +3,12 @@ import re
 from cellardoor.spec import jsonschema
 from cellardoor.model import *
 
-class Bar(Entity):
+model = Model()
+
+class Bar(model.Entity):
 	pass
 
-class Foo(Entity):
+class Foo(model.Entity):
     a = Compound(foo=Text())
     b = Text(required=True, minlength=100, maxlength=5000, regex=re.compile('^b'))
     c = HTML(help="Some stuff")
@@ -21,8 +23,8 @@ class Foo(Entity):
     m = URL()
     n = OneOf(Integer(), Float())
     o = ListOf(Text())
-    p = Reference(Bar)
-    q = Link(Bar, 'a')
+    p = Link(Bar)
+    q = InverseLink(Bar, 'a')
 
 field_schema = {
 	'a': {
@@ -144,7 +146,7 @@ field_schema = {
 	},
 	'p': {
 		'type': 'string',
-		'format': 'Reference',
+		'format': 'Link',
 		'schema': '#/definitions/Bar',
 		'default': None
 	}

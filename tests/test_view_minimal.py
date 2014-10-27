@@ -7,20 +7,20 @@ from . import create_fake_request
 
 class TestMinimalView(unittest.TestCase):
 	
-	def test_collection_response(self):
+	def test_list_response(self):
 		"""
-		Should return a simple list for collection get methods
+		Should return a simple list for list get methods
 		"""
 		view = MinimalView()
 		objs = [{'foo':123}, {'foo':456}]
 		
 		req = create_fake_request(headers={'accept':'application/json'})
-		content_type, result = view.get_collection_response(req, objs)
+		content_type, result = view.get_list_response(req, objs)
 		self.assertEquals(content_type, 'application/json')
 		self.assertEquals(result, json.dumps(objs))
 		
 		req = create_fake_request(headers={'accept':'application/x-msgpack'})
-		content_type, result = view.get_collection_response(req, objs)
+		content_type, result = view.get_list_response(req, objs)
 		self.assertEquals(content_type, 'application/x-msgpack')
 		self.assertEquals(result, msgpack.packb(objs))
 		

@@ -26,7 +26,7 @@ class TestView(unittest.TestCase):
 		view = View()
 		
 		with self.assertRaises(NotImplementedError):
-			view.get_collection_response(None, None)
+			view.get_list_response(None, None)
 			
 			
 		with self.assertRaises(NotImplementedError):

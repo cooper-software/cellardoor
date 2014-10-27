@@ -16,7 +16,7 @@ class MongoDBStorage(Storage):
 		
 		
 	def setup(self, model):
-		for e in model.entities:
+		for e in model.entities.values():
 			collection = self.get_collection(e)
 			for k,v in e.fields.items():
 				if v.unique:
@@ -215,7 +215,7 @@ class MongoDBStorage(Storage):
 		
 		
 	def get_collection(self, entity, shadow=False):
-		if len(entity.hierarchy) > 1:
+		if len(entity.hierarchy) > 0:
 			collection_name = entity.hierarchy[0].__name__
 		else:
 			collection_name = entity.__name__
@@ -227,7 +227,7 @@ class MongoDBStorage(Storage):
 			
 			
 	def get_type_name(self, entity):
-		if len(entity.hierarchy) > 1:
+		if len(entity.hierarchy) > 0:
 			return '.'.join([x.__name__ for x in entity.hierarchy]) + '.' + entity.__name__
 		else:
 			return None

@@ -2,6 +2,7 @@ import functools
 import falcon
 import json
 import logging
+import inspect
 from ..methods import LIST, CREATE, GET, REPLACE, UPDATE, DELETE, get_http_methods
 from ..serializers import JSONSerializer, MsgPackSerializer
 from ..views import View
@@ -13,50 +14,49 @@ __all__ = ['add_to_falcon']
 
 class Resource(object):
 	"""
-	A resource exposes a collection through falcon
+	A resource exposes an interface through falcon
 	"""
 	
 	# The types of content that are accepted.
 	accept_serializers = (JSONSerializer(), MsgPackSerializer())
 	
 	
-	def __init__(self, collection, views):
-		self.collection = collection
+	def __init__(self, interface, views):
+		self.interface = interface
 		self.views = views
 		self.logger = logging.getLogger(__name__)
 		
 		
 	def add_to_falcon(self, app):
-		methods = self.collection.rules.enabled_methods
-		collection_methods = methods.intersection((LIST, CREATE))
+		methods = self.interface.rules.enabled_methods
+		interface_methods = methods.intersection((LIST, CREATE))
 		individual_methods = methods.intersection((GET, REPLACE, UPDATE, DELETE))
 		
-		if not collection_methods and not individual_methods:
-			raise Exception, "The '%s' collection exposes no methods" % self.collection.plural_name
+		if not interface_methods and not individual_methods:
+			raise Exception, "The '%s' interface exposes no methods" % self.interface.plural_name
 		
-		if collection_methods:
-			app.add_route('/%s' % self.collection.plural_name, ListEndpoint(self, collection_methods))
+		if interface_methods:
+			app.add_route('/%s' % self.interface.plural_name, ListEndpoint(self, interface_methods))
 			
 		if individual_methods:
-			app.add_route('/%s/{id}' % self.collection.plural_name, IndividualEndpoint(self, individual_methods))
+			app.add_route('/%s/{id}' % self.interface.plural_name, IndividualEndpoint(self, individual_methods))
 		
-		if self.collection.links:
-			for reference_name, reference in self.collection.entity.links_and_references:
-				if reference_name in self.collection.links:
-					app.add_route('/%s/{id}/%s' % (self.collection.plural_name, reference_name), 
-						ReferenceEndpoint(self, reference_name))
+		for link_name, link in self.interface.entity.links:
+			if self.interface.api.get_interface_for_entity(link.entity):
+				app.add_route('/%s/{id}/%s' % (self.interface.plural_name, link_name), 
+					ReferenceEndpoint(self, link_name))
 			
 	
 	def list(self, req, resp):
 		kwargs = self.get_kwargs(req)
-		items = self.collection.list(**kwargs)
+		items = self.interface.list(**kwargs)
 		self.send_list(req, resp, items)
 		
 		
 	def count(self, req, resp):
 		kwargs = self.get_kwargs(req)
 		kwargs['count'] = True
-		result = self.collection.list(**kwargs)
+		result = self.interface.list(**kwargs)
 		resp.content_type, _ = View.choose(req, self.views)
 		resp.set_header('X-Count', str(result))
 		
@@ -64,48 +64,48 @@ class Resource(object):
 	def create(self, req, resp):
 		fields = self.get_fields_from_request(req)
 		kwargs = self.get_kwargs(req, 'show_hidden', 'context', 'embedded')
-		item = self.collection.create(fields, **kwargs)
+		item = self.interface.create(fields, **kwargs)
 		resp.status = falcon.HTTP_201
 		self.send_one(req, resp, item)
 		
 	
 	def get(self, req, resp, id):
 		kwargs = self.get_kwargs(req, 'show_hidden', 'context', 'embedded')
-		item = self.collection.get(id, **kwargs)
+		item = self.interface.get(id, **kwargs)
 		self.send_one(req, resp, item)
 		
 		
 	def update(self, req, resp, id):
 		fields = self.get_fields_from_request(req)
 		kwargs = self.get_kwargs(req, 'show_hidden', 'context', 'embedded')
-		item = self.collection.update(id, fields, **kwargs)
+		item = self.interface.update(id, fields, **kwargs)
 		self.send_one(req, resp, item)
 		
 		
 	def replace(self, req, resp, id):
 		fields = self.get_fields_from_request(req)
 		kwargs = self.get_kwargs(req, 'show_hidden', 'context', 'embedded')
-		item = self.collection.replace(id, fields, **kwargs)
+		item = self.interface.replace(id, fields, **kwargs)
 		self.send_one(req, resp, item)
 		
 		
 	def delete(self, req, resp, id):
-		self.collection.delete(id, context=self.get_context(req))
+		self.interface.delete(id, context=self.get_context(req))
 		
 		
-	def get_link_or_reference(self, req, resp, id, reference_name):
+	def get_link_or_reference(self, req, resp, id, link_name):
 		kwargs = self.get_kwargs(req)
-		result = self.collection.link(id, reference_name, **kwargs)
+		result = self.interface.link(id, link_name, **kwargs)
 		if isinstance(result, dict):
 			self.send_one(req, resp, result)
 		else:
 			self.send_list(req, resp, result)
 			
 			
-	def count_link_or_reference(self, req, resp, id, reference_name):
+	def count_link_or_reference(self, req, resp, id, link_name):
 		kwargs = self.get_kwargs(req)
 		kwargs['count'] = True
-		result = self.collection.link(id, reference_name, **kwargs)
+		result = self.interface.link(id, link_name, **kwargs)
 		resp.content_type, _ = View.choose(req, self.views)
 		if isinstance(result, int):
 			resp.set_header('X-Count', str(result))
@@ -124,7 +124,7 @@ class Resource(object):
 		
 			
 	def serialize_list(self, req, data):
-		return self.serialize(req, 'get_collection_response', data)
+		return self.serialize(req, 'get_list_response', data)
 			
 			
 	def serialize(self, req, method_name, data):
@@ -259,17 +259,17 @@ class IndividualEndpoint(Endpoint):
 		
 class ReferenceEndpoint(object):
 	
-	def __init__(self, resource, reference_name):
+	def __init__(self, resource, link_name):
 		self.resource = resource
-		self.reference_name = reference_name
+		self.link_name = link_name
 		
 		
 	def on_get(self, req, resp, id):
-		return self.resource.get_link_or_reference(req, resp, id, self.reference_name)
+		return self.resource.get_link_or_reference(req, resp, id, self.link_name)
 		
 		
 	def on_head(self, req, resp, id):
-		return self.resource.count_link_or_reference(req, resp, id, self.reference_name)
+		return self.resource.count_link_or_reference(req, resp, id, self.link_name)
 		
 		
 		
@@ -303,23 +303,35 @@ def duplicate_field_error(views, exc, req, resp, params):
 	resp.status = falcon.HTTP_400
 		
 		
-def add_to_falcon(falcon_api, cellardoor_api, views=(MinimalView,)):
-	views_by_type = []
+class FalconApp(object):
 	
-	for v in views:
-		for mimetype, _ in v.serializers:
-			views_by_type.append((mimetype, v))
-			
-	falcon_api.add_error_handler(errors.NotFoundError, not_found_handler)
-	falcon_api.add_error_handler(errors.NotAuthenticatedError, not_authenticated_handler)
-	falcon_api.add_error_handler(errors.NotAuthorizedError, not_authorized_handler)
-	validation_error_handler_with_views = functools.partial(validation_error_handler, views_by_type)
-	falcon_api.add_error_handler(errors.CompoundValidationError, validation_error_handler_with_views)
-	falcon_api.add_error_handler(errors.DisabledFieldError, disabled_field_error)
-	duplicate_field_error_with_views = functools.partial(duplicate_field_error, views_by_type)
-	falcon_api.add_error_handler(errors.DuplicateError, duplicate_field_error_with_views)
-	
-	for collection in cellardoor_api.collections.values():
-		resource = Resource(collection, views_by_type)
-		resource.add_to_falcon(falcon_api)
+	def __init__(self, api, falcon_app=None, views=(MinimalView,)):
+		if falcon_app is None:
+			falcon_app = falcon.API()
+		self.falcon_app = falcon_app
+		self.api = api
 		
+		views_by_type = []
+		
+		for v in views:
+			if inspect.isclass(v):
+				v = v()
+			for mimetype, _ in v.serializers:
+				views_by_type.append((mimetype, v))
+				
+		falcon_app.add_error_handler(errors.NotFoundError, not_found_handler)
+		falcon_app.add_error_handler(errors.NotAuthenticatedError, not_authenticated_handler)
+		falcon_app.add_error_handler(errors.NotAuthorizedError, not_authorized_handler)
+		validation_error_handler_with_views = functools.partial(validation_error_handler, views_by_type)
+		falcon_app.add_error_handler(errors.CompoundValidationError, validation_error_handler_with_views)
+		falcon_app.add_error_handler(errors.DisabledFieldError, disabled_field_error)
+		duplicate_field_error_with_views = functools.partial(duplicate_field_error, views_by_type)
+		falcon_app.add_error_handler(errors.DuplicateError, duplicate_field_error_with_views)
+		
+		for interface in api.interfaces.values():
+			resource = Resource(interface, views_by_type)
+			resource.add_to_falcon(falcon_app)
+			
+			
+	def __call__(self, *args, **kwargs):
+		return self.falcon_app(*args, **kwargs)

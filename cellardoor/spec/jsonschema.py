@@ -112,9 +112,9 @@ class EntitySerializer(object):
 		prop['anyOf'] = map(self.get_property, field.fields)
 		
 		
-	def handle_Reference(self, field, prop):
+	def handle_Link(self, field, prop):
 		self.handle_Text(field, prop)
-		prop['format'] = 'Reference'
+		prop['format'] = 'Link'
 		prop['schema'] = '#/definitions/%s' % field.entity.__name__
 		
 		

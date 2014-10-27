@@ -5,22 +5,26 @@ from cellardoor.storage.mongodb import MongoDBStorage
 from cellardoor import errors
 
 
-class Foo(Entity):
+storage = MongoDBStorage('test')
+model = Model(storage=storage)
+
+
+class Foo(model.Entity):
 	a = Text()
 	b = TypeOf(int)
 
 
-class Bar(Entity):
+class Bar(model.Entity):
 	versioned = True
 	a = Text()
 	b = TypeOf(int)
 	
 	
-class Baz(Entity):
+class Baz(model.Entity):
 	foo = TypeOf(int, unique=True)
 	
 	
-class Primate(Entity):
+class Primate(model.Entity):
 	pass
 	
 	
@@ -32,30 +36,29 @@ class Scotsman(Human):
 	pass
 
 
+model.freeze()
+
+
 class TestMongoDBStorage(unittest.TestCase):
 	
-	def setUp(self):
-		self.storage = MongoDBStorage('test')
-		self.model = Model(self.storage, (Foo, Bar, Baz, Primate, Human, Scotsman))
-		
-		
 	def tearDown(self):
-		for c in self.storage.db.collection_names():
+		for c in storage.db.collection_names():
 			if not c.startswith('system.'):
-				self.storage.db[c].drop()
+				storage.db[c].drop()
+		storage.setup(model)
 		
 	
 	def test_create(self):
 		"""
 		Should be able to create a document
 		"""
-		results = self.storage.get(Foo)
+		results = storage.get(Foo)
 		self.assertEquals(len(results), 0)
 		
-		foo_id = self.storage.create(Foo, {'a':'cat', 'b':123})
+		foo_id = storage.create(Foo, {'a':'cat', 'b':123})
 		self.assertIsInstance(foo_id, basestring)
 		
-		results = self.storage.get(Foo)
+		results = storage.get(Foo)
 		self.assertEquals(len(results), 1)
 		self.assertEquals(results[0], {'_id':foo_id, 'a':'cat', 'b':123})
 		
@@ -64,9 +67,9 @@ class TestMongoDBStorage(unittest.TestCase):
 		"""
 		Should be able to replace an existing document
 		"""
-		foo_id = self.storage.create(Foo, {'a':'cat', 'b':123})
-		self.storage.update(Foo, foo_id, {'a':'dog'}, replace=True)
-		results = self.storage.get(Foo)
+		foo_id = storage.create(Foo, {'a':'cat', 'b':123})
+		storage.update(Foo, foo_id, {'a':'dog'}, replace=True)
+		results = storage.get(Foo)
 		self.assertEquals(results[0], {'_id':foo_id, 'a':'dog'})
 		
 		
@@ -74,11 +77,11 @@ class TestMongoDBStorage(unittest.TestCase):
 		"""
 		Should modify an existing document and return the modified version.
 		"""
-		foo_id = self.storage.create(Foo, {'a':'cat', 'b':123})
+		foo_id = storage.create(Foo, {'a':'cat', 'b':123})
 		
-		result = self.storage.update(Foo, foo_id, {'a':'dog'})
+		result = storage.update(Foo, foo_id, {'a':'dog'})
 		
-		results = self.storage.get(Foo)
+		results = storage.get(Foo)
 		self.assertEquals(len(results), 1)
 		self.assertEquals(results[0], {'_id':foo_id, 'a':'dog', 'b':123})
 		
@@ -94,10 +97,10 @@ class TestMongoDBStorage(unittest.TestCase):
 		]
 		
 		for doc in docs:
-			doc['_id'] = self.storage.create(Foo, doc)
+			doc['_id'] = storage.create(Foo, doc)
 			
-		self.storage.delete(Foo, docs[1]['_id'])
-		results = self.storage.get(Foo)
+		storage.delete(Foo, docs[1]['_id'])
+		results = storage.get(Foo)
 		
 		self.assertEquals(results, [docs[0], docs[2]])
 		
@@ -113,15 +116,15 @@ class TestMongoDBStorage(unittest.TestCase):
 		]
 		
 		for doc in docs:
-			doc['_id'] = self.storage.create(Foo, doc)
+			doc['_id'] = storage.create(Foo, doc)
 		
-		results = self.storage.get(Foo, filter={'_id':docs[0]['_id']})
+		results = storage.get(Foo, filter={'_id':docs[0]['_id']})
 		self.assertEquals(results,[docs[0]])
 		
-		results = self.storage.get(Foo, filter={'b':2})
+		results = storage.get(Foo, filter={'b':2})
 		self.assertEquals(results,[docs[1]])
 		
-		results = self.storage.get(Foo, filter={'a':'skidoo', 'b':2})
+		results = storage.get(Foo, filter={'a':'skidoo', 'b':2})
 		self.assertEquals(results,[])
 		
 		
@@ -136,9 +139,9 @@ class TestMongoDBStorage(unittest.TestCase):
 		]
 		
 		for doc in docs:
-			doc['_id'] = self.storage.create(Foo, doc)
+			doc['_id'] = storage.create(Foo, doc)
 		
-		results = self.storage.get(Foo, filter={'b':{'$gt':1}})
+		results = storage.get(Foo, filter={'b':{'$gt':1}})
 		self.assertEquals(results,docs[1:])
 		
 		
@@ -154,12 +157,12 @@ class TestMongoDBStorage(unittest.TestCase):
 		]
 		
 		for doc in docs:
-			doc['_id'] = self.storage.create(Foo, doc)
+			doc['_id'] = storage.create(Foo, doc)
 		
-		results = self.storage.get(Foo, sort=('+a',))
+		results = storage.get(Foo, sort=('+a',))
 		self.assertEquals(results, [docs[3], docs[0], docs[2], docs[1]])
 		
-		results = self.storage.get(Foo, sort=('-b','-a'))
+		results = storage.get(Foo, sort=('-b','-a'))
 		self.assertEquals(results, [docs[2], docs[3], docs[1], docs[0]])
 		
 		
@@ -167,15 +170,15 @@ class TestMongoDBStorage(unittest.TestCase):
 		"""
 		Should limit which fields are returned, except for the id field.
 		"""
-		foo_id = self.storage.create(Foo, {'a':'one', 'b':1})
+		foo_id = storage.create(Foo, {'a':'one', 'b':1})
 		
-		result = self.storage.get(Foo, fields=('a',))[0]
+		result = storage.get(Foo, fields=('a',))[0]
 		self.assertEquals(result, {'_id':foo_id, 'a':'one'})
 		
-		result = self.storage.get(Foo, fields=('b',))[0]
+		result = storage.get(Foo, fields=('b',))[0]
 		self.assertEquals(result, {'_id':foo_id, 'b':1})
 		
-		result = self.storage.get(Foo, fields=())[0]
+		result = storage.get(Foo, fields=())[0]
 		self.assertEquals(result, {'_id':foo_id})
 		
 		
@@ -191,16 +194,16 @@ class TestMongoDBStorage(unittest.TestCase):
 		]
 		
 		for doc in docs:
-			doc['_id'] = self.storage.create(Foo, doc)
+			doc['_id'] = storage.create(Foo, doc)
 			
 			
-		results = self.storage.get(Foo)
+		results = storage.get(Foo)
 		self.assertEquals(len(results), 4)
 		
-		results = self.storage.get(Foo, limit=2)
+		results = storage.get(Foo, limit=2)
 		self.assertEquals(len(results), 2)
 		
-		results = self.storage.get(Foo, offset=1, limit=2)
+		results = storage.get(Foo, offset=1, limit=2)
 		self.assertEquals(results, docs[1:3])
 		
 		
@@ -210,10 +213,10 @@ class TestMongoDBStorage(unittest.TestCase):
 		"""
 		ids = []
 		for i in range(0,10):
-			ids.append(self.storage.create(Foo, {'b':i}))
+			ids.append(storage.create(Foo, {'b':i}))
 		
 		subset_of_ids = ids[0:5]
-		results = self.storage.get_by_ids(Foo, subset_of_ids, fields={})
+		results = storage.get_by_ids(Foo, subset_of_ids, fields={})
 		self.assertEquals([r['_id'] for r in results], subset_of_ids)
 		
 		
@@ -227,28 +230,28 @@ class TestMongoDBStorage(unittest.TestCase):
 			'd': {'$where':'foo()'}
 		}
 		with self.assertRaises(errors.DisabledFieldError) as cm:
-			self.storage.check_filter(filter, ('a','b', 'd'), {})
+			storage.check_filter(filter, ('a','b', 'd'), {})
 		self.assertEquals(cm.exception.message, 'You cannot filter by the "c" field')
 		
 		
 	def test_filter_identity_fail(self):
 		"""An error is raised if the context's identity doesn't have the specified attribute"""
 		filter = {'stuff': '$identity.things'}
-		self.storage.check_filter(filter, ('stuff',), {'identity':{'things':123}})
+		storage.check_filter(filter, ('stuff',), {'identity':{'things':123}})
 		self.assertEquals(filter, {'stuff':123})
 		
 		
 	def test_filter_identity(self):
 		"""$identity is replaced with the context's identity when checking the filter"""
 		filter = {'stuff': '$identity.things'}
-		self.storage.check_filter(filter, ('stuff',), {'identity':{'things':123}})
+		storage.check_filter(filter, ('stuff',), {'identity':{'things':123}})
 		self.assertEquals(filter, {'stuff':123})
 		
 		
 	def test_filter_identity_list(self):
 		"""$identity is replaced with the context's identity when checking the filter"""
 		filter = {'stuff': ['foo', '$identity.things']}
-		self.storage.check_filter(filter, ('stuff',), {'identity':{'things':123}})
+		storage.check_filter(filter, ('stuff',), {'identity':{'things':123}})
 		self.assertEquals(filter, {'stuff':['foo', 123]})
 		
 		
@@ -256,11 +259,11 @@ class TestMongoDBStorage(unittest.TestCase):
 		"""
 		Returns an empty result when trying to get versions of an unversioned entity
 		"""
-		foo_id = self.storage.create(Foo, {'a':'cat', 'b':123})
-		self.storage.update(Foo, foo_id, {'a':'b'})
-		results = self.storage.get(Foo)
+		foo_id = storage.create(Foo, {'a':'cat', 'b':123})
+		storage.update(Foo, foo_id, {'a':'b'})
+		results = storage.get(Foo)
 		self.assertEquals(len(results), 1)
-		results = self.storage.get(Foo, versions=True)
+		results = storage.get(Foo, versions=True)
 		self.assertEquals(len(results), 0)
 		
 		
@@ -268,11 +271,11 @@ class TestMongoDBStorage(unittest.TestCase):
 		"""
 		Returns an empty result when trying to get versions of an unversioned entity
 		"""
-		foo_id = self.storage.create(Foo, {'a':'cat', 'b':123})
-		self.storage.update(Foo, foo_id, {'a':'b'})
-		results = self.storage.get_by_ids(Foo, [foo_id])
+		foo_id = storage.create(Foo, {'a':'cat', 'b':123})
+		storage.update(Foo, foo_id, {'a':'b'})
+		results = storage.get_by_ids(Foo, [foo_id])
 		self.assertEquals(len(results), 1)
-		results = self.storage.get_by_ids(Foo, [foo_id], versions=True)
+		results = storage.get_by_ids(Foo, [foo_id], versions=True)
 		self.assertEquals(len(results), 0)
 		
 		
@@ -280,8 +283,8 @@ class TestMongoDBStorage(unittest.TestCase):
 		"""
 		When created, a versioned entity will have version information.
 		"""
-		bar_id = self.storage.create(Bar, {'a':'car', 'b':123})
-		bar = self.storage.get_by_id(Bar, bar_id)
+		bar_id = storage.create(Bar, {'a':'car', 'b':123})
+		bar = storage.get_by_id(Bar, bar_id)
 		self.assertEquals(bar, {'_id':bar_id, '_version':1, 'a':'car', 'b':123})
 		
 		
@@ -289,18 +292,18 @@ class TestMongoDBStorage(unittest.TestCase):
 		"""
 		If the version is not provided with the update, a CompoundValidationError is raised
 		"""
-		bar_id = self.storage.create(Bar, {'a':'car', 'b':123})
-		self.assertRaises(errors.CompoundValidationError, self.storage.update, Bar, bar_id, {'a':'bike'})
+		bar_id = storage.create(Bar, {'a':'car', 'b':123})
+		self.assertRaises(errors.CompoundValidationError, storage.update, Bar, bar_id, {'a':'bike'})
 		
 		
 	def test_update_versioned_conflict(self):
 		"""
 		If the version provided with an update doesn't match the version of the stored document, a VersionConflictError is raised.
 		"""
-		bar_id = self.storage.create(Bar, {'a':'car', 'b':123})
-		bar = self.storage.get_by_id(Bar, bar_id)
+		bar_id = storage.create(Bar, {'a':'car', 'b':123})
+		bar = storage.get_by_id(Bar, bar_id)
 		with self.assertRaises(errors.VersionConflictError) as cm:
-			self.storage.update(Bar, bar_id, {'_version':99, 'a':'bike'})
+			storage.update(Bar, bar_id, {'_version':99, 'a':'bike'})
 		self.assertEquals(cm.exception.other, bar)
 		
 		
@@ -308,10 +311,10 @@ class TestMongoDBStorage(unittest.TestCase):
 		"""
 		When a versioned item is updated, the version number will increment.
 		"""
-		bar_id = self.storage.create(Bar, {'a':'car', 'b':123})
-		bar = self.storage.update(Bar, bar_id, {'_version':1, 'a':'bike'})
+		bar_id = storage.create(Bar, {'a':'car', 'b':123})
+		bar = storage.update(Bar, bar_id, {'_version':1, 'a':'bike'})
 		self.assertEquals(bar['_version'], 2)
-		bar = self.storage.update(Bar, bar_id, {'_version':2, 'a':'unicycle'})
+		bar = storage.update(Bar, bar_id, {'_version':2, 'a':'unicycle'})
 		self.assertEquals(bar['_version'], 3)
 		
 		
@@ -319,10 +322,10 @@ class TestMongoDBStorage(unittest.TestCase):
 		"""
 		Can get a list of past versions of documents
 		"""
-		bar_id = self.storage.create(Bar, {'a':'car', 'b':123})
-		self.storage.update(Bar, bar_id, {'_version':1, 'a':'bike'})
-		self.storage.update(Bar, bar_id, {'_version':2, 'a':'unicycle'})
-		results = self.storage.get(Bar, versions=True)
+		bar_id = storage.create(Bar, {'a':'car', 'b':123})
+		storage.update(Bar, bar_id, {'_version':1, 'a':'bike'})
+		storage.update(Bar, bar_id, {'_version':2, 'a':'unicycle'})
+		results = storage.get(Bar, versions=True)
 		self.assertEquals(
 			results,
 			[
@@ -336,10 +339,10 @@ class TestMongoDBStorage(unittest.TestCase):
 		"""
 		Deleting a versioned document leaves a record of the deletion.
 		"""
-		bar_id = self.storage.create(Bar, {'a':'bike', 'b':123})
-		bar = self.storage.get_by_id(Bar, bar_id)
-		self.storage.delete(Bar, bar_id, deleted_by='The Grinch')
-		results = self.storage.get(Bar, versions=True)
+		bar_id = storage.create(Bar, {'a':'bike', 'b':123})
+		bar = storage.get_by_id(Bar, bar_id)
+		storage.delete(Bar, bar_id, deleted_by='The Grinch')
+		results = storage.get(Bar, versions=True)
 		self.assertEquals(results[0], bar)
 		delete_record = results[1]
 		self.assertIn('_deleted_on', delete_record)
@@ -352,8 +355,8 @@ class TestMongoDBStorage(unittest.TestCase):
 		"""
 		Entities that extend other entities get a _type field
 		"""
-		sean_id = self.storage.create(Scotsman, {'name':'Sean Connery'})
-		sean = self.storage.get_by_id(Scotsman, sean_id)
+		sean_id = storage.create(Scotsman, {'name':'Sean Connery'})
+		sean = storage.get_by_id(Scotsman, sean_id)
 		self.assertEquals(sean['_type'], 'Primate.Human.Scotsman')
 		
 		
@@ -361,11 +364,11 @@ class TestMongoDBStorage(unittest.TestCase):
 		"""
 		Can get subclass items by querying the base class
 		"""
-		sean_id = self.storage.create(Scotsman, {'name':'Sean Connery'})
-		sean = self.storage.get_by_id(Scotsman, sean_id)
-		base_sean = self.storage.get_by_id(Human, sean_id)
+		sean_id = storage.create(Scotsman, {'name':'Sean Connery'})
+		sean = storage.get_by_id(Scotsman, sean_id)
+		base_sean = storage.get_by_id(Human, sean_id)
 		self.assertEquals(base_sean, sean)
-		humans = self.storage.get(Human)
+		humans = storage.get(Human)
 		self.assertEquals(humans, [sean])
 		
 		
@@ -373,16 +376,16 @@ class TestMongoDBStorage(unittest.TestCase):
 		"""
 		When fetching items for a subclass, no base class items are returned.
 		"""
-		bobo_id = self.storage.create(Primate, {})
-		bobo = self.storage.get_by_id(Primate, bobo_id)
-		not_bobo = self.storage.get_by_id(Human, bobo_id)
+		bobo_id = storage.create(Primate, {})
+		bobo = storage.get_by_id(Primate, bobo_id)
+		not_bobo = storage.get_by_id(Human, bobo_id)
 		self.assertEquals(not_bobo, None)
 		
-		sean_id = self.storage.create(Scotsman, {'name':'Sean Connery'})
-		sean = self.storage.get_by_id(Scotsman, sean_id)
+		sean_id = storage.create(Scotsman, {'name':'Sean Connery'})
+		sean = storage.get_by_id(Scotsman, sean_id)
 		
-		primate_results = self.storage.get(Primate)
-		human_results = self.storage.get(Human)
+		primate_results = storage.get(Primate)
+		human_results = storage.get(Human)
 		self.assertEquals(primate_results, [bobo, sean])
 		self.assertEquals(human_results, [sean])
 		
@@ -391,38 +394,38 @@ class TestMongoDBStorage(unittest.TestCase):
 		"""
 		Raises an error when attempting to create an item with a duplicated unique field.
 		"""
-		self.storage.create(Baz, {'foo':123})
+		storage.create(Baz, {'foo':123})
 		
 		with self.assertRaises(errors.DuplicateError):
-			self.storage.create(Baz, {'foo':123})
+			storage.create(Baz, {'foo':123})
 			
 			
 	def test_update_collision(self):
 		"""
 		Raises an error when attempting to update an item with a duplicated unique field.
 		"""
-		self.storage.create(Baz, {'foo':123})
-		baz_id = self.storage.create(Baz, {'foo':321})
+		storage.create(Baz, {'foo':123})
+		baz_id = storage.create(Baz, {'foo':321})
 		
 		with self.assertRaises(errors.DuplicateError):
-			self.storage.update(Baz, baz_id, {'foo':123})
+			storage.update(Baz, baz_id, {'foo':123})
 		
 		
 	def test_nonnative_ids(self):
 		"""
 		Can use something other than a `bson.objectid.ObjectId` as an item id.
 		"""
-		baz_id = self.storage.create(Baz, {'_id':123, 'foo':123})
+		baz_id = storage.create(Baz, {'_id':123, 'foo':123})
 		self.assertEquals(baz_id, '123')
 		
-		fetched_baz = self.storage.get_by_id(Baz, '123')
+		fetched_baz = storage.get_by_id(Baz, '123')
 		self.assertEquals(fetched_baz, {'_id':'123', 'foo':123})
 		
-		udpated_baz = self.storage.update(Baz, '123', {'foo':666})
+		udpated_baz = storage.update(Baz, '123', {'foo':666})
 		self.assertEquals(udpated_baz, {'_id':'123', 'foo':666})
 		
-		self.storage.delete(Baz, '123')
-		fetched_baz = self.storage.get_by_id(Baz, '123')
+		storage.delete(Baz, '123')
+		fetched_baz = storage.get_by_id(Baz, '123')
 		self.assertEquals(fetched_baz, None)
 		
 		
@@ -437,7 +440,7 @@ class TestMongoDBStorage(unittest.TestCase):
 		]
 		
 		for doc in docs:
-			doc['_id'] = self.storage.create(Foo, doc)
+			doc['_id'] = storage.create(Foo, doc)
 		
-		result = self.storage.get(Foo, count=True)
+		result = storage.get(Foo, count=True)
 		self.assertEquals(result, 3)

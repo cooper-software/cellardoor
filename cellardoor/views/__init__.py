@@ -2,7 +2,7 @@ class View(object):
 	
 	serializers = None
 	
-	def get_collection_response(self, req, objs):
+	def get_list_response(self, req, objs):
 		raise NotImplementedError
 		
 		
