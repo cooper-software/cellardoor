@@ -1,5 +1,5 @@
 from cellardoor.api import API
-from cellardoor.api.interfaces import LIST, GET, CREATE, UPDATE, DELETE, ALL
+from cellardoor.api.methods import LIST, GET, CREATE, UPDATE, DELETE, ALL
 from . import model
 from .authorization import admin_or_self, admin_or_user
 

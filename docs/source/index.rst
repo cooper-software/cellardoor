@@ -23,8 +23,11 @@ This is to give you a basic idea of what working with cellardoor looks like. For
 .. code-block:: python
 	
 	from cellardoor.model import *
+	from cellardoor.storage.mongodb import MongoDBStorage
 	
-	class Todo(Entity):
+	model = Model(storage=MongoDBStorage('cellardoor_todo'))
+	
+	class Todo(model.Entity):
 		title = Text()
 		is_done = Boolean()
 		
@@ -34,34 +37,21 @@ This is to give you a basic idea of what working with cellardoor looks like. For
 
 .. code-block:: python
 	
-	from cellardoor.collection import Collection
-	from cellardoor.methods import ALL
+	from cellardoor.api import API
+	from cellardoor.api.methods import ALL
 	
-	class Todos(Collection):
+	api = API(model)
+	
+	class Todos(api.Interface):
 		entity = Todo
 		method_authorization = {
 			ALL: None
 		}
 		enabled_filters = ('title','is_done')
 		enabled_sort = ('title','is_done')
-		
-		
-
-3. Decide how to store data 
-###########################
-
-.. code-block:: python
-	
-	from cellardoor import CellarDoor
-	from cellardoor.storage.mongodb import MongoDBStorage
-	
-	api = CellarDoor(
-		storage=MongoDBStorage('todo'), 
-		collections=(Todos,)
-	)
 	
 	
-4. Profit
+3. Profit
 #########
 
 Everyone gets a nice, pythonic API
@@ -88,11 +78,8 @@ If you need it, create a ReST API
 
 .. code-block:: python
 	
-	import falcon
-	from cellardoor.falcon import add_to_falcon
-	
-	app = falcon.API()
-	add_to_falcon(app, api)
+	from cellardoor.wsgi.falcon_app import FalconApp
+	app = FalconApp(api)
 
 
 Need more? Flask? SQLAlchemy? Protocol Buffers? We're working on other storage backends and protocols and you can also :doc:`get involved <development>`.
