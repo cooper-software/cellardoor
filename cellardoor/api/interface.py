@@ -2,27 +2,12 @@ from copy import deepcopy
 from ..model import ListOf, InverseLink
 from ..events import EventManager
 from .. import errors
+from .methods import *
 
 
 __all__ = [
-	'Interface',
-	'LIST',
-	'GET',
-	'CREATE',
-	'UPDATE',
-	'REPLACE',
-	'DELETE',
-	'ALL'
+	'Interface'
 ]
-
-LIST = 'list'
-GET = 'get'
-CREATE = 'create'
-REPLACE = 'replace'
-UPDATE = 'update'
-DELETE = 'delete'
-ALL = (LIST, GET, CREATE, UPDATE, REPLACE, DELETE)
-
 
 
 class RuleSet(object):
