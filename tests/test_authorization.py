@@ -371,14 +371,6 @@ class TestAuthorization(unittest.TestCase):
 		self.assertIsInstance(foo, ObjectProxy)
 		
 		
-	def test_item_proxy_attr_error(self):
-		"""Raises an AttributeError if the requested field isn't defined by the entity"""
-		foo = ItemProxy(Foo)
-		
-		with self.assertRaises(AttributeError):
-			foo.twiddlers
-		
-		
 	def test_item_proxy_link_attr(self):
 		"""An item proxy returns a LinkProxy if the requested field is a link"""
 		foo = ItemProxy(Foo)

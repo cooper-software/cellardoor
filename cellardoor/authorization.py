@@ -299,10 +299,8 @@ class ItemProxy(ObjectProxy):
 		if key in self._entity.links:
 			link = self._entity.links[key]
 			return LinkProxy(self, link.entity, key)
-		elif key in self._entity.fields:
-			return ObjectProxyValue(self, key)
 		else:
-			raise AttributeError, "'%s' has no field called '%s'" % (self._entity.__name__, key)
+			return ObjectProxyValue(self, key)
 		
 		
 	def __repr__(self):
