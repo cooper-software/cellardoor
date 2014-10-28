@@ -1,6 +1,24 @@
 import unittest
 from mock import Mock
 from cellardoor.authorization import *
+from cellardoor.model import Model, Text, Link
+from cellardoor.storage import Storage
+
+
+model = Model(storage=Storage())
+
+class Foo(model.Entity):
+	bar = Link('Bar')
+	baz = Text()
+	
+	
+class Bar(model.Entity):
+	pass
+	
+	
+model.freeze()
+
+
 
 class TestAuthorization(unittest.TestCase):
 	
@@ -347,72 +365,60 @@ class TestAuthorization(unittest.TestCase):
 		self.assertEquals(expr_one, expr_two)
 		
 		
-	# def test_item_proxy_is_object_proxy(self):
-	# 	"""An ItemProxy should be a kind of ObjectProxy"""
-	# 	foo = ItemProxy(None, None)
-	# 	self.assertIsInstance(foo, ObjectProxy)
+	def test_item_proxy_is_object_proxy(self):
+		"""An ItemProxy should be a kind of ObjectProxy"""
+		foo = ItemProxy(None, None)
+		self.assertIsInstance(foo, ObjectProxy)
 		
 		
-	# def test_item_proxy_attr_error(self):
-	# 	"""Raises an AttributeError if the requested field isn't defined by the collection's entity"""
-	# 	collection = Mock()
-	# 	collection.entity = Mock()
-	# 	collection.entity.fields = {}
-	# 	foo = ItemProxy(collection, 'foo')
+	def test_item_proxy_attr_error(self):
+		"""Raises an AttributeError if the requested field isn't defined by the entity"""
+		foo = ItemProxy(Foo)
 		
-	# 	with self.assertRaises(AttributeError):
-	# 		foo.bar
+		with self.assertRaises(AttributeError):
+			foo.twiddlers
 		
 		
-	# def test_item_proxy_link_attr(self):
-	# 	"""An item proxy returns a LinkProxy if the requested field is a link"""
-	# 	collection = Mock()
-	# 	collection.entity = Mock()
-	# 	collection.entity.fields = { 'bar': 'BarField' }
-	# 	collection.links = { 'bar': 'BarLink' }
-		
-	# 	foo = ItemProxy(collection, 'foo')
-	# 	link = foo.bar
-	# 	self.assertIsInstance(link, LinkProxy)
-	# 	self.assertEquals(link._proxy, foo)
-	# 	self.assertEquals(link._collection, 'BarLink')
-	# 	self.assertEquals(link._name, 'bar')
+	def test_item_proxy_link_attr(self):
+		"""An item proxy returns a LinkProxy if the requested field is a link"""
+		foo = ItemProxy(Foo)
+		link = foo.bar
+		self.assertIsInstance(link, LinkProxy)
+		self.assertEquals(link._proxy, foo)
+		self.assertEquals(link._entity, Bar)
+		self.assertEquals(link._name, 'bar')
 		
 		
-	# def test_item_proxy_value_attr(self):
-	# 	"""An item proxy returns an ObjectProxyValue if the requested field is not a link"""
-	# 	collection = Mock()
-	# 	collection.entity = Mock()
-	# 	collection.entity.fields = { 'bar': 'BarField' }
-	# 	collection.links = None
-		
-	# 	foo = ItemProxy(collection, 'foo')
-	# 	value = foo.bar
-	# 	self.assertIsInstance(value, ObjectProxyValue)
-	# 	self.assertNotIsInstance(value, LinkProxy)
-	# 	self.assertEquals(value._proxy, foo)
-	# 	self.assertEquals(value._key, 'bar')
+	def test_item_proxy_value_attr(self):
+		"""An item proxy returns an ObjectProxyValue if the requested field is not a link"""
+		foo = ItemProxy(Foo)
+		value = foo.baz
+		self.assertIsInstance(value, ObjectProxyValue)
+		self.assertNotIsInstance(value, LinkProxy)
+		self.assertEquals(value._proxy, foo)
+		self.assertEquals(value._key, 'baz')
 		
 		
-	# def test_link_proxy_is_item_and_value(self):
-	# 	"""A link proxy is both an item proxy and a value proxy"""
-	# 	link = LinkProxy(None, None, None)
-	# 	self.assertIsInstance(link, ObjectProxyValue)
-	# 	self.assertIsInstance(link, ItemProxy)
+	def test_link_proxy_is_item_and_value(self):
+		"""A link proxy is both an item proxy and a value proxy"""
+		link = LinkProxy(None, None, None)
+		self.assertIsInstance(link, ObjectProxyValue)
+		self.assertIsInstance(link, ItemProxy)
 		
 		
-	# def test_link_proxy_get(self):
-	# 	"""Returns the result of the proxy collection's link"""
-	# 	proxy = Mock()
-	# 	proxy.get = Mock(return_value={'_id':'123'})
-	# 	proxy._collection = Mock()
-	# 	proxy._collection.link = Mock(return_value='123-link')
+	def test_link_proxy_get(self):
+		"""Returns the result of the proxy interface's link"""
+		proxy = Mock()
+		proxy.get = Mock(return_value={'_id':'123'})
+		interface = Mock()
+		interface.link = Mock(return_value='123-link')
+		api = Mock()
+		api.get_interface_for_entity = Mock(return_value=interface)
 		
-	# 	link = LinkProxy(proxy, None, 'link-name')
-	# 	result = link.get(None)
-	# 	self.assertEquals(result, '123-link')
-	# 	proxy.get.assert_called_once_with(None)
-	# 	proxy._collection.link.assert_called_once_with(
-	# 		'123', 'link-name', bypass_authorization=True, show_hidden=True
-	# 	)
-	# 	
+		link = LinkProxy(proxy, None, 'link-name')
+		result = link.get({'api': api})
+		self.assertEquals(result, '123-link')
+		interface.link.assert_called_once_with(
+			'123', 'link-name', bypass_authorization=True, show_hidden=True
+		)
+		

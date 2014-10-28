@@ -163,14 +163,14 @@ class APISerializer(object):
 			definitions[e.__name__] = entity_serializer.create_schema(e)
 		
 		resources = {}
-		for collection in api.collections:
-			entity_links = definitions[collection.entity.__class__.__name__]['links']
+		for interface in api.interfaces:
+			entity_links = definitions[interface.entity.__class__.__name__]['links']
 			if 'resource' not in entity_links:
 				entity_links['resource'] = {
 					'rel': 'resource',
-					'href': '#/properties/%s' % collection.plural_name
+					'href': '#/properties/%s' % interface.plural_name
 				}
-			resources[collection.plural_name] = self.get_resource_schema(collection)
+			resources[interface.plural_name] = self.get_resource_schema(interface)
 		
 		return {
 			"$schema": "http://json-schema.org/draft-04/schema#",
@@ -180,123 +180,122 @@ class APISerializer(object):
 		}
 		
 		
-	def get_resource_schema(self, collection):
+	def get_resource_schema(self, interface):
 		links = {}
 		
-		for method in collection.rules.enabled_methods:
+		for method in interface.rules.enabled_methods:
 			fn = getattr(self, 'get_%s_link' % method)
-			links[method] = fn(collection)
+			links[method] = fn(interface)
 			
-		if collection.links:
-			for k,v in collection.links.items():
-				links['link-%s' % k] = self.get_link_link(collection, k, v)
+		for k,v in interface.entity.links.items():
+			links['link-%s' % k] = self.get_link_link(interface, k, v)
 		
 		return {
-			"title": collection.plural_name,
+			"title": interface.plural_name,
 			"links": links
 		}
 		
 		
-	def get_list_link(self, collection):
+	def get_list_link(self, interface):
 		return {
-			'href': self.base_url + '/%s' % collection.plural_name,
+			'href': self.base_url + '/%s' % interface.plural_name,
 			'method': 'GET',
 			'rel': 'instances',
 			'title': 'List',
 			'targetSchema': {
 				'type': 'array',
 				'items': {
-					'$ref': self.entity_schema_ref(collection)
+					'$ref': self.entity_schema_ref(interface)
 				}
 			}
 		}
 		
 		
-	def get_get_link(self, collection):
+	def get_get_link(self, interface):
 		return {
-			'href': self.base_url + '/%s/{id}' % collection.plural_name,
+			'href': self.base_url + '/%s/{id}' % interface.plural_name,
 			'method': 'GET',
 			'rel': 'instance',
 			'title': 'Details',
-			'targetSchema': { '$ref': self.entity_schema_ref(collection) }
+			'targetSchema': { '$ref': self.entity_schema_ref(interface) }
 		}
 		
 		
-	def get_create_link(self, collection):
+	def get_create_link(self, interface):
 		return {
-			'href': self.base_url + '/%s' % collection.plural_name,
+			'href': self.base_url + '/%s' % interface.plural_name,
 			'method': 'POST',
 			'rel': 'create',
 			'title': 'New',
-			'schema': { '$ref': self.entity_schema_ref(collection) },
-			'targetSchema': { '$ref': self.entity_schema_ref(collection) }
+			'schema': { '$ref': self.entity_schema_ref(interface) },
+			'targetSchema': { '$ref': self.entity_schema_ref(interface) }
 		}
 		
 		
-	def get_update_link(self, collection):
+	def get_update_link(self, interface):
 		return {
-			'href': self.base_url + '/%s/{id}' % collection.plural_name,
+			'href': self.base_url + '/%s/{id}' % interface.plural_name,
 			'method': 'PATCH',
 			'rel': 'update',
 			'title': 'Update',
 			'schema': {
-				'allOf': [ { '$ref': self.entity_schema_ref(collection) } ],
+				'allOf': [ { '$ref': self.entity_schema_ref(interface) } ],
 				'required': []
 			},
-			'targetSchema': { '$ref': self.entity_schema_ref(collection) }
+			'targetSchema': { '$ref': self.entity_schema_ref(interface) }
 		}
 		
 		
-	def get_replace_link(self, collection):
+	def get_replace_link(self, interface):
 		return {
-			'href': self.base_url + '/%s/{id}' % collection.plural_name,
+			'href': self.base_url + '/%s/{id}' % interface.plural_name,
 			'method': 'PUT',
 			'rel': 'replace',
 			'title': 'Replace',
-			'schema': { '$ref': self.entity_schema_ref(collection) },
-			'targetSchema': { '$ref': self.entity_schema_ref(collection) }
+			'schema': { '$ref': self.entity_schema_ref(interface) },
+			'targetSchema': { '$ref': self.entity_schema_ref(interface) }
 		}
 		
 		
-	def get_delete_link(self, collection):
+	def get_delete_link(self, interface):
 		return {
-			'href': self.base_url + '/%s/{id}' % collection.plural_name,
+			'href': self.base_url + '/%s/{id}' % interface.plural_name,
 			'method': 'DELETE',
 			'rel': 'delete',
 			'title': 'Delete'
 		}
 		
 		
-	def get_link_link(self, collection, link_name, link_collection):
+	def get_link_link(self, interface, link_name, link_interface):
 		schema_link = {
-			'href': self.base_url + '/%s/{id}/%s' % (collection.plural_name, link_name),
+			'href': self.base_url + '/%s/{id}/%s' % (interface.plural_name, link_name),
 			'method': 'GET',
 			'rel': 'link',
 			'title': 'Link'
 		}
 		
 		link = None
-		entities = [collection.entity] + collection.entity.children
+		entities = [interface.entity] + interface.entity.children
 		for entity in entities:
 			if hasattr(entity, link_name):
 				link = getattr(entity, link_name)
 				break
 		if link is None:
-			raise Exception, "%s has no link %s" % (collection.entity.__class__.__name__, link_name)
+			raise Exception, "%s has no link %s" % (interface.entity.__class__.__name__, link_name)
 		
-		if collection.entity.is_multiple_link(link):
+		if interface.entity.is_multiple_link(link):
 			schema_link['targetSchema'] = {
 				'type': 'array',
-				'items': { '$ref': self.entity_schema_ref(link_collection) }
+				'items': { '$ref': self.entity_schema_ref(link_interface) }
 			}
 		else:
-			schema_link['targetSchema'] = { '$ref': self.entity_schema_ref(link_collection) }
+			schema_link['targetSchema'] = { '$ref': self.entity_schema_ref(link_interface) }
 			
 		return schema_link
 		
 		
-	def entity_schema_ref(self, collection):
-		return '#/definitions/%s' % collection.entity.__class__.__name__
+	def entity_schema_ref(self, interface):
+		return '#/definitions/%s' % interface.entity.__class__.__name__
 
 
 def to_jsonschema(api, base_url, api_cls=APISerializer, entity_cls=EntitySerializer):

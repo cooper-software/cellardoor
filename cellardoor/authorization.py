@@ -290,36 +290,40 @@ class ContainsComparison(ObjectProxyValueComparison):
 		
 class ItemProxy(ObjectProxy):
 	
-	def __init__(self, collection, name):
+	def __init__(self, entity, name='item'):
 		super(ItemProxy, self).__init__(name)
-		self._collection = collection
+		self._entity = entity
 		
 		
 	def __getattr__(self, key):
-		if self._collection.links and key in self._collection.links:
-			return LinkProxy(self, self._collection.links[key], key)
-		else:
+		if key in self._entity.links:
+			link = self._entity.links[key]
+			return LinkProxy(self, link.entity, key)
+		elif key in self._entity.fields:
 			return ObjectProxyValue(self, key)
+		else:
+			raise AttributeError, "'%s' has no field called '%s'" % (self._entity.__name__, key)
 		
 		
 	def __repr__(self):
-		return 'ItemProxy(%s, %s)' % (self._collection.plural_name, self._name)
+		return 'ItemProxy(%s, %s)' % (self._entity.__name__, self._name)
 		
 	
 	
 class LinkProxy(ObjectProxyValue, ItemProxy):
 	
-	def __init__(self, proxy, collection, name):
-		ItemProxy.__init__(self, collection, name)
+	def __init__(self, proxy, entity, name):
+		ItemProxy.__init__(self, entity, name)
 		ObjectProxyValue.__init__(self, proxy, name)
 		
 		
 	def get(self, context):
 		item = self._proxy.get(context)
-		return self._proxy._collection.link(item['_id'], self._name, 
+		interface = context['api'].get_interface_for_entity(self._proxy._entity)
+		return interface.link(item['_id'], self._name, 
 							bypass_authorization=True, show_hidden=True)
 		
 		
 	def __repr__(self):
-		return 'LinkProxy(%s, %s)' % (self._proxy._name, self._name)
+		return 'LinkProxy(%s, %s)' % (self._proxy._entity.__name__, self._name)
 		

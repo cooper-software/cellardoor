@@ -104,7 +104,7 @@ class EntityType(type):
         
         fields = {}
         hidden_fields = set()
-        links = []
+        links = {}
         
         # Make sure all fields are instantiated, no fields are using a reserved name
         # and put fields into their categorized buckets for quick lookup later.
@@ -118,14 +118,14 @@ class EntityType(type):
                 if v.hidden:
                     hidden_fields.add(k)
             if isinstance(v, (Link, InverseLink)):
-                links.append((k,v))
+                links[k] = v
             elif isinstance(v, ListOf) and isinstance(v.field, (Link, InverseLink)):
-                links.append((k, v.field))
+                links[k] = v.field
         
         embeddable = set()
         embed_by_default = set()
         
-        for k,v in links:
+        for k,v in links.items():
             if v.embeddable:
                 embeddable.add(k)
                 if v.embed_by_default:
@@ -134,7 +134,7 @@ class EntityType(type):
         # Add all the fields from the base entities to the categorized buckets
         for entity_cls in hierarchy:
             fields.update(entity_cls.fields)
-            links += entity_cls.links
+            links.update(entity_cls.links)
             hidden_fields.update(entity_cls.hidden_fields)
             embeddable.update(entity_cls.embeddable)
             embed_by_default.update(entity_cls.embed_by_default)
@@ -173,10 +173,6 @@ class EntityType(type):
         new_cls.model.add_entity(new_cls)
         
         return new_cls
-        
-        
-    def is_multiple_link(self):
-        return isinstance(link, ListOf) or isinstance(link, InverseLink) and link.multiple
         
         
             
@@ -231,7 +227,7 @@ class Model(object):
         if self.is_frozen:
             return
         for entity in self.entities.values():
-            for _, link in entity.links:
+            for _, link in entity.links.items():
                 if isinstance(link.entity, basestring):
                     if link.entity not in self.entities:
                         raise InvalidModelException, "%s is not defined in this model" % link.entity
