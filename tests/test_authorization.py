@@ -345,6 +345,18 @@ class TestAuthorization(unittest.TestCase):
 		self.assertFalse(
 			(a >= c)(context)
 		)
+		
+		
+	def test_proxy_contains(self):
+		"""A proxy value can check if it contains an item"""
+		a = ObjectProxy('foo').bar
+		b = ObjectProxy('foo').baz
+		
+		context = {'foo': { 'bar':3, 'baz':[1,2,3,4,5] }}
+		self.assertTrue((a.in_(b))(context))
+		
+		context = {'foo': { 'bar':23, 'baz':[1,2,3,4,5] }}
+		self.assertFalse((a.in_(b))(context))
 	
 	
 	def test_auth_expr_equality_fail(self):

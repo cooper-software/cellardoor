@@ -194,7 +194,7 @@ class ObjectProxyValue(AuthenticationExpression):
 		return GreaterThanEqualComparison(self, other)
 		
 		
-	def __contains__(self, other):
+	def in_(self, other):
 		return ContainsComparison(self, other)
 		
 		
@@ -227,7 +227,7 @@ class ObjectProxyValueComparison(AuthenticationExpression):
 			
 		
 	def compare(self, a, b):
-		self
+		raise NotImplementedError
 		
 		
 	def uses(self, key):
