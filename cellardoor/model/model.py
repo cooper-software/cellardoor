@@ -9,7 +9,11 @@ __all__ = [
     'Model',
     'InvalidModelException'
 ]
-       
+
+
+class InvalidModelException(Exception):
+    pass
+
         
 class Link(Text):
     
@@ -175,6 +179,27 @@ class EntityType(type):
         return new_cls
         
         
+    def get_link(cls, name):
+        link = cls.links.get(name)
+        if not link:
+            return None
+        if not link.storage:
+            link.storage = cls.model.storage
+            if isinstance(link.entity, basestring):
+                try:
+                    link.entity = cls.model.entities[link.entity]
+                except KeyError:
+                    raise InvalidModelException, "The model has no entity '%s'" % link.entity
+            elif link.entity not in cls.model:
+                raise InvalidModelException, "The model has no entity '%s'" % link.entity.__name__
+        return link
+        
+        
+    def get_links(cls):
+        link_names = cls.links.keys()
+        return dict(zip(link_names, map(cls.get_link, link_names)))
+        
+        
             
 class Entity(object):
     
@@ -182,11 +207,6 @@ class Entity(object):
     
     mixins = []
     versioned = False
-    
-            
-
-class InvalidModelException(Exception):
-    pass
     
     
 
@@ -224,18 +244,7 @@ class Model(object):
         
         
     def freeze(self):
-        if self.is_frozen:
-            return
-        for entity in self.entities.values():
-            for _, link in entity.links.items():
-                if isinstance(link.entity, basestring):
-                    if link.entity not in self.entities:
-                        raise InvalidModelException, "%s is not defined in this model" % link.entity
-                    else:
-                        link.entity = self.entities[link.entity]
-                elif link.entity.__name__ not in self.entities:
-                    raise InvalidModelException, "%s is from a different model" % link.entity.__name__
-                link.storage = self.storage
-        self.is_frozen = True
-        self.storage.setup(self)
+        if not self.is_frozen:
+            self.is_frozen = True
+            self.storage.setup(self)
         

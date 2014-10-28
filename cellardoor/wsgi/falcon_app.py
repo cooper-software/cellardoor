@@ -41,7 +41,7 @@ class Resource(object):
 		if individual_methods:
 			app.add_route('/%s/{id}' % self.interface.plural_name, IndividualEndpoint(self, individual_methods))
 		
-		for link_name, link in self.interface.entity.links.items():
+		for link_name, link in self.interface.entity.get_links().items():
 			if self.interface.api.get_interface_for_entity(link.entity):
 				app.add_route('/%s/{id}/%s' % (self.interface.plural_name, link_name), 
 					ReferenceEndpoint(self, link_name))

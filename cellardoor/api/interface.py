@@ -537,8 +537,8 @@ class Interface(object):
 		link = None
 		entities = [self.entity] + self.entity.children
 		for entity in entities:
-			if hasattr(entity, link_name):
-				link = getattr(entity, link_name)
+			link = entity.get_link(link_name)
+			if link:
 				break
 		if not link:
 			raise Exception, "Entity '%s' nor its children have a link called '%s'" % (self.entity.__name__, link_name)

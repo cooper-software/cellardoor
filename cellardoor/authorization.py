@@ -296,8 +296,8 @@ class ItemProxy(ObjectProxy):
 		
 		
 	def __getattr__(self, key):
-		if key in self._entity.links:
-			link = self._entity.links[key]
+		link = self._entity.get_link(key)
+		if link:
 			return LinkProxy(self, link.entity, key)
 		else:
 			return ObjectProxyValue(self, key)

@@ -302,7 +302,7 @@ class TestModel(unittest.TestCase):
             bar = Link('Bar')
         
         with self.assertRaises(InvalidModelException):
-            model.freeze()
+            Foo.get_link('bar')
             
             
     def test_foreign_link(self):
@@ -319,7 +319,7 @@ class TestModel(unittest.TestCase):
             foo = Link(Foo)
             
         with self.assertRaises(InvalidModelException):
-            other_model.freeze()
+            Bar.get_link('foo')
             
             
     def test_pass(self):
@@ -334,7 +334,8 @@ class TestModel(unittest.TestCase):
         class Bar(model.Entity):
             foos = ListOf(Link(Foo))
             
-        model.freeze()
+        Foo.get_link('bar')
+        Bar.get_link('foos')
         
         
     def test_fail_add_to_frozen(self):
@@ -351,26 +352,6 @@ class TestModel(unittest.TestCase):
         with self.assertRaises(Exception):
             class Bar(model.Entity):
                 pass
-                
-                
-    def test_freeze_set_storage(self):
-        """
-        Freezing a model resolves all links and sets their storage attribute
-        """
-        storage = Storage()
-        model = Model(storage=storage)
-        
-        class Foo(model.Entity):
-            bar = Link('Bar')
-            
-            
-        class Bar(model.Entity):
-            pass
-            
-        model.freeze()
-        
-        self.assertEquals(Foo.bar.entity, Bar)
-        self.assertEquals(Foo.bar.storage, storage)
         
         
         
