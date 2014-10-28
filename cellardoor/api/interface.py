@@ -1,4 +1,5 @@
 from copy import deepcopy
+import inspect
 from ..model import ListOf, InverseLink
 from ..events import EventManager
 from .. import errors
@@ -231,13 +232,14 @@ class ListOptions(BaseOptions):
 
 class InterfaceType(type):
 	
-	def __new__(cls, name, bases, attrs):
+	def __init__(cls, name, bases, attrs):
 		if name == 'Interface':
-			return super(InterfaceType, cls).__new__(cls, name, bases, attrs)
-			
-		singular_name = attrs.get('singular_name')
-		plural_name = attrs.get('plural_name')
-		entity = attrs.get('entity')
+			return
+		
+		members = dict(inspect.getmembers(cls))
+		singular_name = members.get('singular_name')
+		plural_name = members.get('plural_name')
+		entity = members.get('entity')
 		if entity:
 			entity_name = entity.__name__.lower()
 		else:
@@ -262,30 +264,28 @@ class InterfaceType(type):
 				storage = b.api.model.storage
 				break
 		
-		attrs['singular_name'] = singular_name
-		attrs['plural_name'] = plural_name
-		attrs['hooks'] = EventManager('create', 'update', 'delete')
-		attrs['rules'] = RuleSet(attrs.get('method_authorization'))
-		attrs['storage'] = storage
+		cls.singular_name = singular_name
+		cls.plural_name = plural_name
+		cls.hooks = EventManager('create', 'update', 'delete')
+		cls.rules = RuleSet(members.get('method_authorization'))
+		cls.storage = storage
 		
 		hidden_fields = set(entity.hidden_fields.copy())
 		for c in entity.children:
 			hidden_fields.update(c.hidden_fields)
 		
-		attrs['options_factory'] = OptionsFactory(
+		cls.options_factory = OptionsFactory(
 			storage=storage,
 		    hidden_fields=hidden_fields, 
-		    hidden_field_authorization=attrs.get('hidden_field_authorization'),
-		    enabled_filters=attrs.get('enabled_filters', ()),
-		    enabled_sort=attrs.get('enabled_sort', ()),
-		    default_sort=attrs.get('default_sort', ()),
-		    default_limit=attrs.get('default_limit', 0),
-		    max_limit=attrs.get('max_limit', 100)
+		    hidden_field_authorization=members.get('hidden_field_authorization'),
+		    enabled_filters=members.get('enabled_filters', ()),
+		    enabled_sort=members.get('enabled_sort', ()),
+		    default_sort=members.get('default_sort', ()),
+		    default_limit=members.get('default_limit', 0),
+		    max_limit=members.get('max_limit', 100)
 		)
 		
-		new_cls = super(InterfaceType, cls).__new__(cls, name, bases, attrs)
-		new_cls.api.add_interface(new_cls)
-		return new_cls
+		cls.api.add_interface(cls)
 		
 		
 		
