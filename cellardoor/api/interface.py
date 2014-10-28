@@ -265,7 +265,7 @@ class InterfaceType(type):
 		attrs['singular_name'] = singular_name
 		attrs['plural_name'] = plural_name
 		attrs['hooks'] = EventManager('create', 'update', 'delete')
-		attrs['rules'] = RuleSet(attrs['method_authorization'])
+		attrs['rules'] = RuleSet(attrs.get('method_authorization'))
 		attrs['storage'] = storage
 		
 		hidden_fields = set(entity.hidden_fields.copy())
