@@ -42,6 +42,7 @@ class TestStandardOptionsMixin(unittest.TestCase):
 def get_fake_interface():
 	interface = Mock()
 	interface.hooks.listeners.keys = Mock(return_value=[])
+	interface.hooks.listeners.items = Mock(return_value=[])
 	return interface
 		
 		

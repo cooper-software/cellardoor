@@ -159,12 +159,12 @@ class APISerializer(object):
 	def create_schema(self, api, base_url, entity_serializer):
 		self.base_url = base_url
 		definitions = {}
-		for e in api.entities:
-			definitions[e.__name__] = entity_serializer.create_schema(e)
+		for name, entity in api.model.entities.items():
+			definitions[name] = entity_serializer.create_schema(entity)
 		
 		resources = {}
-		for interface in api.interfaces:
-			entity_links = definitions[interface.entity.__class__.__name__]['links']
+		for name, interface in api.interfaces.items():
+			entity_links = definitions[interface.entity.__name__]['links']
 			if 'resource' not in entity_links:
 				entity_links['resource'] = {
 					'rel': 'resource',
@@ -277,11 +277,13 @@ class APISerializer(object):
 		link = None
 		entities = [interface.entity] + interface.entity.children
 		for entity in entities:
-			if hasattr(entity, link_name):
-				link = getattr(entity, link_name)
+			link = entity.fields.get(link_name)
+			if not link:
+				link = entity.links.get(link_name)
+			if link:
 				break
 		if link is None:
-			raise Exception, "%s has no link %s" % (interface.entity.__class__.__name__, link_name)
+			raise Exception, "%s has no link %s" % (interface.entity.__name__, link_name)
 		
 		if interface.entity.is_multiple_link(link):
 			schema_link['targetSchema'] = {
@@ -295,7 +297,7 @@ class APISerializer(object):
 		
 		
 	def entity_schema_ref(self, interface):
-		return '#/definitions/%s' % interface.entity.__class__.__name__
+		return '#/definitions/%s' % interface.entity.__name__
 
 
 def to_jsonschema(api, base_url, api_cls=APISerializer, entity_cls=EntitySerializer):

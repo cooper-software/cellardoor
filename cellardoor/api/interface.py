@@ -389,7 +389,6 @@ class Interface(object):
 		
 		
 	def update(self, id, fields, _replace=False, _method=UPDATE, **kwargs):
-		print self.storage
 		options = self.options_factory.create(kwargs)
 		
 		if not options.bypass_authorization:

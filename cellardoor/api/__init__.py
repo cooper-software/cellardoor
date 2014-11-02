@@ -1,6 +1,7 @@
 from functools import partial
 from .interface import Interface
 from .. import errors
+from ..spec.jsonschema import to_jsonschema
 
 
 class StandardOptionsMixin(object):
@@ -102,7 +103,7 @@ class InterfaceProxy(StandardOptionsMixin):
 		self._interface = interface
 		self._api_options = options
 		
-		for when, events in self._interface.hooks.listeners.keys():
+		for when, events in self._interface.hooks.listeners.items():
 			for event in events.keys():
 				method_name = '%s_%s' % (when, event)
 				setattr(self, method_name, getattr(self._interface.hooks, method_name))
@@ -167,6 +168,10 @@ class FilterProxy(StandardOptionsMixin):
 		self._interface = interface
 		self._base_options = options
 		self._options['filter'] = filter
+		
+		
+	def list(self):
+		return list(iter(self))
 		
 		
 	def __iter__(self):

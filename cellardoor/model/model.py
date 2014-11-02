@@ -200,6 +200,10 @@ class EntityType(type):
         return dict(zip(link_names, map(cls.get_link, link_names)))
         
         
+    def is_multiple_link(cls, link):
+        return isinstance(link, ListOf) or isinstance(link, InverseLink) and link.multiple
+        
+        
             
 class Entity(object):
     
@@ -247,4 +251,6 @@ class Model(object):
         if not self.is_frozen:
             self.is_frozen = True
             self.storage.setup(self)
-        
+            for entity in self.entities.values():
+                for link_name in entity.links:
+                    entity.get_link(link_name)
