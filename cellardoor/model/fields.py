@@ -118,6 +118,13 @@ class Text(Field):
         if not isinstance(value, basestring):
             raise ValidationError(self.NOT_TEXT)
         
+        if not isinstance(value, unicode):
+            try:
+                value = value.decode('utf-8')
+            except UnicodeDecodeError:
+                raise ValidationError(self.NOT_UTF8)
+            
+        
         if self.required and len(value) == 0:
             raise ValidationError(self.REQUIRED)
             
@@ -129,11 +136,6 @@ class Text(Field):
             
         if self.regex is not None and not self.regex.search(value):
             raise ValidationError(self.NO_REGEX_MATCH)
-        
-        try:
-            value = value.decode('utf-8')
-        except UnicodeDecodeError:
-            raise ValidationError(self.NOT_UTF8)
         
         return value
         
