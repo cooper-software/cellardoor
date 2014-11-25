@@ -131,6 +131,10 @@ class EntitySerializer(object):
 			prop['required'] = required
 			
 			
+	def handle_Anything(self, field, prop):
+		prop['type'] = 'object'
+			
+			
 	def handle_BoundingBox(self, field, prop):
 		prop['type'] = 'array'
 		prop['items'] = {
