@@ -199,7 +199,7 @@ class TestEntity(unittest.TestCase):
         model = Model()
         
         
-        class Named(model.Entity):
+        class Named(object):
             name = Text()
         
             
@@ -216,7 +216,7 @@ class TestEntity(unittest.TestCase):
         model = Model()
         
         
-        class Fooable(model.Entity):
+        class Fooable(object):
             
             def before_create(self, fields, *args, **kwargs):
                 fields['foo'] = 123
