@@ -223,13 +223,55 @@ class TestEntity(unittest.TestCase):
         
                 
         class Bar(model.Entity):
-            mixins = (Fooable(),)
+            mixins = (Fooable,)
             
         bar = Bar()
         fields = {}
         bar.hooks.fire_before_create(fields)
         self.assertIn('foo', fields)
         self.assertEquals(fields['foo'], 123)
+        
+        
+    def test_multiple_mixin_hooks(self):
+        """An entity can have multiple mixins with the same hook"""
+        model = Model()
+        
+        
+        class Fooable(object):
+            
+            def before_create(self, fields, *args, **kwargs):
+                fields['foo'] = 123
+                
+                
+        class Barable(object):
+            
+            def before_create(self, fields, *args, **kwargs):
+                fields['bar'] = 456
+        
+                
+        class Baz(model.Entity):
+            mixins = (Fooable, Barable)
+            
+            def before_create(self, fields, *args, **kwargs):
+                fields['baz'] = 789
+                
+                
+        class Qux(Baz):
+            
+            def before_create(self, fields, *args, **kwargs):
+                fields['qux'] = 000
+            
+        qux = Qux()
+        fields = {}
+        qux.hooks.fire_before_create(fields)
+        self.assertIn('foo', fields)
+        self.assertEquals(fields['foo'], 123)
+        self.assertIn('bar', fields)
+        self.assertEquals(fields['bar'], 456)
+        self.assertIn('baz', fields)
+        self.assertEquals(fields['baz'], 789)
+        self.assertIn('qux', fields)
+        self.assertEquals(fields['qux'], 000)
         
         
     def test_inherited_mixin_fields(self):

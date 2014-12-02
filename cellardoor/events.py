@@ -23,3 +23,10 @@ class EventManager(object):
 		fns = self.listeners[when][event_name]
 		for fn in fns:
 			fn(*args, **kwargs)
+			
+			
+	def update_from(self, other):
+		for when, events in other.listeners.items():
+			for event, listeners in events.items():
+				for fn in listeners:
+					self.register(when, event, fn)

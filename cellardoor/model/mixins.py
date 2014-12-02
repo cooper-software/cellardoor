@@ -10,12 +10,12 @@ class Timestamped(object):
     created = DateTime(help="Created")
     modified = DateTime(help="Modified")
     
-    def on_pre_create(self, fields, *args, **kwargs):
+    def before_create(self, fields, *args, **kwargs):
         now = datetime.utcnow()
         fields['created'] = now
         fields['modified'] = now
         
         
-    def on_pre_update(self, id, fields, *args, **kwargs):
+    def before_update(self, id, fields, *args, **kwargs):
         fields['modified'] = datetime.utcnow()
         

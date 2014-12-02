@@ -75,22 +75,25 @@ class EntityType(type):
         # sure we aren't inheriting from more than one entity
         hierarchy = []
         mixins = set(attrs['mixins']) if attrs.get('mixins') else set()
-        entity_base_found = False
+        parent = None
         
         for base in bases:
             if issubclass(base, Entity):
-                if entity_base_found:
+                if parent:
                     raise Exception, "Cannot extend more than one Entity"
-                entity_base_found = True
+                parent = base
                 if base.__name__ != 'Entity':
                     hierarchy = list(base.hierarchy)
                     hierarchy.append(base)
-                    if hasattr(base, 'mixins') and base.mixins:
-                        mixins.update(base.mixins)
+                    #if hasattr(base, 'mixins') and base.mixins:
+                    #    mixins.update(base.mixins)
         
         
         # Add fields and hooks from the mixins
         hooks = EventManager('create', 'update', 'delete')
+        
+        if parent and hasattr(parent, 'hooks'):
+            hooks.update_from(parent.hooks)
         
         if mixins:
             for mixin in mixins:
@@ -104,7 +107,6 @@ class EntityType(type):
                         when, event = parts[0], '_'.join(parts[1:])
                         method_name = '%s_%s' % (when, event)
                         getattr(hooks, method_name)(v)
-        
         
         fields = {}
         hidden_fields = set()
