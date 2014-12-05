@@ -132,7 +132,13 @@ class EntitySerializer(object):
 			
 			
 	def handle_Anything(self, field, prop):
-		prop['type'] = 'object'
+		prop['anyOf'] = [
+			{'type':'array'},
+			{'type':'boolean'},
+			{'type':'null'},
+			{'type':'object'},
+			{'type':'string'}
+		]
 			
 			
 	def handle_BoundingBox(self, field, prop):
@@ -155,6 +161,20 @@ class EntitySerializer(object):
 			'maxItems': 2,
 			'minItems': 2
 		}
+		
+		
+	def handle_TypeOf(self, field, prop):
+		type = field.types[0]
+		if type == dict:
+			prop['type'] = 'object'
+		elif type == list:
+			prop['type'] = 'array'
+		elif type == int:
+			prop['type'] == 'integer'
+		elif type == float:
+			prop['type'] == 'float'
+		elif len(field.types) == 2 and int in field.types and float in field.types:
+			prop['type'] == 'number'
 		
 		
 		

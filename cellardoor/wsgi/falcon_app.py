@@ -3,7 +3,7 @@ import falcon
 import json
 import logging
 import inspect
-from ..methods import LIST, CREATE, GET, REPLACE, UPDATE, DELETE, get_http_methods
+from ..api.methods import LIST, CREATE, GET, REPLACE, UPDATE, DELETE, get_http_methods
 from ..serializers import JSONSerializer, MsgPackSerializer
 from ..views import View
 from ..views.minimal import MinimalView

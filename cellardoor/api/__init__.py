@@ -5,6 +5,7 @@ from ..spec.jsonschema import to_jsonschema
 
 
 class StandardOptionsMixin(object):
+	""""""
 	
 	def __init__(self, *accessors):
 		self._options = {}
