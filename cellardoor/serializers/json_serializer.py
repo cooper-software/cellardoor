@@ -39,3 +39,7 @@ class JSONSerializer(Serializer):
 		
 	def unserialize(self, stream):
 		return json.load(stream, object_hook=as_date)
+		
+		
+	def unserialize_string(self, data):
+		return json.loads(data, object_hook=as_date)

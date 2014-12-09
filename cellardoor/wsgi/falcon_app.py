@@ -1,6 +1,5 @@
 import functools
 import falcon
-import json
 import logging
 import inspect
 from ..api.methods import LIST, CREATE, GET, REPLACE, UPDATE, DELETE, get_http_methods
@@ -19,6 +18,7 @@ class Resource(object):
 	
 	# The types of content that are accepted.
 	accept_serializers = (JSONSerializer(), MsgPackSerializer())
+	params_serializer = JSONSerializer()
 	
 	
 	def __init__(self, interface, views):
@@ -159,9 +159,9 @@ class Resource(object):
 	def get_kwargs(self, req, *include):
 		"""Parse out the filter, sort, etc., parameters from a request"""
 		params = (
-			('embedded', json.loads, None),
-			('filter', json.loads, None),
-			('sort', json.loads, None),
+			('embedded', self.params_serializer.unserialize_string, None),
+			('filter', self.params_serializer.unserialize_string, None),
+			('sort', self.params_serializer.unserialize_string, None),
 			('offset', int, 0),
 			('limit', int, 0),
 			('show_hidden', self.bool_field, False)
