@@ -1,3 +1,4 @@
+import re
 import json
 from datetime import datetime
 
@@ -19,6 +20,13 @@ class CellarDoorJSONEncoder(json.JSONEncoder):
 		
 		return super(CellarDoorJSONEncoder, self).default(obj)
 		
+		
+def as_date(obj):
+	if '_date' in obj:
+		return datetime(*map(int, re.split('[^\d]', obj['_date'])[:-1]))
+	else:
+		return obj
+		
 
 
 class JSONSerializer(Serializer):
@@ -30,4 +38,4 @@ class JSONSerializer(Serializer):
 		
 		
 	def unserialize(self, stream):
-		return json.load(stream)
+		return json.load(stream, object_hook=as_date)

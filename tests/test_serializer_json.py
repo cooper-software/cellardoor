@@ -21,7 +21,7 @@ class TestJSONSerializer(unittest.TestCase):
 		self.assertEquals(unserialized_obj, obj)
 		
 		
-	def test_with_date(self):
+	def test_date_serialization(self):
 		"""
 		Should convert dates to ISO format when serializing
 		"""
@@ -44,6 +44,31 @@ class TestJSONSerializer(unittest.TestCase):
 					'foo': 23,
 					'bar': [1,2,3]
 				}
+			}
+		)
+		
+		
+	def test_date_unserialization(self):
+		"""
+		Should specially formatted date objects to to naive datetimes
+		"""
+		serializer = JSONSerializer()
+		
+		stream = StringIO('{ "when": "2014-12-09T21:30:22.272Z" }')
+		obj = serializer.unserialize(stream)
+		self.assertEquals(
+			obj,
+			{
+				'when': '2014-12-09T21:30:22.272Z'
+			}
+		)
+		
+		stream = StringIO('{ "when": { "_date": "2014-12-09T21:30:22.272Z" } }')
+		obj = serializer.unserialize(stream)
+		self.assertEquals(
+			obj,
+			{
+				'when': datetime(2014, 12, 9, 21, 30, 22, 272)
 			}
 		)
 		
