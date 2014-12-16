@@ -5,7 +5,8 @@ class EntitySerializer(object):
 	
 	fallbacks = (
 		model.Text, model.Integer, model.Float, model.DateTime,
-		model.Boolean, model.Enum, model.ListOf, model.OneOf
+		model.Boolean, model.Enum, model.ListOf, model.OneOf, 
+		model.Compound, model.Anything
 	)
 		
 	def create_schema(self, entity):
