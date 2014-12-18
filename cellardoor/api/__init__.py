@@ -110,6 +110,17 @@ class InterfaceProxy(StandardOptionsMixin):
 				setattr(self, method_name, getattr(self._interface.hooks, method_name))
 		
 		
+	def __getattr__(self, name):
+		return partial(self.link, name)
+		
+		
+	def link(self, name, id):
+		link = self._interface.entity.get_link(name)
+		if not link:
+			raise Exception, "No link called '%s'" % name
+		return LinkProxy(self._interface, self._get_options(), name, id)
+ 		
+		
 	def save(self, item):
 		if '_id' in item:
 			try:
@@ -146,7 +157,7 @@ class InterfaceProxy(StandardOptionsMixin):
 		
 		
 	def find(self, filter=None):
-		return FilterProxy(self._interface, self._options, filter)
+		return FilterProxy(self._interface, self._get_options(), filter)
 		
 		
 	def _get_options(self):
@@ -164,7 +175,8 @@ class FilterProxy(StandardOptionsMixin):
 			'offset',
 			'limit',
 			'bypass_authorization',
-			'show_hidden'
+			'show_hidden',
+			'filter'
 		)
 		self._interface = interface
 		self._base_options = options
@@ -176,7 +188,7 @@ class FilterProxy(StandardOptionsMixin):
 		
 		
 	def __iter__(self):
-		return iter(self._interface.list(**self._merge_options(self._base_options)))
+		return iter(self._list(self._merge_options(self._base_options)))
 		
 		
 	def __len__(self):
@@ -184,8 +196,8 @@ class FilterProxy(StandardOptionsMixin):
 		
 		
 	def count(self):
-		return self._interface.list(
-			**self._merge_options(self._base_options, {'count': True})
+		return self._list(
+			self._merge_options(self._base_options, {'count': True})
 		)
 		
 		
@@ -196,6 +208,20 @@ class FilterProxy(StandardOptionsMixin):
 		options = self._merge_options(self._base_options)
 		options['filter'] = new_filter
 		options['limit'] = 1
-		results = self._interface.list(**options)
+		results = self._list(options)
 		return len(results) != 0
+		
+	def _list(self, options):
+		return self._interface.list(**options)
+		
+		
+class LinkProxy(FilterProxy):
 	
+	def __init__(self, interface, options, name, id):
+		super(LinkProxy, self).__init__(interface, options, {})
+		self._name = name
+		self._id = id
+		
+	def _list(self, options):
+		return self._interface.link(self._id, self._name, **options)
+		

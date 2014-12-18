@@ -1,7 +1,7 @@
 import unittest
 from mock import Mock
 from cellardoor import errors
-from cellardoor.api import API, StandardOptionsMixin, InterfaceProxy, FilterProxy
+from cellardoor.api import API, StandardOptionsMixin, InterfaceProxy, FilterProxy, LinkProxy
 
 
 class TestStandardOptionsMixin(unittest.TestCase):
@@ -43,6 +43,7 @@ def get_fake_interface():
 	interface = Mock()
 	interface.hooks.listeners.keys = Mock(return_value=[])
 	interface.hooks.listeners.items = Mock(return_value=[])
+	interface.entity.get_link = lambda x: True
 	return interface
 		
 		
@@ -147,27 +148,38 @@ class TestInterfaceProxy(unittest.TestCase):
 		self.assertEquals(result._options['filter'], {'foo':'bar'})
 		
 		
+	def test_link(self):
+		interface = get_fake_interface()
+		interface_proxy = InterfaceProxy(interface)
+		result = interface_proxy.related_things('foo')
+		self.assertIsInstance(result, FilterProxy)
+		self.assertIsInstance(result, LinkProxy)
+		self.assertEquals(result._name, 'related_things')
+		self.assertEquals(result._id, 'foo')
+		
+		
 		
 class TestFilterProxy(unittest.TestCase):
 	
 	def test_options(self):
 		interface = get_fake_interface()
-		interface_proxy = FilterProxy(interface, {}, {})
-		self.assertTrue(hasattr(interface_proxy, 'fields'))
-		self.assertTrue(hasattr(interface_proxy, 'embed'))
-		self.assertTrue(hasattr(interface_proxy, 'sort'))
-		self.assertTrue(hasattr(interface_proxy, 'offset'))
-		self.assertTrue(hasattr(interface_proxy, 'limit'))
-		self.assertTrue(hasattr(interface_proxy, 'bypass_authorization'))
-		self.assertTrue(hasattr(interface_proxy, 'show_hidden'))
+		filter_proxy = FilterProxy(interface, {}, {})
+		self.assertTrue(hasattr(filter_proxy, 'fields'))
+		self.assertTrue(hasattr(filter_proxy, 'embed'))
+		self.assertTrue(hasattr(filter_proxy, 'sort'))
+		self.assertTrue(hasattr(filter_proxy, 'offset'))
+		self.assertTrue(hasattr(filter_proxy, 'limit'))
+		self.assertTrue(hasattr(filter_proxy, 'bypass_authorization'))
+		self.assertTrue(hasattr(filter_proxy, 'show_hidden'))
+		self.assertTrue(hasattr(filter_proxy, 'filter'))
 		
 		
 	def test_iter(self):
 		interface = get_fake_interface()
 		interface.list = Mock(return_value=[1,2,3])
-		interface_proxy = FilterProxy(interface, {}, {'foo':'bar'})
-		interface_proxy.show_hidden(True)
-		result = list(iter(interface_proxy))
+		filter_proxy = FilterProxy(interface, {}, {'foo':'bar'})
+		filter_proxy.show_hidden(True)
+		result = list(iter(filter_proxy))
 		self.assertEquals(result, [1,2,3])
 		interface.list.assert_called_once_with(filter={'foo':'bar'}, show_hidden=True)
 		
@@ -175,37 +187,47 @@ class TestFilterProxy(unittest.TestCase):
 	def test_count(self):
 		interface = get_fake_interface()
 		interface.list = Mock(return_value=42)
-		interface_proxy = FilterProxy(interface, {}, {'foo':'bar'})
-		interface_proxy.show_hidden(True)
-		result = interface_proxy.count()
+		filter_proxy = FilterProxy(interface, {}, {'foo':'bar'})
+		filter_proxy.show_hidden(True)
+		result = filter_proxy.count()
 		self.assertEquals(result, 42)
 		interface.list.assert_called_once_with(filter={'foo':'bar'}, show_hidden=True, count=True)
 		
 		
 	def test_len(self):
-		interface_proxy = FilterProxy(None, {}, {})
-		interface_proxy.count = Mock(return_value=33)
-		result = len(interface_proxy)
+		filter_proxy = FilterProxy(None, {}, {})
+		filter_proxy.count = Mock(return_value=33)
+		result = len(filter_proxy)
 		self.assertEquals(result, 33)
-		interface_proxy.count.assert_called_once()
+		filter_proxy.count.assert_called_once()
 		
 		
 	def test_contains(self):
 		interface = get_fake_interface()
 		interface.list = Mock(return_value=[])
-		interface_proxy = FilterProxy(interface, {}, {'foo':'bar'})
-		interface_proxy.show_hidden(True)
+		filter_proxy = FilterProxy(interface, {}, {'foo':'bar'})
+		filter_proxy.show_hidden(True)
 		
-		result = '123' in interface_proxy
+		result = '123' in filter_proxy
 		self.assertEquals(result, False)
 		interface.list.assert_called_once_with(filter={'_id':'123', 'foo':'bar'}, limit=1, show_hidden=True)
 		
 		interface.list = Mock(return_value=[1])
-		result = '123' in interface_proxy
+		result = '123' in filter_proxy
 		self.assertEquals(result, True)
 		
 		interface.list = Mock(return_value=[1])
-		result = {'_id':'123'} in interface_proxy
+		result = {'_id':'123'} in filter_proxy
 		self.assertEquals(result, True)
 		interface.list.assert_called_once_with(filter={'_id':'123', 'foo':'bar'}, limit=1, show_hidden=True)
 		
+		
+class TestLinkProxy(unittest.TestCase):
+	
+	def test_list(self):
+		interface = get_fake_interface()
+		interface.link = Mock(return_value=[1,2,3])
+		link_proxy = LinkProxy(interface, {}, 'related_things', 'an_id')
+		result = link_proxy.list()
+		self.assertEquals(result, [1,2,3])
+		interface.link.assert_called_once_with('an_id', 'related_things', filter={})
