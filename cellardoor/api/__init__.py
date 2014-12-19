@@ -5,7 +5,6 @@ from ..spec.jsonschema import to_jsonschema
 
 
 class StandardOptionsMixin(object):
-	""""""
 	
 	def __init__(self, *accessors):
 		self._options = {}
@@ -98,6 +97,7 @@ class InterfaceProxy(StandardOptionsMixin):
 		StandardOptionsMixin.__init__(self,
 			'fields',
 			'embed',
+			'allow_embedding',
 			'bypass_authorization',
 			'show_hidden'
 		)
@@ -171,6 +171,7 @@ class FilterProxy(StandardOptionsMixin):
 		StandardOptionsMixin.__init__(self,
 			'fields',
 			'embed',
+			'allow_embedding',
 			'sort',
 			'offset',
 			'limit',
