@@ -3,7 +3,7 @@ from copy import deepcopy
 from mock import Mock
 from cellardoor.model import Model, Entity, Link, InverseLink, Text, ListOf, Integer, Float, Enum
 from cellardoor.api import API
-from cellardoor.methods import ALL, LIST, GET, CREATE
+from cellardoor.api.methods import ALL, LIST, GET, CREATE
 from cellardoor.storage import Storage
 from cellardoor import errors
 from cellardoor.authorization import ObjectProxy
