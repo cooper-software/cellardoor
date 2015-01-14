@@ -9,6 +9,8 @@ find_dupe_index_pattern = re.compile(r'\$([a-zA-Z0-9_]+)\s+')
 
 class MongoDBStorage(Storage):
 	
+	special_fields = { '$where', '$text' }
+	
 	def __init__(self, db=None, *args, **kwargs):
 		self.client = pymongo.MongoClient(*args, **kwargs)
 		self.db = self.client[db]
@@ -250,7 +252,7 @@ class MongoDBStorage(Storage):
 		for k,v in filter.items():
 			
 			if k.startswith('$'):
-				if k == '$where':
+				if k in self.special_fields:
 					continue
 			elif k not in allowed_fields:
 				raise errors.DisabledFieldError('You cannot filter by the "%s" field' % k)
