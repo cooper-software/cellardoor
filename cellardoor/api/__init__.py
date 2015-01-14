@@ -114,54 +114,55 @@ class InterfaceProxy(StandardOptionsMixin):
 		return partial(self.link, name)
 		
 		
-	def link(self, name, id):
+	def link(self, name, id, **kwargs):
 		link = self._interface.entity.get_link(name)
 		if not link:
 			raise Exception, "No link called '%s'" % name
-		return LinkProxy(self._interface, self._get_options(), name, id)
+		return LinkProxy(self._interface, self._get_options(kwargs), name, id)
  		
 		
-	def save(self, item):
+	def save(self, item, **kwargs):
 		if '_id' in item:
 			try:
-				return self._interface.replace(item['_id'], item, **self._get_options())
+				return self._interface.replace(item['_id'], item, **self._get_options(kwargs))
 			except errors.NotFoundError:
 				pass
 			else:
 				return
-		return self._interface.create(item, **self._get_options())
+		return self._interface.create(item, **self._get_options(kwargs))
 		
 		
-	def update(self, id, fields):
-		return self._interface.update(id, fields, **self._get_options())
+	def update(self, id, fields, **kwargs):
+		return self._interface.update(id, fields, **self._get_options(kwargs))
 		
 		
-	def delete(self, id):
-		self._interface.delete(id, **self._get_options())
+	def delete(self, id, **kwargs):
+		self._interface.delete(id, **self._get_options(kwargs))
 		return self
 		
 		
-	def get(self, id_or_filter):
+	def get(self, id_or_filter, **kwargs):
 		if isinstance(id_or_filter, dict):
 			list_options = {
 				'filter': id_or_filter,
 				'limit': 1
 			}
 			list_options.update(self._options)
+			list_options.update(kwargs)
 			results = self._interface.list(**list_options)
 			if len(results) == 0:
 				raise errors.NotFoundError
 			return results[0]
 		else:
-			return self._interface.get(id_or_filter, **self._get_options())
+			return self._interface.get(id_or_filter, **self._get_options(kwargs))
 		
 		
-	def find(self, filter=None):
-		return FilterProxy(self._interface, self._get_options(), filter)
+	def find(self, filter=None, **kwargs):
+		return FilterProxy(self._interface, self._get_options(kwargs), filter)
 		
 		
-	def _get_options(self):
-		return self._merge_options(self._api_options, self._options)
+	def _get_options(self, options):
+		return self._merge_options(self._api_options, self._options, options)
 		
 		
 		
@@ -196,9 +197,9 @@ class FilterProxy(StandardOptionsMixin):
 		return self.count()
 		
 		
-	def count(self):
+	def count(self, **kwargs):
 		return self._list(
-			self._merge_options(self._base_options, {'count': True})
+			self._merge_options(self._base_options, kwargs, {'count': True})
 		)
 		
 		
