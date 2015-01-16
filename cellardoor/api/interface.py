@@ -41,7 +41,8 @@ class RuleSet(object):
 			if isinstance(item, list):
 				for i in item:
 					self.enforce_rules(rules, i, context)
-			self.enforce_rules(rules, item, context)
+			else:
+				self.enforce_rules(rules, item, context)
 		
 		
 	def enforce_non_item_rules(self, method, context):
