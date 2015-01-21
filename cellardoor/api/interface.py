@@ -134,7 +134,9 @@ class OptionsFactory(object):
 		new_options['sort'] = options['sort'] if options.get('sort') else self.default_sort
 		new_options['offset'] = options.get('offset', 0)
 		new_options['limit'] = options.get('limit', 0)
-		new_options['limit'] = min(new_options['limit'] if new_options['limit'] else self.default_limit, self.max_limit)
+		new_options['limit'] = new_options['limit'] if new_options['limit'] else self.default_limit
+		if not new_options['bypass_authorization']:
+			new_options['limit'] = min(new_options['limit'], self.max_limit)
 		new_options['count'] = options.get('count', False)
 		
 		self.check_filter(new_options)
