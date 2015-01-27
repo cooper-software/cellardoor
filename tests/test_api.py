@@ -2,6 +2,23 @@ import unittest
 from mock import Mock
 from cellardoor import errors
 from cellardoor.api import API, StandardOptionsMixin, InterfaceProxy, FilterProxy, LinkProxy
+from cellardoor.api.methods import ALL
+from cellardoor.storage import Storage
+from cellardoor.model import Model, Entity
+
+storage = Storage()
+storage.create = Mock()
+model = Model(storage=storage)
+api = API(model)
+
+class Foo(model.Entity):
+	pass
+	
+class Foos(api.Interface):
+	entity = Foo
+	method_authorization = {
+		ALL: None
+	}
 
 
 class TestStandardOptionsMixin(unittest.TestCase):
@@ -156,6 +173,18 @@ class TestInterfaceProxy(unittest.TestCase):
 		self.assertIsInstance(result, LinkProxy)
 		self.assertEquals(result._name, 'related_things')
 		self.assertEquals(result._id, 'foo')
+		
+		
+	def test_hooks(self):
+		@api.foos.before_create
+		def before_create(fields, context):
+			print 'Stuff!!!'
+			fields['foo'] = 'bar'
+		
+		fields = {}
+		api.foos.save(fields)
+		
+		self.assertEquals(fields, {'foo':'bar'})
 		
 		
 		
