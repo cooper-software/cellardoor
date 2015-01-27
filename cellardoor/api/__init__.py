@@ -120,6 +120,10 @@ class InterfaceProxy(StandardOptionsMixin):
 			raise Exception, "No link called '%s'" % name
 		return LinkProxy(self._interface, self._get_options(kwargs), name, id)
  		
+ 		
+	def create(self, item, **kwargs):
+		return self._interface.create(item, **self._get_options(kwargs))
+ 		
 		
 	def save(self, item, **kwargs):
 		if '_id' in item:
