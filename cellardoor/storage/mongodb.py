@@ -63,8 +63,6 @@ class MongoDBStorage(Storage):
 			else:
 				filter.update(type_filter)
 		
-		print sort_pairs
-		
 		results = collection.find(spec=filter, 
 								  fields=fields, 
 								  sort=sort_pairs, 
