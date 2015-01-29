@@ -45,14 +45,14 @@ class MongoDBStorage(Storage):
 			if filter and '_id' in filter and isinstance(filter['_id'], basestring):
 				filter['_id'] = self._objectid(filter['_id'])
 		
-		if sort is None:
-			if filter and '$text' in filter:
-				sort = [('score', {'$meta':'textScore'})]
-				if not fields:
-					fields = {}
-				fields['score'] = {'$meta':'textScore'}
-		else:
-			sort = [(field[1:], 1) if field[0] == '+' else (field[1:], -1) for field in sort]
+		sort_pairs = []
+		if filter and '$text' in filter:
+			sort_pairs.append(('score', {'$meta':'textScore'}))
+			if not fields:
+				fields = {}
+			fields['score'] = {'$meta':'textScore'}
+		if sort:
+			sort_pairs.extend([(field[1:], 1) if field[0] == '+' else (field[1:], -1) for field in sort])
 		
 		collection = self.get_collection(entity, shadow=versions)
 		
@@ -63,9 +63,11 @@ class MongoDBStorage(Storage):
 			else:
 				filter.update(type_filter)
 		
+		print sort_pairs
+		
 		results = collection.find(spec=filter, 
 								  fields=fields, 
-								  sort=sort, 
+								  sort=sort_pairs, 
 								  skip=offset, 
 								  limit=limit)
 		
