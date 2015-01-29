@@ -1,4 +1,5 @@
 import unittest
+from mock import Mock
 from datetime import datetime
 from cellardoor.model import *
 from cellardoor.storage.mongodb import MongoDBStorage
@@ -46,6 +47,12 @@ class TestMongoDBStorage(unittest.TestCase):
 			if not c.startswith('system.'):
 				storage.db[c].drop()
 		storage.setup(model)
+		
+		
+	def get_new_storage(self):
+		st = MongoDBStorage('test')
+		st.setup(model)
+		return st
 		
 	
 	def test_create(self):
@@ -164,6 +171,23 @@ class TestMongoDBStorage(unittest.TestCase):
 		
 		results = storage.get(Foo, sort=('-b','-a'))
 		self.assertEquals(results, [docs[2], docs[3], docs[1], docs[0]])
+		
+		
+	def test_get_filter_text_sort(self):
+		"""
+		When using a $text query, the default sort should be the text score.
+		"""
+		st = self.get_new_storage()
+		st.db.Foo = Mock()
+		st.db.Foo.find = Mock(return_value=[])
+		st.get(Foo, filter={'$text':{'$search':'foo'}})
+		st.db.Foo.find.assert_called_once_with(
+			spec={'$text': {'$search': 'foo'}},
+			fields={'score': {'$meta': 'textScore'}},
+			sort=[('score', {'$meta': 'textScore'})], 
+			skip=0, 
+			limit=0
+		)
 		
 		
 	def test_get_fields(self):

@@ -1,3 +1,7 @@
+"""
+Provides a friendly interface for managing 
+"""
+
 from functools import partial
 from .interface import Interface
 from .. import errors

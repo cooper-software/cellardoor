@@ -44,8 +44,14 @@ class MongoDBStorage(Storage):
 			to_dict = self.document_to_dict
 			if filter and '_id' in filter and isinstance(filter['_id'], basestring):
 				filter['_id'] = self._objectid(filter['_id'])
-				
-		if sort is not None:
+		
+		if sort is None:
+			if filter and '$text' in filter:
+				sort = [('score', {'$meta':'textScore'})]
+				if not fields:
+					fields = {}
+				fields['score'] = {'$meta':'textScore'}
+		else:
 			sort = [(field[1:], 1) if field[0] == '+' else (field[1:], -1) for field in sort]
 		
 		collection = self.get_collection(entity, shadow=versions)
@@ -56,7 +62,7 @@ class MongoDBStorage(Storage):
 				filter = type_filter
 			else:
 				filter.update(type_filter)
-			
+		
 		results = collection.find(spec=filter, 
 								  fields=fields, 
 								  sort=sort, 
@@ -222,10 +228,13 @@ class MongoDBStorage(Storage):
 		else:
 			collection_name = entity.__name__
 			
+		# We use getattr here instead of __getitem__ to
+		# make it easier to inject mock collections objects
+		# for testing
 		if shadow:
-			return self.db[collection_name+'.vermongo']
+			return getattr(self.db, collection_name+'.vermongo')
 		else:
-			return self.db[collection_name]
+			return getattr(self.db, collection_name)
 			
 			
 	def get_type_name(self, entity):
