@@ -1,5 +1,5 @@
 CellarDoor
-=======
+==========
 
 |Build Status| |Coverage Status|
 
