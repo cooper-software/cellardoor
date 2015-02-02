@@ -358,6 +358,15 @@ class TestBoolean(unittest.TestCase):
                 self.assertEqual(True, field.validate(true))
             except ValidationError:
                 self.fail("Didn't pass '%s'" % true)
+                
+                
+    def test_native(self):
+        """
+        Should pass a native bool without modification
+        """
+        field = Boolean()
+        self.assertEqual(True, field.validate(True))
+        self.assertEqual(False, field.validate(False))
 
 
 

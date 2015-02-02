@@ -252,8 +252,6 @@ class Boolean(Field):
                 return False
             else:
                 raise ValidationError(self.NOT_BOOL)
-        elif isinstance(value, bool):
-            return value
         raise ValidationError(self.NOT_BOOL)
         
         
