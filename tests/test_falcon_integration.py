@@ -311,7 +311,7 @@ class TestResource(TestBase):
 		
 	def test_get_multiple_link(self):
 		"""A GET with a path to /collection/{id}/link calls collection.link"""
-		api.interfaces['foos'].link = Mock(return_value={'_id':'123'})
+		api.interfaces['foos'].link = Mock(return_value=[{'_id':'123'}])
 		data = self.simulate_request(
 			'/foos/123/bazes', 
 			method='GET', 
@@ -326,7 +326,7 @@ class TestResource(TestBase):
 		)
 		result = json.loads(''.join(data))
 		self.assertEquals(self.srmock.status, '200 OK')
-		self.assertEquals(result, {'_id':'123'})
+		self.assertEquals(result, [{'_id':'123'}])
 		api.interfaces['foos'].link.assert_called_with('123', 'bazes', sort=['+name'], filter={'foo':23}, offset=7, limit=10, show_hidden=True, embedded=None, context={})
 		
 		
