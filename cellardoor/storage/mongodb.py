@@ -118,9 +118,6 @@ class MongoDBStorage(Storage):
 		
 		
 	def update(self, entity, id, fields, replace=False):
-		type_name = self.get_type_name(entity)
-		if type_name:
-			fields['_type'] = type_name
 		try:
 			if entity.versioned:
 				return self._versioned_update(entity, id, fields, replace=replace)
@@ -156,11 +153,7 @@ class MongoDBStorage(Storage):
 		else:
 			doc = { '$set': fields }
 			
-		try:
-			doc = collection.find_and_modify({'_id':obj_id, '_version':current_version}, doc, new=True)
-		except pymongo.errors.DuplicateKeyError, e:
-			shadow_collection.remove(current_doc['_id'])
-			self._raise_dupe_error(e)
+		doc = collection.find_and_modify({'_id':obj_id, '_version':current_version}, doc, new=True)
 		if doc:
 			return self.document_to_dict(doc)
 		else:
