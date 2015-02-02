@@ -185,12 +185,10 @@ class Resource(object):
 		return True if value.lower() == 'true' or value == '1' else False
 		
 		
-	def get_param(self, req, param_name, parsing_fn, required=False, default=None):
+	def get_param(self, req, param_name, parsing_fn, default=None):
 		"""Get a parsed query param"""
 		param = req.get_param(param_name)
 		if not param:
-			if required:
-				raise falcon.HTTPBadRequest("Bad Request", "Missing required %s parameter" % param_name)
 			return default
 		try:
 			return parsing_fn(param)

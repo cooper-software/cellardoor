@@ -331,6 +331,21 @@ class TestResource(TestBase):
 		api.interfaces['foos'].link.assert_called_with('123', 'bazes', sort=['+name'], filter={'foo':23}, offset=7, limit=10, show_hidden=True, embedded=None, context={})
 		
 		
+	def test_query_param_parse_error(self):
+		"""
+		Passing an unparseable query param results in a 400 error
+		"""
+		self.simulate_request(
+			'/foos/123/bazes', 
+			method='GET', 
+			headers={'accept':'application/json'},
+			query_string=urllib.urlencode({
+				'filter':'{blarg}'
+			})
+		)
+		self.assertEquals(self.srmock.status, '400 Bad Request')
+		
+		
 	def test_pass_identity(self):
 		api.interfaces['foos'].list = Mock(return_value=[])
 		environ = create_environ('/foos')
