@@ -17,6 +17,18 @@ class TestAbstractField(unittest.TestCase):
         self.assertRaises(NotImplementedError, field.validate, 23)
         
         
+    def test_field_validate_required_no_default(self):
+        field = Field(required=True)
+        with self.assertRaises(ValidationError):
+            field.validate(None)
+            
+            
+    def test_field_validate_default(self):
+        field = Field(default=23)
+        value = field.validate(None)
+        self.assertEqual(value, 23)
+        
+        
 class TestText(unittest.TestCase):
         
     def test_not_text(self):
