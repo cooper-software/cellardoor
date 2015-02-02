@@ -1,7 +1,10 @@
 import unittest
 import re
+from mock import Mock
 from cellardoor.spec import jsonschema
 from cellardoor.model import *
+from cellardoor.api import API, Interface
+from cellardoor.api.methods import ALL
 
 model = Model()
 
@@ -38,9 +41,6 @@ class TestEntitySerializer(unittest.TestCase):
 		return self.entity_serializer.create_schema(entity)
 	
 	def test_base_properties(self):
-		"""
-		Should conform to minimum JSON Schema standard
-		"""
 		class Foo(self.model.Entity):
 			pass
 			
@@ -156,6 +156,7 @@ class TestEntitySerializer(unittest.TestCase):
 	def test_Text(self):
 		class Foo(self.model.Entity):
 			stuff = Text()
+			things = Text(minlength=100, maxlength=5000, regex=re.compile('^b'))
 			
 		schema = self.get_schema(Foo)
 		self.assertEquals(
@@ -164,6 +165,17 @@ class TestEntitySerializer(unittest.TestCase):
 				'default': None, 
 				'format': 'Text', 
 				'type': 'string'
+			}
+		)
+		self.assertEquals(
+			schema['properties']['things'], 
+			{
+				'default': None, 
+				'format': 'Text', 
+				'type': 'string',
+				'minLength': 100,
+				'maxLength': 5000,
+				'pattern': '^b'
 			}
 		)
 		
@@ -497,4 +509,285 @@ class TestEntitySerializer(unittest.TestCase):
 	
 	
 class TestAPISerializer(unittest.TestCase):
-	pass
+	
+	maxDiff = None
+	
+	def get_schema(self, api, entity_serializer=None):
+		if entity_serializer is None:
+			entity_serializer = jsonschema.EntitySerializer()
+		serializer = jsonschema.APISerializer()
+		return serializer.create_schema(api, 'http://www.example.com/api', entity_serializer)
+		
+	
+	def test_empty(self):
+		schema = self.get_schema(API(Model()))
+		self.assertEquals(
+			schema,
+			{
+				'$schema': 'http://json-schema.org/draft-04/schema#',
+				'type': 'object',
+				'definitions': {},
+				'properties': {}
+			}
+		)
+		
+		
+	def test_entity(self):
+		entity_serializer = Mock()
+		entity_serializer.create_schema = Mock(return_value='foo')
+		
+		model = Model()
+		class Foo(model.Entity):
+			pass
+			
+		api = API(model)
+		schema = self.get_schema(api, entity_serializer)
+		
+		entity_serializer.create_schema.assert_called_once_with(Foo)
+		
+		self.assertEquals(
+			schema['definitions'],
+			{ 'Foo': 'foo' }
+		)
+		
+		
+	def test_interface(self):
+		model = Model(storage=Mock())
+		class Foo(model.Entity):
+			pass
+			
+		api = API(model)
+		
+		class Foos(api.Interface):
+			entity = Foo
+			
+		
+		schema = self.get_schema(api)
+		self.assertEquals(
+			schema['definitions']['Foo'],
+			{
+				'title': 'Foo',
+				'properties':{},
+				'links': {
+					'resource': {
+						'rel': 'resource',
+						'href': '#/properties/foos'
+					}
+				}
+			}
+		)
+		self.assertEquals(
+			schema['properties']['foos'],
+			{
+				'title': 'foos',
+				'links': {}
+			}
+		)
+		
+		
+	def test_methods(self):
+		model = Model(storage=Mock())
+		class Foo(model.Entity):
+			pass
+			
+		api = API(model)
+		
+		class Foos(api.Interface):
+			entity = Foo
+			method_authorization = {
+				ALL: None
+			}
+			
+		
+		schema = self.get_schema(api)
+		self.assertEquals(
+			schema['properties']['foos']['links']['create'],
+			{
+				'href': 'http://www.example.com/api/foos',
+                'method': 'POST',
+                'rel': 'create',
+                'schema': {'$ref': '#/definitions/Foo'},
+                'targetSchema': {'$ref': '#/definitions/Foo'},
+                'title': 'New'
+            }
+		)
+		self.assertEquals(
+			schema['properties']['foos']['links']['delete'],
+			{
+				'href': 'http://www.example.com/api/foos/{id}',
+                'method': 'DELETE',
+                'rel': 'delete',
+                'title': 'Delete'
+            }
+		)
+		self.assertEquals(
+			schema['properties']['foos']['links']['get'],
+			{
+				'href': 'http://www.example.com/api/foos/{id}',
+                'method': 'GET',
+                'rel': 'instance',
+                'targetSchema': {'$ref': '#/definitions/Foo'},
+                'title': 'Details'
+            }
+		)
+		self.assertEquals(
+			schema['properties']['foos']['links']['list'],
+			{
+				'href': 'http://www.example.com/api/foos',
+                'method': 'GET',
+                'rel': 'instances',
+                'targetSchema':
+                {
+                	'type': 'array',
+                	'items': {'$ref': '#/definitions/Foo'}
+                },
+                'title': 'List'
+            }
+		)
+		self.assertEquals(
+			schema['properties']['foos']['links']['replace'],
+			{
+				'href': 'http://www.example.com/api/foos/{id}',
+                'method': 'PUT',
+                'rel': 'replace',
+                'schema': {'$ref': '#/definitions/Foo'},
+                'targetSchema': {'$ref': '#/definitions/Foo'},
+                'title': 'Replace'
+            }
+		)
+		self.assertEquals(
+			schema['properties']['foos']['links']['update'],
+			{
+				'href': 'http://www.example.com/api/foos/{id}',
+                'method': 'PATCH',
+                'rel': 'update',
+                'schema':
+                {
+                	'allOf': [
+                		{'$ref': '#/definitions/Foo'}
+            		],
+                    'required': []
+                },
+                'targetSchema': {'$ref': '#/definitions/Foo'},
+                'title': 'Update'
+            }
+		)
+		
+		
+	def test_entity_links(self):
+		model = Model(storage=Mock())
+		
+		class Foo(model.Entity):
+			pass
+			
+		class Bar(model.Entity):
+			foos = ListOf(Link(Foo))
+			foo = Link(Foo)
+			baz = Link('Baz')
+			
+		class Baz(model.Entity):
+			bars = InverseLink(Bar, 'baz')
+			
+		api = API(model)
+		
+		class Bars(api.Interface):
+			entity = Bar
+			
+		class Bazes(api.Interface):
+			entity = Baz
+			plural_name = 'bazes'
+			
+		schema = self.get_schema(api)
+		self.assertEquals(
+			schema['properties']['bars']['links']['link-foos'],
+			{
+				'href': 'http://www.example.com/api/bars/{id}/foos',
+				'method': 'GET',
+				'rel': 'link',
+				'targetSchema': 
+				{
+					'type': 'array',
+					'items': {'$ref': '#/definitions/Foo'}
+                },
+				'title': 'Link'
+			}
+		)
+		self.assertEquals(
+			schema['properties']['bars']['links']['link-foo'],
+			{
+				'href': 'http://www.example.com/api/bars/{id}/foo',
+				'method': 'GET',
+				'rel': 'link',
+				'targetSchema': {'$ref': '#/definitions/Foo'},
+				'title': 'Link'
+			}
+		)
+		self.assertEquals(
+			schema['properties']['bars']['links']['link-baz'],
+			{
+				'href': 'http://www.example.com/api/bars/{id}/baz',
+				'method': 'GET',
+				'rel': 'link',
+				'targetSchema': {'$ref': '#/definitions/Baz'},
+				'title': 'Link'
+			}
+		)
+		self.assertEquals(
+			schema['properties']['bazes']['links']['link-bars'],
+			{
+				'href': 'http://www.example.com/api/bazes/{id}/bars',
+				'method': 'GET',
+				'rel': 'link',
+				'targetSchema':
+				{
+					'type': 'array',
+					'items': {'$ref': '#/definitions/Bar'}
+                },
+				'title': 'Link'
+			}
+		)
+		
+		
+class TestJSONSchema(unittest.TestCase):
+	
+	def test_jsonschema(self):
+		model = Model(storage=Mock())
+		
+		class Foo(model.Entity):
+			pass
+			
+		api = API(model)
+		
+		class Foos(api.Interface):
+			entity = Foo
+		
+		schema = jsonschema.to_jsonschema(api, 'http://www.example.com/api')
+		self.assertEquals(
+			schema,
+			{
+				'$schema': 'http://json-schema.org/draft-04/schema#',
+				'type': 'object',
+				'definitions': 
+				{
+					'Foo': 
+					{
+						'title': 'Foo',
+						'properties':{},
+						'links': {
+							'resource': {
+								'rel': 'resource',
+								'href': '#/properties/foos'
+							}
+						}
+					}
+				},
+				'properties':
+				{
+					'foos':
+					{
+						'title': 'foos',
+						'links': {}
+					}
+				}
+			}
+		)

@@ -310,8 +310,6 @@ class APISerializer(object):
 				link = entity.links.get(link_name)
 			if link:
 				break
-		if link is None:
-			raise Exception, "%s has no link %s" % (interface.entity.__name__, link_name)
 		
 		if interface.entity.is_multiple_link(link):
 			schema_link['targetSchema'] = {
