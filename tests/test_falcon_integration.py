@@ -59,6 +59,19 @@ class TestResource(TestBase):
 		api.refresh()
 		FalconApp(api, falcon_app=self.api)
 	
+	
+	def test_fail_no_methods(self):
+		model = Model(storage=Mock())
+		
+		class Foo(model.Entity):
+			pass
+		
+		empty_api = API(model)
+		
+		class Foos(empty_api.Interface):
+			entity = Foo
+			
+		self.assertRaises(Exception, FalconApp, empty_api)
 
 		
 	def test_create_fail_content_type(self):
