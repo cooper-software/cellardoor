@@ -5,6 +5,7 @@ from cellardoor.api import API, StandardOptionsMixin, InterfaceProxy, FilterProx
 from cellardoor.api.methods import ALL
 from cellardoor.storage import Storage
 from cellardoor.model import Model, Entity
+from cellardoor.errors import NotFoundError
 
 storage = Storage()
 storage.create = Mock()
@@ -95,6 +96,17 @@ class TestInterfaceProxy(unittest.TestCase):
 		self.assertTrue(hasattr(interface_proxy, 'embed'))
 		self.assertTrue(hasattr(interface_proxy, 'bypass_authorization'))
 		self.assertTrue(hasattr(interface_proxy, 'show_hidden'))
+		
+		
+	def test_create(self):
+		interface = get_fake_interface()
+		interface.create = Mock(return_value='create')
+		interface_proxy = InterfaceProxy(interface)
+		interface_proxy.show_hidden(True)
+		
+		result = interface_proxy.create({'foo':'bar'})
+		self.assertEquals(result, 'create')
+		interface.create.assert_called_once_with({'foo':'bar'}, show_hidden=True)
 		
 	
 	def test_save(self):
