@@ -29,6 +29,12 @@ class TestAuthorization(unittest.TestCase):
 		with self.assertRaises(NotImplementedError):
 			expr({})
 			
+		with self.assertRaises(NotImplementedError):
+			expr == 2
+			
+		with self.assertRaises(NotImplementedError):
+			expr.uses('foo')
+			
 			
 	def test_auth_expr_and_fail(self):
 		"""An auth expression and'd with an expression of another type raises an exception"""
