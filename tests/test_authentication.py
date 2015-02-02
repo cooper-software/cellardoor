@@ -82,6 +82,12 @@ class TestBasic(unittest.TestCase):
 		self.assertEquals(credentials, None)
 		
 		
+	def test_skip_if_not_a_pair(self):
+		identifier = BasicAuthIdentifier()
+		credentials = identifier.identify({'HTTP_AUTHORIZATION':'Foo'})
+		self.assertEquals(credentials, None)
+		
+		
 	def test_skip_if_not_basic(self):
 		identifier = BasicAuthIdentifier()
 		credentials = identifier.identify({'HTTP_AUTHORIZATION':'Foo 123'})
