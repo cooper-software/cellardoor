@@ -440,6 +440,26 @@ class TestModel(unittest.TestCase):
         self.assertEquals(result, id)
         
         
+    def test_multiple_link(self):
+        """
+        A link is defined as a multiple link if it is a list of links or a multiple inverse link
+        """
+        model = Model()
+        
+        class Foo(model.Entity):
+            bar = Link('Bar')
+            
+            
+        class Bar(model.Entity):
+            one_foo = Link(Foo)
+            list_of_foos = ListOf(Link(Foo))
+            inverse_foos = InverseLink(Foo, 'bar')
+            
+        self.assertEquals(False, Bar.is_multiple_link(Bar.one_foo))
+        self.assertEquals(True, Bar.is_multiple_link(Bar.list_of_foos))
+        self.assertEquals(True, Bar.is_multiple_link(Bar.inverse_foos))
+        
+        
         
 if __name__ == "__main__":
     unittest.main()

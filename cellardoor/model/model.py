@@ -203,7 +203,7 @@ class EntityType(type):
         
         
     def is_multiple_link(cls, link):
-        return isinstance(link, ListOf) or isinstance(link, InverseLink) and link.multiple
+        return isinstance(link, ListOf) or (isinstance(link, InverseLink) and link.multiple)
         
         
             
