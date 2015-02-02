@@ -1,6 +1,7 @@
 import re
 import json
 from datetime import datetime
+import collections
 
 from . import Serializer
 
@@ -8,12 +9,8 @@ from . import Serializer
 class CellarDoorJSONEncoder(json.JSONEncoder):
 	
 	def default(self, obj):
-		try:
-			iterable = iter(obj)
-		except TypeError:
-			pass
-		else:
-			return list(iterable)
+		if isinstance(obj, collections.Iterable):
+			return list(obj)
 		
 		if isinstance(obj, datetime):
 			return obj.isoformat()
