@@ -34,8 +34,10 @@ class Foo(model.Entity):
 	
 class Bar(model.Entity):
 	foo = Link(Foo)
+	foo_cascade = Link(Foo, ondelete=Link.CASCADE)
 	embedded_foo = Link(Foo, embeddable=True)
 	bazes = ListOf(Link('Baz'))
+	bazes_cascade = ListOf(Link('Baz', ondelete=Link.CASCADE))
 	number = Integer()
 	name = Text()
 	
@@ -822,4 +824,21 @@ class InterfaceTest(unittest.TestCase):
 		result = foos.link(foo['_id'], 'bars', count=True)
 		self.assertEquals(result, 3)
 		bars.storage.get.assert_called_once_with(Bar, filter={'foo':'123'}, sort=('+name',), offset=0, limit=0, count=True)
+		
+		
+	def test_reverse_delete_null_single(self):
+		"""Removing a single linked item with a NULL rule, nulls the referencing item's link field"""
+		foos = api.interfaces['foos']
+		bars = api.interfaces['bars']
+		foos.storage = Storage()
+		bars.storage = Storage()
+		foos.storage.delete = Mock()
+		foos.storage.get_by_id = Mock(return_value={'_id':'123'})
+		bars.storage.get = Mock(return_value=[{'_id':'666'}])
+		bars.storage.update = Mock(return_value={'_id':'666'})
+		
+		foos.delete('123')
+		
+		bars.storage.get.assert_called_once_with(Bar, filter={'foo':'123'})
+		bars.storage.update.assert_called_once_with(Bar, '666', {'foo':None})
 		

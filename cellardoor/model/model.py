@@ -21,7 +21,7 @@ class Link(Text):
     
     # Reverse delete options
     NULL = 1
-    DELETE = 2
+    CASCADE = 2
     
     def __init__(self, entity, 
             embeddable=False, embed_by_default=True, embedded_fields=None, ondelete=NULL,
@@ -158,7 +158,8 @@ class EntityType(type):
             embeddable = embeddable,
             embed_by_default = embed_by_default,
             children = [],
-            validator = Compound(**fields)
+            validator = Compound(**fields),
+            inverse_links = []
         ))
         
         new_cls = super(EntityType, cls).__new__(cls, name, bases, attrs)
@@ -255,4 +256,6 @@ class Model(object):
             self.storage.setup(self)
             for entity in self.entities.values():
                 for link_name in entity.links:
-                    entity.get_link(link_name)
+                    link = entity.get_link(link_name)
+                    if not isinstance(link, InverseLink):
+                        link.entity.inverse_links.append(link)

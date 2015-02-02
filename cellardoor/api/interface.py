@@ -439,12 +439,18 @@ class Interface(object):
 		self.entity.hooks.fire_before_delete(id, options.context)
 		self.hooks.fire_before_delete(id, options.context)
 		
+		self.inverse_delete(id)
+		
 		self.storage.delete(self.entity, id)
 		self.post(DELETE, options)
 		
 		options.context['item'] = item
 		self.entity.hooks.fire_after_delete(id, options.context)
 		self.hooks.fire_after_delete(id, options.context)
+		
+		
+	def inverse_delete(self, id):
+		pass
 		
 		
 	def link(self, id, link_name, **kwargs):
