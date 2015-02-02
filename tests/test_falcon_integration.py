@@ -409,3 +409,29 @@ class TestResource(TestBase):
 		
 		self.assertRaises(falcon.HTTPInternalServerError, foos.serialize, None, 'serialize_one', {})
 		
+		
+class TestFalconApp(unittest.TestCase):
+	
+	def test_wsgi(self):
+		"""
+		A FalconApp is a wsgi app
+		"""
+		model = Model(storage=Mock())
+		
+		class Foo(model.Entity):
+			pass
+		
+		dummy_api = API(model)
+		
+		class Foos(dummy_api.Interface):
+			entity = Foo
+			method_authorization = {ALL:None}
+		
+		falcon_app = Mock(return_value='foo')
+		app = FalconApp(dummy_api, falcon_app=falcon_app)
+		
+		result = app('1', '2', thing='3')
+		self.assertEquals(result, 'foo')
+		falcon_app.assert_called_once_with('1', '2', thing='3')
+		
+		
