@@ -474,6 +474,13 @@ class TestModel(unittest.TestCase):
                 pass
         
         
+    def test_repr(self):
+        """
+        A model has a clear string representation
+        """
+        model = Model('foo', 'bar')
+        self.assertEquals(repr(model), "Model(name='foo', storage='bar')")
+        
         
 if __name__ == "__main__":
     unittest.main()
