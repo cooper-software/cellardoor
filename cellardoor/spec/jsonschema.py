@@ -27,8 +27,8 @@ class EntitySerializer(object):
 			
 			
 	def get_links(self, entity):
-		if len(entity.hierarchy) > 1:
-			parent = entity.hierarchy[-2]
+		if len(entity.hierarchy) > 0:
+			parent = entity.hierarchy[-1]
 			return {
 				'parent': {
 					'rel': 'parent',
@@ -101,7 +101,7 @@ class EntitySerializer(object):
 		
 		
 	def handle_Enum(self, field, prop):
-		prop['enum'] = tuple(field.values)
+		prop['enum'] = field.values
 		
 		
 	def handle_ListOf(self, field, prop):
@@ -138,7 +138,8 @@ class EntitySerializer(object):
 			{'type':'boolean'},
 			{'type':'null'},
 			{'type':'object'},
-			{'type':'string'}
+			{'type':'string'},
+			{'type':'number'}
 		]
 			
 			
@@ -170,12 +171,14 @@ class EntitySerializer(object):
 			prop['type'] = 'object'
 		elif type == list:
 			prop['type'] = 'array'
-		elif type == int:
-			prop['type'] == 'integer'
-		elif type == float:
-			prop['type'] == 'float'
 		elif len(field.types) == 2 and int in field.types and float in field.types:
-			prop['type'] == 'number'
+			prop['type'] = 'number'
+		elif type == int:
+			prop['type'] = 'integer'
+		elif type == float:
+			prop['type'] = 'float'
+		elif type == unicode:
+			prop['type'] = 'string'
 		
 		
 		
