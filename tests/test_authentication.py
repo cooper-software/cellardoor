@@ -16,8 +16,21 @@ class BarAuthenticator(Authenticator):
 
 class TestAuthentication(unittest.TestCase):
 	
-	def test_bad_pair(self):
-		self.assertRaises(ValueError, AuthenticationMiddleware, None, [('a','b')])
+	def test_abstract_identifier(self):
+		id = Identifier()
+		with self.assertRaises(NotImplementedError):
+			id.identify({})
+			
+	def test_abstract_authenticator(self):
+		auth = Authenticator()
+		with self.assertRaises(NotImplementedError):
+			auth.authenticate({})
+	
+	def test_bad_identifier(self):
+		self.assertRaises(ValueError, AuthenticationMiddleware, None, [(None, BarAuthenticator())])
+		
+	def test_bad_authenticator(self):
+		self.assertRaises(ValueError, AuthenticationMiddleware, None, [(FooIdentifier(), None)])
 	
 	def test_middleware(self):
 		identifier = FooIdentifier()
