@@ -64,12 +64,12 @@ class TestAuthorization(unittest.TestCase):
 				return self.val
 				
 				
-				
 		true_expr = IdentityExpr(True)
 		false_expr = IdentityExpr(False)
 		
 		and_expr = true_expr & false_expr
 		self.assertIsInstance(and_expr, AuthorizationExpression)
+		self.assertEquals(repr(and_expr), 'AndExpression(%s, %s)' % (true_expr, false_expr))
 		
 		self.assertTrue((true_expr & true_expr)({}))
 		self.assertFalse((true_expr & false_expr)({}))
@@ -92,8 +92,9 @@ class TestAuthorization(unittest.TestCase):
 		true_expr = IdentityExpr(True)
 		false_expr = IdentityExpr(False)
 		
-		and_expr = true_expr | false_expr
-		self.assertIsInstance(and_expr, AuthorizationExpression)
+		or_expr = true_expr | false_expr
+		self.assertIsInstance(or_expr, AuthorizationExpression)
+		self.assertEquals(repr(or_expr), 'OrExpression(%s, %s)' % (true_expr, false_expr))
 		
 		self.assertTrue((true_expr | true_expr)({}))
 		self.assertTrue((true_expr | false_expr)({}))
@@ -125,8 +126,10 @@ class TestAuthorization(unittest.TestCase):
 	def test_object_proxy_match(self):
 		"""A match operation evaluates against an item in the context"""
 		proxy = ObjectProxy('foo')
-		expr = proxy.match(lambda x: x['bar'] == 23)
+		fn = lambda x: x['bar'] == 23
+		expr = proxy.match(fn)
 		self.assertTrue(expr({'foo':{'bar':23}}))
+		self.assertEquals(repr(expr), 'ObjectProxyMatch(%s, %s)' % (repr(proxy), repr(fn)))
 		
 		
 	def test_object_proxy_get(self):
@@ -138,6 +141,8 @@ class TestAuthorization(unittest.TestCase):
 		
 		attr = proxy.bar
 		self.assertIsInstance(item, ObjectProxyValue)
+		
+		self.assertEquals(repr(attr), 'ObjectProxyValue(%s, %s)' % (proxy, 'bar'))
 		
 		
 	def test_object_proxy_nonexistent(self):
@@ -397,6 +402,7 @@ class TestAuthorization(unittest.TestCase):
 		self.assertEquals(link._proxy, foo)
 		self.assertEquals(link._entity, Bar)
 		self.assertEquals(link._name, 'bar')
+		self.assertEquals(repr(link), 'LinkProxy(Foo, bar)')
 		
 		
 	def test_item_proxy_value_attr(self):

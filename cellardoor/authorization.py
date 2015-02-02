@@ -33,7 +33,7 @@ class AuthorizationExpression(object):
 	def uses(self, key):
 		raise NotImplementedError
 			
-			
+
 			
 class BinaryExpression(AuthorizationExpression):
 	
@@ -66,6 +66,10 @@ class OrExpression(BinaryExpression):
 		
 	def __call__(self, context):
 		return self.a(context) or self.b(context)
+		
+		
+	def __repr__(self):
+		return 'OrExpression(%s, %s)' % (repr(self.a), repr(self.b))
 		
 
 
