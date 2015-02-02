@@ -8,7 +8,16 @@ from cellardoor.storage import Storage
 
 
 class TestEntity(unittest.TestCase):
+    
+    def test_reserved_names(self):
+        """
+        An exception is raised if an entity defines a field that starts with an underscore
+        """
+        model = Model()
         
+        with self.assertRaises(Exception):
+            class Foo(model.Entity):
+                _stuff = Text()
     
     def test_can_validate(self):
         """
