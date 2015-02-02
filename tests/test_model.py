@@ -2,6 +2,7 @@
 Unit tests for data fields
 """
 import unittest
+from mock import Mock
 from cellardoor.model import *
 from cellardoor.storage import Storage
 
@@ -394,6 +395,40 @@ class TestModel(unittest.TestCase):
         with self.assertRaises(Exception):
             class Bar(model.Entity):
                 pass
+                
+                
+    def test_link_validation_optional(self):
+        """
+        link validates a None value when the link is optional
+        """
+        link = Link('foo')
+        value = link.validate(None)
+        self.assertEquals(value, None)
+        
+        
+    def test_link_validation_unknown(self):
+        """
+        A validation error is raised if the item referred to by the link doesn't exist.
+        """
+        link = Link('foo')
+        link.storage = Mock()
+        link.storage.get_by_id = Mock(return_value=None)
+        
+        with self.assertRaises(ValidationError):
+            link.validate('123')
+        
+        
+        
+    def test_link_validation_exists(self):
+        """
+        Link validation returns the original value if the referenced item exists
+        """
+        link = Link('foo')
+        link.storage = Mock()
+        link.storage.get_by_id = Mock(return_value=True)
+        id = '123'
+        result = link.validate(id)
+        self.assertEquals(result, id)
         
         
         
