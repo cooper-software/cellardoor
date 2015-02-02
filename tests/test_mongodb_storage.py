@@ -349,7 +349,25 @@ class TestMongoDBStorage(unittest.TestCase):
 		bar_id = storage.create(Bar, {'a':'car', 'b':123})
 		storage.update(Bar, bar_id, {'_version':1, 'a':'bike'})
 		storage.update(Bar, bar_id, {'_version':2, 'a':'unicycle'})
+		
 		results = storage.get(Bar, versions=True)
+		self.assertEquals(
+			results,
+			[
+				{'_id':bar_id, '_version':1, 'a':'car', 'b':123},
+				{'_id':bar_id, '_version':2, 'a':'bike', 'b':123}
+			]
+		)
+		
+		results = storage.get(Bar, filter={'_version':{'$lt':2}}, versions=True)
+		self.assertEquals(
+			results,
+			[
+				{'_id':bar_id, '_version':1, 'a':'car', 'b':123}
+			]
+		)
+		
+		results = storage.get(Bar, filter={'_id':bar_id}, versions=True)
 		self.assertEquals(
 			results,
 			[
