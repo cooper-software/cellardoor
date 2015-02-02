@@ -125,8 +125,8 @@ class Resource(object):
 			
 	def serialize_list(self, req, data):
 		return self.serialize(req, 'get_list_response', data)
-			
-			
+		
+		
 	def serialize(self, req, method_name, data):
 		view = self.get_view(req)
 		method = getattr(view, method_name)
@@ -134,7 +134,7 @@ class Resource(object):
 			return method(req, data)
 		except Exception, e:
 			self.logger.exception('Failed to serialize response.')
-			raise falcon.HTTPInternalServerError()
+			raise falcon.HTTPInternalServerError('Internal Server Error', '')
 			
 			
 	def get_view(self, req):
@@ -310,6 +310,7 @@ class FalconApp(object):
 			falcon_app = falcon.API()
 		self.falcon_app = falcon_app
 		self.api = api
+		self.resources = {}
 		
 		views_by_type = []
 		
@@ -331,6 +332,7 @@ class FalconApp(object):
 		for interface in api.interfaces.values():
 			resource = Resource(interface, views_by_type)
 			resource.add_to_falcon(falcon_app)
+			self.resources[interface.plural_name] = resource
 			
 			
 	def __call__(self, *args, **kwargs):

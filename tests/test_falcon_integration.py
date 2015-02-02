@@ -4,6 +4,7 @@ import msgpack
 from mock import Mock
 import urllib
 from falcon.testing import TestBase, create_environ
+import falcon
 from cellardoor import errors
 from cellardoor.api import API
 from cellardoor.wsgi.falcon_app import FalconApp
@@ -369,4 +370,27 @@ class TestResource(TestBase):
 		self.simulate_request('/foos/123/bazes', method='HEAD')
 		self.assertEquals(self.srmock.headers_dict['x-count'], '52')
 		api.interfaces['foos'].link.assert_called_with('123', 'bazes', sort=None, filter=None, offset=0, limit=0, show_hidden=False, embedded=None, context={}, count=True)
+		
+		
+	def test_serialization_error(self):
+		"""Catches a serialization error on the server side"""
+		model = Model(storage=Mock())
+		
+		class Foo(model.Entity):
+			pass
+		
+		dummy_api = API(model)
+		
+		class Foos(dummy_api.Interface):
+			entity = Foo
+			method_authorization = {ALL:None}
+			
+		app = FalconApp(dummy_api)
+		foos = app.resources['foos']
+		view = Mock()
+		view.serialize_one = Mock()
+		view.serialize_one.side_effect = Exception
+		foos.get_view = Mock(return_value=view)
+		
+		self.assertRaises(falcon.HTTPInternalServerError, foos.serialize, None, 'serialize_one', {})
 		
