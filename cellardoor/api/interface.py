@@ -403,10 +403,7 @@ class Interface(object):
 				raise errors.NotFoundError("No %s with id '%s' was found" % (self.singular_name, id))
 			self.rules.enforce_item_rules(_method, item, options.context)
 		
-		version = fields.pop('_version', None)
 		fields = self.entity.validator.validate(fields, enforce_required=_replace)
-		if version:
-			fields['_version'] = version
 		item = self.storage.update(self.entity, id, fields, replace=_replace)
 		if item is None:
 			raise errors.NotFoundError("No %s with id '%s' was found" % (self.singular_name, id))

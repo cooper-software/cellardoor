@@ -26,24 +26,10 @@ class MongoDBStorage(Storage):
 					self.unique_fields_by_index[index_name] = k
 		
 	
-	def get(self, entity, filter=None, fields=None, sort=None, offset=0, limit=0, versions=False, count=False):
-		if versions:
-			if not entity.versioned:
-				return []
-			to_dict = self.versioned_document_to_dict
-			if filter:
-				if '_id' in filter:
-					if isinstance(filter['_id'], basestring):
-						filter['_id'] = self._objectid(filter['_id'])
-					filter['_id._id'] = filter['_id']
-					del filter['_id']
-				if '_version' in filter:
-					filter['_id._version'] = filter['_version']
-					del filter['_version']
-		else:
-			to_dict = self.document_to_dict
-			if filter and '_id' in filter and isinstance(filter['_id'], basestring):
-				filter['_id'] = self._objectid(filter['_id'])
+	def get(self, entity, filter=None, fields=None, sort=None, offset=0, limit=0, count=False):
+		to_dict = self.document_to_dict
+		if filter and '_id' in filter and isinstance(filter['_id'], basestring):
+			filter['_id'] = self._objectid(filter['_id'])
 		
 		sort_pairs = []
 		if filter and '$text' in filter:
@@ -54,7 +40,7 @@ class MongoDBStorage(Storage):
 		if sort:
 			sort_pairs.extend([(field[1:], 1) if field[0] == '+' else (field[1:], -1) for field in sort])
 		
-		collection = self.get_collection(entity, shadow=versions)
+		collection = self.get_collection(entity)
 		
 		type_filter = self.get_type_filter(entity)
 		if type_filter:
@@ -75,14 +61,11 @@ class MongoDBStorage(Storage):
 			return map(to_dict, results)
 			
 			
-	def get_by_ids(self, entity, ids, filter=None, fields=None, sort=None, offset=0, limit=0, versions=False, count=False):
-		if versions and not entity.versioned:
-			return []
-			
+	def get_by_ids(self, entity, ids, filter=None, fields=None, sort=None, offset=0, limit=0, count=False):
 		if not filter:
 			filter = {}
 		filter['_id'] = {'$in':map(self._objectid, ids)}
-		return self.get(entity, filter=filter, fields=fields, sort=sort, offset=offset, limit=limit, versions=versions, count=count)
+		return self.get(entity, filter=filter, fields=fields, sort=sort, offset=offset, limit=limit, count=count)
 		
 		
 	def get_by_id(self, entity, id, filter=None, fields=None):
@@ -101,8 +84,6 @@ class MongoDBStorage(Storage):
 		
 		
 	def create(self, entity, fields):
-		if entity.versioned:
-			fields['_version'] = 1
 		collection = self.get_collection(entity)
 		type_name = self.get_type_name(entity)
 		if type_name:
@@ -119,87 +100,20 @@ class MongoDBStorage(Storage):
 		
 	def update(self, entity, id, fields, replace=False):
 		try:
-			if entity.versioned:
-				return self._versioned_update(entity, id, fields, replace=replace)
+			collection = self.get_collection(entity)
+			obj_id = self._objectid(id)
+			if replace:
+				doc = fields
 			else:
-				return self._unversioned_update(entity, id, fields, replace=replace)
+				doc = { '$set': fields }
+			doc = collection.find_and_modify({ '_id': obj_id }, doc, new=True)
+			if doc:
+				return self.document_to_dict(doc)
 		except pymongo.errors.DuplicateKeyError, e:
 			self._raise_dupe_error(e)
 			
 			
-	def _versioned_update(self, entity, id, fields, replace=None):
-		if '_version' not in fields:
-			raise errors.CompoundValidationError({'_version': 'This field is required.'})
-		current_version = fields.pop('_version')
-		collection = self.get_collection(entity)
-		shadow_collection = self.get_collection(entity, shadow=True)
-		obj_id = self._objectid(id)
-		current_doc = collection.find_one(obj_id)
-		
-		if not current_doc:
-			return None
-				
-		if current_doc['_version'] != current_version:
-			raise errors.VersionConflictError(
-				self.document_to_dict(current_doc)
-			)
-		
-		current_doc['_id'] = {'_id':obj_id, '_version':current_version}
-		shadow_collection.insert(current_doc)
-		
-		fields['_version'] = current_version + 1
-		if replace:
-			doc = fields
-		else:
-			doc = { '$set': fields }
-			
-		doc = collection.find_and_modify({'_id':obj_id, '_version':current_version}, doc, new=True)
-		if doc:
-			return self.document_to_dict(doc)
-		else:
-			current_doc = collection.find_one(obj_id)
-			raise errors.VersionConflictError(self.document_to_dict(current_doc))
-			
-		
-	def _unversioned_update(self, entity, id, fields, replace=None):
-		collection = self.get_collection(entity)
-		obj_id = self._objectid(id)
-		if replace:
-			doc = fields
-		else:
-			doc = { '$set': fields }
-		doc = collection.find_and_modify({ '_id': obj_id }, doc, new=True)
-		if doc:
-			return self.document_to_dict(doc)
-		
-		
 	def delete(self, entity, id, deleted_by=None):
-		if entity.versioned:
-			return self._versioned_delete(entity, id, deleted_by)
-		else:
-			return self._unversioned_delete(entity, id)
-		
-		
-	def _versioned_delete(self, entity, id, deleted_by):
-		collection = self.get_collection(entity)
-		shadow_collection = self.get_collection(entity, shadow=True)
-		obj_id = self._objectid(id)
-		current_doc = collection.find_one(obj_id)
-		current_doc['_id'] = {'_id':current_doc['_id'], '_version':current_doc['_version']}
-		shadow_collection.insert(current_doc)
-		new_version = current_doc['_version'] + 1
-		delete_doc = {
-			'_id':{'_id':current_doc['_id']['_id'], '_version':new_version}, 
-			'_deleted_on':datetime.utcnow(),
-			'_version':current_doc['_version'] + 1
-		}
-		if deleted_by:
-			delete_doc['_deleted_by'] = deleted_by
-		shadow_collection.insert(delete_doc)
-		collection.remove(obj_id)
-		
-		
-	def _unversioned_delete(self, entity, id):
 		collection = self.get_collection(entity)
 		obj_id = self._objectid(id)
 		collection.remove(obj_id)
@@ -210,12 +124,7 @@ class MongoDBStorage(Storage):
 		return doc
 		
 		
-	def versioned_document_to_dict(self, doc):
-		doc['_id'] = self._from_objectid(doc['_id']['_id'])
-		return doc
-		
-		
-	def get_collection(self, entity, shadow=False):
+	def get_collection(self, entity):
 		if len(entity.hierarchy) > 0:
 			collection_name = entity.hierarchy[0].__name__
 		else:
@@ -224,10 +133,7 @@ class MongoDBStorage(Storage):
 		# We use getattr here instead of __getitem__ to
 		# make it easier to inject mock collections objects
 		# for testing
-		if shadow:
-			return getattr(self.db, collection_name+'.vermongo')
-		else:
-			return getattr(self.db, collection_name)
+		return getattr(self.db, collection_name)
 			
 			
 	def get_type_name(self, entity):

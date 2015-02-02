@@ -8,27 +8,27 @@ class Storage(object):
 		pass
 		
 	
-	def get(self, entity, filter=None, fields=None, sort=None, offset=0, limit=0, versions=False, count=False):
+	def get(self, entity, filter=None, fields=None, sort=None, offset=0, limit=0, count=False):
 		raise NotImplementedError
 		
 		
-	def get_by_ids(self, entity, ids, filter=None, fields=None, sort=None, offset=0, limit=0, versions=False, count=False):
+	def get_by_ids(self, entity, ids, filter=None, fields=None, sort=None, offset=0, limit=0, count=False):
 		raise NotImplementedError
 		
 		
-	def get_by_id(self, entity, id, fields=None, version=None):
+	def get_by_id(self, entity, id, fields=None):
 		raise NotImplementedError
 		
 		
-	def create(self, entity, fields, version_creator=None):
+	def create(self, entity, fields):
 		raise NotImplementedError
 		
 		
-	def update(self, entity, id, fields, replace=False, version_creator=None):
+	def update(self, entity, id, fields, replace=False):
 		raise NotImplementedError
 		
 		
-	def delete(self, entity, id, version_creator=None):
+	def delete(self, entity, id):
 		raise NotImplementedError
 		
 		
