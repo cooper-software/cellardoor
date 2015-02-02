@@ -460,6 +460,20 @@ class TestModel(unittest.TestCase):
         self.assertEquals(True, Bar.is_multiple_link(Bar.inverse_foos))
         
         
+    def test_redefine(self):
+        """
+        Attempting to define an entity that has already been added to a model raises an error
+        """
+        model = Model()
+        
+        class Foo(model.Entity):
+            pass
+            
+        with self.assertRaises(Exception):
+            class Foo(model.Entity):
+                pass
+        
+        
         
 if __name__ == "__main__":
     unittest.main()
