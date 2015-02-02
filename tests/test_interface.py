@@ -62,6 +62,10 @@ class Shell(model.Entity):
 class LittorinaLittorea(Littorina):
 	shell = Link('Shell', embeddable=True)
 	
+	
+class Planet(model.Entity):
+	pass
+	
 
 class Foos(api.Interface):
 	entity = Foo
@@ -128,6 +132,12 @@ class Shells(api.Interface):
 		ALL: None
 	}
 
+
+class Planets(api.Interface):
+	entity = Planet
+	method_authorization = {
+		LIST: item.foo == 23
+	}
 
 class InterfaceTest(unittest.TestCase):
 	
@@ -488,6 +498,14 @@ class InterfaceTest(unittest.TestCase):
 		hiddens.storage.get_by_id = Mock(return_value={'foo':700})
 		with self.assertRaises(errors.NotAuthorizedError):
 			hiddens.get(123)
+			
+			
+	def test_auth_result_fail_list(self):
+		"""Raises NotAuthorizedError if a member of a result list doesn't pass a rule."""
+		planets = api.interfaces['planets']
+		planets.storage.get = Mock(return_value=[{'foo':700}])
+		with self.assertRaises(errors.NotAuthorizedError):
+			planets.list()
 		
 		
 	def test_auth_result_pass(self):

@@ -1,3 +1,5 @@
+import types
+import collections
 from copy import deepcopy
 import inspect
 from ..model import ListOf, InverseLink
@@ -38,7 +40,7 @@ class RuleSet(object):
 	def enforce_item_rules(self, method, item, context):
 		rules = self.item_rules.get(method)
 		if rules:
-			if isinstance(item, list):
+			if isinstance(item, (collections.Sequence, types.GeneratorType)):
 				for i in item:
 					self.enforce_rules(rules, i, context)
 			else:
@@ -186,11 +188,6 @@ class BaseOptions(object):
 		
 	def __getattr__(self, key):
 		return self.__getitem__(key)
-		
-		
-	def __deepcopy__(self, memo):
-		options = BaseOptions(deepcopy(self._options, memo))
-		options._embed_by_class = deepcopy(self._embed_by_class, memo)
 		
 		
 	def get_embed_for_type(self, base_entity, type):
