@@ -144,6 +144,12 @@ class TestText(unittest.TestCase):
         self.assertEquals(validated_value, 'foo')
         
         
+    def test_not_utf8_fail(self):
+        field = Text()
+        with self.assertRaises(ValidationError):
+            field.validate('\xFF')
+        
+        
 class TestEmail(unittest.TestCase):
     
     def test_fail(self):
