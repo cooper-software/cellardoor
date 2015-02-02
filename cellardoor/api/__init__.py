@@ -131,12 +131,7 @@ class InterfaceProxy(StandardOptionsMixin):
 		
 	def save(self, item, **kwargs):
 		if '_id' in item:
-			try:
-				return self._interface.replace(item['_id'], item, **self._get_options(kwargs))
-			except errors.NotFoundError:
-				pass
-			else:
-				return
+			return self._interface.replace(item['_id'], item, **self._get_options(kwargs))
 		return self._interface.create(item, **self._get_options(kwargs))
 		
 		
