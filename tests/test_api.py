@@ -190,7 +190,6 @@ class TestInterfaceProxy(unittest.TestCase):
 	def test_hooks(self):
 		@api.foos.before_create
 		def before_create(fields, context):
-			print 'Stuff!!!'
 			fields['foo'] = 'bar'
 		
 		fields = {}
