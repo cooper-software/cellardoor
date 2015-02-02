@@ -1,15 +1,12 @@
 import msgpack
 from datetime import datetime
+import collections
 from . import Serializer
 
 
 def default_handler(obj):
-	try:
-		iterable = iter(obj)
-	except TypeError:
-		pass
-	else:
-		return list(iterable)
+	if isinstance(obj, collections.Iterable):
+		return list(obj)
 	
 	if isinstance(obj, datetime):
 		return obj.isoformat()
