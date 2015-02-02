@@ -1,0 +1,2 @@
+[report]
+omit=cellardoor/model/dateparsers.py

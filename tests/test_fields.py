@@ -236,6 +236,9 @@ class TestDateTime(unittest.TestCase):
         
         self.assertEqual(today, field.validate("today"))
         
+        with self.assertRaises(ValidationError):
+            field.validate('eggbert')
+        
         
     def test_dateutil(self):
         """
@@ -251,6 +254,9 @@ class TestDateTime(unittest.TestCase):
         bday = datetime(1982,9,6)
         
         self.assertEqual(bday, field.validate('9/6/82'))
+        
+        with self.assertRaises(ValidationError):
+            field.validate('eggbert')
             
             
     def test_reflexive(self):

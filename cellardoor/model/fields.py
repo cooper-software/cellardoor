@@ -1,5 +1,6 @@
 import re
 from datetime import datetime
+from .dateparsers import *
 
 __all__ = [
     'ValidationError',
@@ -159,19 +160,7 @@ class Email(Text):
         super(Email, self).__init__(
             regex="^((\".+\")|((\\\.))|([\d\w\!#\$%&'\*\+\-/=\?\^_`\{\|\}~]))((\"[^@]+\")|(\\\.)|([\d\w\!#\$%&'\*\+\-/=\?\^_`\.\{\|\}~]))*@[a-zA-Z0-9]+([a-zA-Z0-9\-][a-zA-Z0-9]+)?(\.[a-zA-Z0-9]+([a-zA-Z0-9\-][a-zA-Z0-9]+)?)+\.?$",
             *args, **kwargs)
-
-
-try:
-    import timelib
-    strtodatetime = timelib.strtodatetime
-except ImportError:
-    strtodatetime = None
-
-try:
-    from dateutil import parser as date_parser
-    parsedate = date_parser.parse
-except ImportError:
-    parsedate = None
+        
 
 class DateTime(Field):
     """
