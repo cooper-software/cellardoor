@@ -62,3 +62,17 @@ class TestJSONSerializer(unittest.TestCase):
 		unserialized_obj = serializer.unserialize(stream)
 		self.assertEquals(unserialized_obj, {'foo': [0,1,2,3,4]})
 		
+		
+	def test_fail(self):
+		"""
+		Should raise an exception when trying to serialize other things
+		"""
+		class Foo(object):
+			pass
+			
+		value = {'foo':Foo()}
+		serializer = MsgPackSerializer()
+		
+		with self.assertRaises(Exception):
+			serializer.serialize(obj)
+		
