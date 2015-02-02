@@ -1,7 +1,7 @@
 from functools import partial
 
 
-class AuthenticationExpression(object):
+class AuthorizationExpression(object):
 	
 	def __call__(self, context):
 		raise NotImplementedError
@@ -26,7 +26,7 @@ class AuthenticationExpression(object):
 		
 		
 	def require_auth_expr(self, other):
-		if not isinstance(other, AuthenticationExpression):
+		if not isinstance(other, AuthorizationExpression):
 			raise TypeError, "Type '%s' is incompatible with type '%s'" % (type(self).__name__, type(other).__name__)
 			
 			
@@ -35,7 +35,7 @@ class AuthenticationExpression(object):
 			
 			
 			
-class BinaryExpression(AuthenticationExpression):
+class BinaryExpression(AuthorizationExpression):
 	
 	def __init__(self, a, b):
 		self.a = a
@@ -69,7 +69,7 @@ class OrExpression(BinaryExpression):
 		
 
 
-class ObjectProxy(AuthenticationExpression):
+class ObjectProxy(AuthorizationExpression):
 	
 	def __init__(self, name):
 		self._name = name
@@ -112,7 +112,7 @@ class ObjectProxy(AuthenticationExpression):
 		
 		
 		
-class ObjectProxyMatch(AuthenticationExpression):
+class ObjectProxyMatch(AuthorizationExpression):
 	
 	def __init__(self, proxy, fn):
 		self._proxy = proxy
@@ -137,7 +137,7 @@ class ObjectProxyMatch(AuthenticationExpression):
 		
 		
 		
-class ObjectProxyValue(AuthenticationExpression):
+class ObjectProxyValue(AuthorizationExpression):
 	
 	def __init__(self, proxy, key):
 		self._proxy = proxy
@@ -198,7 +198,7 @@ class ObjectProxyValue(AuthenticationExpression):
 		return ContainsComparison(self, other)
 		
 		
-class ObjectProxyValueComparison(AuthenticationExpression):
+class ObjectProxyValueComparison(AuthorizationExpression):
 	
 	opstr = ''
 	
@@ -231,7 +231,7 @@ class ObjectProxyValueComparison(AuthenticationExpression):
 		
 		
 	def uses(self, key):
-		if isinstance(self.other, AuthenticationExpression):
+		if isinstance(self.other, AuthorizationExpression):
 			return self._proxy.uses(key) or self.other.uses(key)
 		else:
 			return self._proxy.uses(key)

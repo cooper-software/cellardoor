@@ -24,7 +24,7 @@ class TestAuthorization(unittest.TestCase):
 	
 	def test_auth_expr_abstract(self):
 		"""A base auth expression can't be called"""
-		expr = AuthenticationExpression()
+		expr = AuthorizationExpression()
 		
 		with self.assertRaises(NotImplementedError):
 			expr({})
@@ -32,7 +32,7 @@ class TestAuthorization(unittest.TestCase):
 			
 	def test_auth_expr_and_fail(self):
 		"""An auth expression and'd with an expression of another type raises an exception"""
-		expr = AuthenticationExpression()
+		expr = AuthorizationExpression()
 		
 		with self.assertRaises(TypeError):
 			expr & 23
@@ -40,7 +40,7 @@ class TestAuthorization(unittest.TestCase):
 			
 	def test_auth_expr_or_fail(self):
 		"""An auth expression or'd with an expression of another type raises an exception"""
-		expr = AuthenticationExpression()
+		expr = AuthorizationExpression()
 		
 		with self.assertRaises(TypeError):
 			expr | 23
@@ -49,7 +49,7 @@ class TestAuthorization(unittest.TestCase):
 	def test_auth_expr_and(self):
 		"""And'ing two auth expressions creates another auth expression that is the logical AND of the two expressions"""
 		
-		class IdentityExpr(AuthenticationExpression):
+		class IdentityExpr(AuthorizationExpression):
 			
 			def __init__(self, val):
 				self.val = val
@@ -63,7 +63,7 @@ class TestAuthorization(unittest.TestCase):
 		false_expr = IdentityExpr(False)
 		
 		and_expr = true_expr & false_expr
-		self.assertIsInstance(and_expr, AuthenticationExpression)
+		self.assertIsInstance(and_expr, AuthorizationExpression)
 		
 		self.assertTrue((true_expr & true_expr)({}))
 		self.assertFalse((true_expr & false_expr)({}))
@@ -73,7 +73,7 @@ class TestAuthorization(unittest.TestCase):
 	def test_auth_expr_or(self):
 		"""And'ing two auth expressions creates another auth expression that is the logical OR of the two expressions"""
 		
-		class IdentityExpr(AuthenticationExpression):
+		class IdentityExpr(AuthorizationExpression):
 			
 			def __init__(self, val):
 				self.val = val
@@ -87,7 +87,7 @@ class TestAuthorization(unittest.TestCase):
 		false_expr = IdentityExpr(False)
 		
 		and_expr = true_expr | false_expr
-		self.assertIsInstance(and_expr, AuthenticationExpression)
+		self.assertIsInstance(and_expr, AuthorizationExpression)
 		
 		self.assertTrue((true_expr | true_expr)({}))
 		self.assertTrue((true_expr | false_expr)({}))
@@ -97,7 +97,7 @@ class TestAuthorization(unittest.TestCase):
 	def test_auth_expr_invert(self):
 		"""Inverting an auth expression negates it"""
 		
-		class TrueExpr(AuthenticationExpression):
+		class TrueExpr(AuthorizationExpression):
 			
 			def __call__(self, context):
 				return True
