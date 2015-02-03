@@ -16,7 +16,6 @@ class Foo(model.Entity):
 
 
 class Bar(model.Entity):
-	versioned = True
 	a = Text()
 	b = TypeOf(int)
 	
@@ -277,120 +276,6 @@ class TestMongoDBStorage(unittest.TestCase):
 		filter = {'stuff': ['foo', '$identity.things']}
 		storage.check_filter(filter, ('stuff',), {'identity':{'things':123}})
 		self.assertEquals(filter, {'stuff':['foo', 123]})
-		
-		
-	def test_get_versioned_fail(self):
-		"""
-		Returns an empty result when trying to get versions of an unversioned entity
-		"""
-		foo_id = storage.create(Foo, {'a':'cat', 'b':123})
-		storage.update(Foo, foo_id, {'a':'b'})
-		results = storage.get(Foo)
-		self.assertEquals(len(results), 1)
-		results = storage.get(Foo, versions=True)
-		self.assertEquals(len(results), 0)
-		
-		
-	def test_get_by_ids_versioned_fail(self):
-		"""
-		Returns an empty result when trying to get versions of an unversioned entity
-		"""
-		foo_id = storage.create(Foo, {'a':'cat', 'b':123})
-		storage.update(Foo, foo_id, {'a':'b'})
-		results = storage.get_by_ids(Foo, [foo_id])
-		self.assertEquals(len(results), 1)
-		results = storage.get_by_ids(Foo, [foo_id], versions=True)
-		self.assertEquals(len(results), 0)
-		
-		
-	def test_create_versioned(self):
-		"""
-		When created, a versioned entity will have version information.
-		"""
-		bar_id = storage.create(Bar, {'a':'car', 'b':123})
-		bar = storage.get_by_id(Bar, bar_id)
-		self.assertEquals(bar, {'_id':bar_id, '_version':1, 'a':'car', 'b':123})
-		
-		
-	def test_update_versioned_missing_version(self):
-		"""
-		If the version is not provided with the update, a CompoundValidationError is raised
-		"""
-		bar_id = storage.create(Bar, {'a':'car', 'b':123})
-		self.assertRaises(errors.CompoundValidationError, storage.update, Bar, bar_id, {'a':'bike'})
-		
-		
-	def test_update_versioned_conflict(self):
-		"""
-		If the version provided with an update doesn't match the version of the stored document, a VersionConflictError is raised.
-		"""
-		bar_id = storage.create(Bar, {'a':'car', 'b':123})
-		bar = storage.get_by_id(Bar, bar_id)
-		with self.assertRaises(errors.VersionConflictError) as cm:
-			storage.update(Bar, bar_id, {'_version':99, 'a':'bike'})
-		self.assertEquals(cm.exception.other, bar)
-		
-		
-	def test_update_versioned(self):
-		"""
-		When a versioned item is updated, the version number will increment.
-		"""
-		bar_id = storage.create(Bar, {'a':'car', 'b':123})
-		bar = storage.update(Bar, bar_id, {'_version':1, 'a':'bike'})
-		self.assertEquals(bar['_version'], 2)
-		bar = storage.update(Bar, bar_id, {'_version':2, 'a':'unicycle'})
-		self.assertEquals(bar['_version'], 3)
-		
-		
-	def test_versioned_get(self):
-		"""
-		Can get a list of past versions of documents
-		"""
-		bar_id = storage.create(Bar, {'a':'car', 'b':123})
-		storage.update(Bar, bar_id, {'_version':1, 'a':'bike'})
-		storage.update(Bar, bar_id, {'_version':2, 'a':'unicycle'})
-		
-		results = storage.get(Bar, versions=True)
-		self.assertEquals(
-			results,
-			[
-				{'_id':bar_id, '_version':1, 'a':'car', 'b':123},
-				{'_id':bar_id, '_version':2, 'a':'bike', 'b':123}
-			]
-		)
-		
-		results = storage.get(Bar, filter={'_version':{'$lt':2}}, versions=True)
-		self.assertEquals(
-			results,
-			[
-				{'_id':bar_id, '_version':1, 'a':'car', 'b':123}
-			]
-		)
-		
-		results = storage.get(Bar, filter={'_id':bar_id}, versions=True)
-		self.assertEquals(
-			results,
-			[
-				{'_id':bar_id, '_version':1, 'a':'car', 'b':123},
-				{'_id':bar_id, '_version':2, 'a':'bike', 'b':123}
-			]
-		)
-		
-		
-	def test_versioned_delete(self):
-		"""
-		Deleting a versioned document leaves a record of the deletion.
-		"""
-		bar_id = storage.create(Bar, {'a':'bike', 'b':123})
-		bar = storage.get_by_id(Bar, bar_id)
-		storage.delete(Bar, bar_id, deleted_by='The Grinch')
-		results = storage.get(Bar, versions=True)
-		self.assertEquals(results[0], bar)
-		delete_record = results[1]
-		self.assertIn('_deleted_on', delete_record)
-		self.assertIsInstance(delete_record['_deleted_on'], datetime)
-		del delete_record['_deleted_on']
-		self.assertEquals(delete_record, {'_id':bar_id, '_version':2, '_deleted_by':'The Grinch'})
 		
 		
 	def test_inheritance_type_name(self):

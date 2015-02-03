@@ -213,7 +213,6 @@ class Entity(object):
     __metaclass__ = EntityType
     
     mixins = []
-    versioned = False
     
     
 

@@ -35,7 +35,6 @@ class Person(model.Entity):
 	
 	
 class Post(model.Entity):
-	versioned = True
 	mixins = (Timestamped,)
 	status = Enum('draft', 'published', default='draft')
 	publish_date = DateTime()

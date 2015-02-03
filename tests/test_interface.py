@@ -689,16 +689,6 @@ class InterfaceTest(unittest.TestCase):
 			api.interfaces['readonly_foos'].create({})
 		
 		
-	def test_passes_version(self):
-		"""When updating, the _version field is passed through to the storage method"""
-		storage.update = Mock(return_value={'_id':'123'})
-		storage.get_by_id = Mock(return_value={'_id':'123'})
-		api.interfaces['foos'].update('123', {'_version':57})
-		storage.update.assert_called_with(Foo, '123', {'_version':57}, replace=False)
-		api.interfaces['foos'].replace('123', {'stuff':'things', '_version':57})
-		storage.update.assert_called_with(Foo, '123', {'stuff':'things', '_version':57}, replace=True)
-		
-		
 	def test_default_limit(self):
 		"""A default limit is used when limit is not passed"""
 		storage.get = Mock(return_value=[])
