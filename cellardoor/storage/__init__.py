@@ -24,11 +24,11 @@ class Storage(object):
 		raise NotImplementedError
 		
 		
-	def update(self, entity, id, fields, replace=False):
+	def update(self, entity, id_or_filter, fields, replace=False):
 		raise NotImplementedError
 		
 		
-	def delete(self, entity, id):
+	def delete(self, entity, id_or_filter):
 		raise NotImplementedError
 		
 		

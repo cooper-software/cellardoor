@@ -111,6 +111,25 @@ class TestMongoDBStorage(unittest.TestCase):
 		self.assertEquals(results, [docs[0], docs[2]])
 		
 		
+	def test_delete_filter(self):
+		"""
+		Should remove documents matching the filter
+		"""
+		docs = [
+			{'a':'one', 'b':1},
+			{'a':'two', 'b':1},
+			{'a':'three', 'b':3}
+		]
+		
+		for doc in docs:
+			doc['_id'] = storage.create(Foo, doc)
+			
+		storage.delete(Foo, {'b':1})
+		results = storage.get(Foo)
+		
+		self.assertEquals(results, [docs[2]])
+		
+		
 	def test_get_filter(self):
 		"""
 		Should filter results by field value.
