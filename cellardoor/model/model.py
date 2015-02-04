@@ -52,7 +52,7 @@ class InverseLink(object):
     
     def __init__(self, entity, field, 
             embeddable=False, embed_by_default=True, embedded_fields=None, 
-            multiple=True, hidden=False, help=None):
+            multiple=True, hidden=False, label=None, description=None):
         self.entity = entity
         self.field = field
         self.embeddable = embeddable
@@ -61,7 +61,8 @@ class InverseLink(object):
         self.multiple = multiple
         self.hidden = hidden
         self.storage = None
-        self.help = help
+        self.label = label
+        self.description = description
     
 
 

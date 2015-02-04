@@ -43,8 +43,10 @@ class EntitySerializer(object):
 		prop = {}
 		prop['default'] = field.default
 		prop['format'] = field.__class__.__name__
-		if field.help:
-			prop['description'] = field.help
+		if field.label:
+			prop['title'] = field.label
+		if field.description:
+			prop['description'] = field.description
 		type_name = field.__class__.__name__
 		method_name = 'handle_%s' % type_name
 		if not hasattr(self, method_name):

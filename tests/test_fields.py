@@ -29,6 +29,38 @@ class TestAbstractField(unittest.TestCase):
         self.assertEqual(value, 23)
         
         
+    def test_field_hidden(self):
+        field = Field()
+        self.assertEquals(field.hidden, False)
+        
+        field = Field(hidden=True)
+        self.assertEquals(field.hidden, True)
+        
+        
+    def test_field_unique(self):
+        field = Field()
+        self.assertEquals(field.unique, False)
+        
+        field = Field(unique=True)
+        self.assertEquals(field.unique, True)
+        
+        
+    def test_field_label(self):
+        field = Field()
+        self.assertEquals(field.label, None)
+        
+        field = Field(label="Foo")
+        self.assertEquals(field.label, "Foo")
+        
+        
+    def test_field_description(self):
+        field = Field()
+        self.assertEquals(field.description, None)
+        
+        field = Field(description="Foo")
+        self.assertEquals(field.description, "Foo")
+        
+        
 class TestText(unittest.TestCase):
         
     def test_not_text(self):

@@ -14,7 +14,7 @@ class Bar(model.Entity):
 class Foo(model.Entity):
     a = Compound(foo=Text())
     b = Text(required=True, minlength=100, maxlength=5000, regex=re.compile('^b'))
-    c = HTML(help="Some stuff")
+    c = HTML(label="Some stuff")
     d = Email(required=True)
     e = DateTime()
     f = Boolean()
@@ -60,9 +60,17 @@ class TestEntitySerializer(unittest.TestCase):
 		self.assertEquals(schema['required'], ['things', 'stuff'])
 		
 		
-	def test_help(self):
+	def test_label(self):
 		class Foo(self.model.Entity):
-			stuff = Integer(help="Blah blah blah")
+			stuff = Integer(label="Blah blah blah")
+			
+		schema = self.get_schema(Foo)
+		self.assertEquals(schema['properties']['stuff']['title'], 'Blah blah blah')
+		
+		
+	def test_description(self):
+		class Foo(self.model.Entity):
+			stuff = Integer(description="Blah blah blah")
 			
 		schema = self.get_schema(Foo)
 		self.assertEquals(schema['properties']['stuff']['description'], 'Blah blah blah')

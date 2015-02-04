@@ -7,8 +7,8 @@ __all__ = ['Timestamped']
 
 class Timestamped(object):
     
-    created = DateTime(help="Created")
-    modified = DateTime(help="Modified")
+    created = DateTime(label="Created")
+    modified = DateTime(label="Modified")
     
     def before_create(self, fields, *args, **kwargs):
         now = datetime.utcnow()
