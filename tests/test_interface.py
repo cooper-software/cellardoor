@@ -1,6 +1,7 @@
 import unittest
 from copy import deepcopy
 from mock import Mock
+import random
 from cellardoor.model import Model, Entity, Link, InverseLink, Text, ListOf, Integer, Float, Enum
 from cellardoor.api import API
 from cellardoor.api.methods import ALL, LIST, GET, CREATE
@@ -339,6 +340,34 @@ class InterfaceTest(unittest.TestCase):
 		linked_bazes = foos.link(foo['_id'], 'bazes', sort=('+name',), filter={'name':'foo'}, offset=10, limit=20)
 		self.assertEquals(linked_bazes, created_bazes)
 		bazes.storage.get_by_ids.assert_called_once_with(Baz, baz_ids, sort=('+name',), filter={'name':'foo'}, offset=10, limit=20, count=False)
+		
+		
+	def test_multiple_link_default_order(self):
+		"""
+		Linked items are always in field order unless a sort option is set
+		"""
+		ordered_bazes = []
+		baz_ids = []
+		for i in range(0,3):
+			baz = { 'name':'Baz#%d' % i, '_id':'%d' % i }
+			ordered_bazes.append(baz)
+			baz_ids.append(baz['_id'])
+		
+		random_bazes = [b for b in ordered_bazes]
+		random.shuffle(random_bazes)
+		
+		foo = {'_id':'123', 'bazes':baz_ids}
+		
+		foos = api.interfaces['foos']
+		bazes = api.interfaces['bazes']
+		storage.get_by_id = Mock(return_value=foo)
+		storage.check_filter = Mock(return_value=None)
+		storage.get_by_ids = Mock(return_value=random_bazes)
+		
+		linked_bazes = foos.link(foo['_id'], 'bazes')
+		self.assertEquals(linked_bazes, ordered_bazes)
+		linked_bazes = foos.link(foo['_id'], 'bazes', sort=('+name',))
+		self.assertEquals(linked_bazes, random_bazes)
 		
 		
 	def test_multiple_link_get_embedded(self):
@@ -728,10 +757,10 @@ class InterfaceTest(unittest.TestCase):
 	def test_embeddable_fields(self):
 		"""Only fields in an entity's embedded_fields list are included"""
 		storage.get = Mock(return_value=[{'_id':'123', 'embedded_foos':['1','2','3']}])
-		storage.get_by_ids = Mock(return_value=[{'_id':'666', 'stuff':123, 'optional_stuff':456}])
+		storage.get_by_ids = Mock(return_value=[{'_id':'2', 'stuff':123, 'optional_stuff':456}])
 		foos = api.interfaces['foos']
 		result = foos.list(embed=('embedded_foos',))
-		self.assertEquals(result, [{'_id':'123', 'embedded_foos':[{'_id':'666', 'stuff':123}]}])
+		self.assertEquals(result, [{'_id':'123', 'embedded_foos':[{'_id':'2', 'stuff':123}]}])
 		
 		
 	def test_field_subset(self):
