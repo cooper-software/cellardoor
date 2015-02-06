@@ -113,13 +113,9 @@ class MongoDBStorage(Storage):
 			self._raise_dupe_error(e)
 			
 			
-	def delete(self, entity, id_or_filter):
+	def delete(self, entity, id):
 		collection = self.get_collection(entity)
-		if isinstance(id_or_filter, dict):
-			filter = id_or_filter
-		else:
-			filter = self._objectid(id_or_filter)
-		collection.remove(filter)
+		collection.remove(self._objectid(id))
 		
 		
 	def document_to_dict(self, doc):
