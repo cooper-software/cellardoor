@@ -44,20 +44,17 @@ class TestView(unittest.TestCase):
 		)
 		
 		# No accept header means the first serializer in the list
-		req = create_fake_request()
-		content_type, result = view.serialize(req, {})
+		content_type, result = view.serialize('', {})
 		self.assertEquals(content_type, 'application/x-foo')
 		self.assertEquals(result, 'Foo')
 		
 		# A matching accept header means the matching serializer
-		req = create_fake_request(headers={'accept':'application/x-bar'})
-		content_type, result = view.serialize(req, {})
+		content_type, result = view.serialize('application/x-bar', {})
 		self.assertEquals(content_type, 'application/x-bar')
 		self.assertEquals(result, 'Bar')
 		
 		# An unmatched accept header means the first serializer in the list
-		req = create_fake_request(headers={'accept':'text/xml'})
-		content_type, result = view.serialize(req, {})
+		content_type, result = view.serialize('text/xml', {})
 		self.assertEquals(content_type, 'application/x-foo')
 		self.assertEquals(result, 'Foo')
 		

@@ -1,5 +1,5 @@
 from .api import api
-from cellardoor.wsgi.falcon_app import FalconApp
+from cellardoor.wsgi.falcon_integration import FalconApp
 
 def create_app():
-	return FalconApp(api)
+	return create_falcon_app(api)

@@ -8,9 +8,6 @@ from ..views import View
 from ..views.minimal import MinimalView
 from .. import errors
 
-__all__ = ['add_to_falcon']
-
-
 class Resource(object):
 	"""
 	A resource exposes an interface through falcon
@@ -57,7 +54,7 @@ class Resource(object):
 		kwargs = self.get_kwargs(req)
 		kwargs['count'] = True
 		result = self.interface.list(**kwargs)
-		resp.content_type, _ = View.choose(req, self.views)
+		resp.content_type, _ = View.choose(req.get_header('accept'), self.views)
 		resp.set_header('X-Count', str(result))
 		
 		
@@ -106,7 +103,7 @@ class Resource(object):
 		kwargs = self.get_kwargs(req)
 		kwargs['count'] = True
 		result = self.interface.link(id, link_name, **kwargs)
-		resp.content_type, _ = View.choose(req, self.views)
+		resp.content_type, _ = View.choose(req.get_header('accept'), self.views)
 		if isinstance(result, int):
 			resp.set_header('X-Count', str(result))
 		
@@ -131,7 +128,7 @@ class Resource(object):
 		view = self.get_view(req)
 		method = getattr(view, method_name)
 		try:
-			return method(req, data)
+			return method(req.get_header('accept'), data)
 		except Exception, e:
 			self.logger.exception('Failed to serialize response.')
 			raise falcon.HTTPInternalServerError('Internal Server Error', '')
@@ -139,7 +136,7 @@ class Resource(object):
 			
 	def get_view(self, req):
 		"""Get the correct view based on the Accept header"""
-		_, view = View.choose(req, self.views)
+		_, view = View.choose(req.get_header('accept'), self.views)
 		return view
 			
 			
@@ -284,8 +281,8 @@ def not_authorized_handler(exc, req, resp, params):
 	
 	
 def validation_error_handler(views, exc, req, resp, params):
-	_, view = View.choose(req, views)
-	resp.content_type, resp.body = view.get_individual_response(req, exc.errors)
+	_, view = View.choose(req.get_header('accept'), views)
+	resp.content_type, resp.body = view.get_individual_response(req.get_header('accept'), exc.errors)
 	resp.status = falcon.HTTP_400
 	
 	
@@ -296,8 +293,8 @@ def disabled_field_error(exc, req, resp, params):
 def duplicate_field_error(views, exc, req, resp, params):
 	error = {}
 	error[exc.message] = 'A duplicate value already exists.'
-	_, view = View.choose(req, views)
-	resp.content_type, resp.body = view.get_individual_response(req, error)
+	_, view = View.choose(req.get_header('accept'), views)
+	resp.content_type, resp.body = view.get_individual_response(req.get_header('accept'), error)
 	resp.status = falcon.HTTP_400
 		
 		
@@ -335,3 +332,4 @@ class FalconApp(object):
 			
 	def __call__(self, *args, **kwargs):
 		return self.falcon_app(*args, **kwargs)
+		

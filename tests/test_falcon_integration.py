@@ -7,7 +7,7 @@ from falcon.testing import TestBase, create_environ
 import falcon
 from cellardoor import errors
 from cellardoor.api import API
-from cellardoor.wsgi.falcon_app import FalconApp
+from cellardoor.wsgi.falcon_integration import FalconApp
 from cellardoor.model import Model, Entity, Text, Link, ListOf
 from cellardoor.storage import Storage
 from cellardoor.api.interface import ALL, LIST, GET, CREATE
