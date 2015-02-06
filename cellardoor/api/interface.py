@@ -527,6 +527,17 @@ class Interface(object):
 				return result
 			if not options.bypass_authorization:
 				self.rules.enforce_item_rules(LIST, result, options.context)
+			
+			if not options.sort and len(result) > 1:
+				results_by_id = {}
+				for r in result:
+					results_by_id[r['_id']] = r
+				new_result = []
+				for id in link_value:
+					item = results_by_id.get(id)
+					if item:
+						new_result.append(item)
+				result = new_result
 			return self.post(LIST, options, result)
 		else:
 			self.rules.enforce_non_item_rules(GET, options.context)
