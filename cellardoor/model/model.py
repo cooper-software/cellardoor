@@ -20,18 +20,18 @@ class Link(Text):
     UNKNOWN = 'No item found with this ID.'
     
     # Reverse delete options
-    NULL = 1
+    NULLIFY = 1
     CASCADE = 2
     
     def __init__(self, entity, 
-            embeddable=False, embed_by_default=True, embedded_fields=None, ondelete=NULL,
+            embeddable=False, embed_by_default=True, embedded_fields=None, ondelete=NULLIFY,
             *args, **kwargs):
         self.entity = entity
         self.embeddable = embeddable
         self.embed_by_default = embed_by_default
         self.embedded_fields = embedded_fields
         self.ondelete = ondelete
-        self.storage = None
+        self.model = None
         
         super(Link, self).__init__(*args, **kwargs)
         
@@ -42,7 +42,7 @@ class Link(Text):
         if value is None:
             return None
         
-        reference = self.storage.get_by_id(self.entity, value, fields={})
+        reference = self.model.storage.get_by_id(self.entity, value, fields={})
         if not reference:
             raise ValidationError(self.UNKNOWN)
         return value
@@ -60,7 +60,7 @@ class InverseLink(object):
         self.embedded_fields = embedded_fields
         self.multiple = multiple
         self.hidden = hidden
-        self.storage = None
+        self.model = None
         self.label = label
         self.description = description
     
@@ -160,7 +160,7 @@ class EntityType(type):
             embed_by_default = embed_by_default,
             children = [],
             validator = Compound(**fields),
-            inverse_links = []
+            inverse_links = {}
         ))
         
         new_cls = super(EntityType, cls).__new__(cls, name, bases, attrs)
@@ -187,8 +187,8 @@ class EntityType(type):
         link = cls.links.get(name)
         if not link:
             return None
-        if not link.storage:
-            link.storage = cls.model.storage
+        if not link.model:
+            link.model = cls.model
             if isinstance(link.entity, basestring):
                 try:
                     link.entity = cls.model.entities[link.entity]
@@ -258,4 +258,8 @@ class Model(object):
                 for link_name in entity.links:
                     link = entity.get_link(link_name)
                     if not isinstance(link, InverseLink):
-                        link.entity.inverse_links.append(link)
+                        is_multiple = isinstance(getattr(entity, link_name), ListOf)
+                        inverse_link = InverseLink(entity, link_name, multiple=is_multiple)
+                        if link.ondelete not in link.entity.inverse_links:
+                            link.entity.inverse_links[link.ondelete] = []
+                        link.entity.inverse_links[link.ondelete].append(inverse_link)

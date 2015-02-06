@@ -420,8 +420,9 @@ class TestModel(unittest.TestCase):
         A validation error is raised if the item referred to by the link doesn't exist.
         """
         link = Link('foo')
-        link.storage = Mock()
-        link.storage.get_by_id = Mock(return_value=None)
+        link.model = Mock()
+        link.model.storage = Mock()
+        link.model.storage.get_by_id = Mock(return_value=None)
         
         with self.assertRaises(ValidationError):
             link.validate('123')
@@ -433,8 +434,9 @@ class TestModel(unittest.TestCase):
         Link validation returns the original value if the referenced item exists
         """
         link = Link('foo')
-        link.storage = Mock()
-        link.storage.get_by_id = Mock(return_value=True)
+        link.model = Mock()
+        link.model.storage = Mock()
+        link.model.storage.get_by_id = Mock(return_value=True)
         id = '123'
         result = link.validate(id)
         self.assertEquals(result, id)

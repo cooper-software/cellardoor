@@ -32,5 +32,5 @@ class Storage(object):
 		raise NotImplementedError
 		
 		
-	def check_filter(self, filter, allowed_fields):
+	def check_filter(self, filter, allowed_fields, context):
 		raise NotImplementedError

@@ -860,6 +860,15 @@ class TestCompoundField(unittest.TestCase):
         self.assertRaises(CompoundValidationError, field.validate, {'foo':[]})
         
         
+    def test_pass_none_optional(self):
+        """
+        Optional fields with a None value should pass
+        """
+        field = Compound(foo=Text())
+        result = field.validate({'foo':None})
+        self.assertEquals(result, {'foo':None})
+        
+        
 class TestAnything(unittest.TestCase):
     
     def test_pass(self):

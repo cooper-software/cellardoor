@@ -583,17 +583,25 @@ class Compound(Field):
         
         for k,v in self.fields.items():
             unvalidated_value = value.get(k)
-            if unvalidated_value is None or unvalidated_value == '' or unvalidated_value == []:
-                if v.required and self.enforce_required:
+            is_missing = k not in value
+            is_empty = (isinstance(v, ListOf) and unvalidated_value == []) or unvalidated_value == '' or unvalidated_value is None
+            
+            if v.required and self.enforce_required:
+                if is_empty:
                     errors[k] = 'This field is required.'
                     continue
-                elif self.enforce_required:
+            elif is_missing:
+                if self.enforce_required and v.default:
                     unvalidated_value = v.default
-            if unvalidated_value is not None and unvalidated_value != []:
-                try:
-                    validated[k] = v.validate(unvalidated_value)
-                except ValidationError, e:
-                    errors[k] = e.message
+                else:
+                    continue
+            elif is_empty:
+                validated[k] = unvalidated_value
+            
+            try:
+                validated[k] = v.validate(unvalidated_value)
+            except ValidationError, e:
+                errors[k] = e.message
         
         if errors:
             raise CompoundValidationError(errors)

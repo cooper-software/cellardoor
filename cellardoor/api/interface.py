@@ -2,7 +2,7 @@ import types
 import collections
 from copy import deepcopy
 import inspect
-from ..model import ListOf, InverseLink
+from ..model import ListOf, Link, InverseLink
 from ..events import EventManager
 from .. import errors
 from .methods import *
@@ -403,7 +403,8 @@ class Interface(object):
 				raise errors.NotFoundError("No %s with id '%s' was found" % (self.singular_name, id))
 			self.rules.enforce_item_rules(_method, item, options.context)
 		
-		fields = self.entity.validator.validate(fields, enforce_required=_replace)
+		new_fields = self.entity.validator.validate(fields, enforce_required=_replace)
+		fields = new_fields
 		item = self.storage.update(self.entity, id, fields, replace=_replace)
 		if item is None:
 			raise errors.NotFoundError("No %s with id '%s' was found" % (self.singular_name, id))
@@ -420,7 +421,7 @@ class Interface(object):
 		return self.update(id, fields, _replace=True, _method=REPLACE, **kwargs)
 		
 		
-	def delete(self, id, **kwargs):
+	def delete(self, id, inverse_delete=True, **kwargs):
 		options = self.options_factory.create(kwargs)
 		
 		if not options.bypass_authorization:
@@ -436,7 +437,8 @@ class Interface(object):
 		self.entity.hooks.fire_before_delete(id, options.context)
 		self.hooks.fire_before_delete(id, options.context)
 		
-		self.inverse_delete(id)
+		if inverse_delete:
+			self.inverse_delete(id)
 		
 		self.storage.delete(self.entity, id)
 		self.post(DELETE, options)
@@ -447,7 +449,25 @@ class Interface(object):
 		
 		
 	def inverse_delete(self, id):
-		pass
+		cascade = self.entity.inverse_links.get(Link.CASCADE)
+		if cascade:
+			for link in cascade:
+				link_interface = self.api.get_interface_for_entity(link.entity)
+				items = link_interface.list(filter={link.field:id}, fields=[])
+				for item in items:
+					link_interface.delete(item['_id'])
+		nullify = self.entity.inverse_links.get(Link.NULLIFY)
+		if nullify:
+			for link in nullify:
+				link_interface = self.api.get_interface_for_entity(link.entity)
+				items = link_interface.list(filter={link.field:id}, fields=[link.field])
+				if link.multiple:
+					for item in items:
+						new_ids = filter(lambda x: x != id, item[link.field])
+						link_interface.update(item['_id'], {link.field:new_ids})
+				else:
+					for item in items:
+						link_interface.update(item['_id'], {link.field:None})
 		
 		
 	def link(self, id, link_name, **kwargs):

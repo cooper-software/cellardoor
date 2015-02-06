@@ -35,10 +35,8 @@ class Foo(model.Entity):
 	
 class Bar(model.Entity):
 	foo = Link(Foo)
-	foo_cascade = Link(Foo, ondelete=Link.CASCADE)
 	embedded_foo = Link(Foo, embeddable=True)
-	bazes = ListOf(Link('Baz'))
-	bazes_cascade = ListOf(Link('Baz', ondelete=Link.CASCADE))
+	bazes = ListOf(Link('Baz', ondelete=Link.CASCADE))
 	number = Integer()
 	name = Text()
 	
@@ -52,8 +50,8 @@ class Baz(model.Entity):
 class Hidden(model.Entity):
 	name = Text(hidden=True)
 	foo = Integer
-
-
+	
+	
 class Littorina(model.Entity):
 	size = Float()
 	
@@ -68,8 +66,32 @@ class LittorinaLittorea(Littorina):
 	
 class Planet(model.Entity):
 	pass
-	
 
+
+class NullSingleTarget(model.Entity):
+	pass
+	
+	
+class NullSingleReferrer(model.Entity):
+	target = Link(NullSingleTarget)
+
+
+class NullMultiTarget(model.Entity):
+	pass
+	
+	
+class NullMultiReferrer(model.Entity):
+	targets = ListOf(Link(NullMultiTarget))
+	
+	
+class CascadeTarget(model.Entity):
+	pass
+	
+	
+class CascadeReferrer(model.Entity):
+	target = Link(CascadeTarget, ondelete=Link.CASCADE)
+	
+	
 class Foos(api.Interface):
 	entity = Foo
 	method_authorization = {
@@ -108,7 +130,7 @@ class Bazes(api.Interface):
 	enabled_sort = ('name',)
 	default_limit = 10
 	max_limit = 20
-	
+
 	
 class Hiddens(api.Interface):
 	entity = Hidden
@@ -141,12 +163,66 @@ class Planets(api.Interface):
 	method_authorization = {
 		LIST: item.foo == 23
 	}
+	
+	
+class NullSingleTargets(api.Interface):
+	entity = NullSingleTarget
+	method_authorization = {
+		ALL: None
+	}
+	
+	
+class NullSingleReferrers(api.Interface):
+	entity = NullSingleReferrer
+	method_authorization = {
+		ALL: None
+	}
+	
+	
+class NullMultiTargets(api.Interface):
+	entity = NullMultiTarget
+	method_authorization = {
+		ALL: None
+	}
+	
+	
+class NullMultiReferrers(api.Interface):
+	entity = NullMultiReferrer
+	method_authorization = {
+		ALL: None
+	}
+	
+	
+class CascadeTargets(api.Interface):
+	entity = CascadeTarget
+	method_authorization = {
+		ALL: None
+	}
+	
+	
+class CascadeReferrers(api.Interface):
+	entity = CascadeReferrer
+	method_authorization = {
+		ALL: None
+	}
+	
 
 class InterfaceTest(unittest.TestCase):
 	
 	def setUp(self):
+		storage = Storage()
+		model.storage = storage
 		for interface in api.interfaces.values():
 			interface.set_storage(storage)
+			
+			
+	def get_interface(self, name, storage=None):
+		if storage is None:
+			storage = Storage()
+		interface = api.interfaces[name]
+		interface.set_storage(storage)
+		return interface
+		
 		
 	def test_create_fail_validation(self):
 		"""
@@ -160,12 +236,11 @@ class InterfaceTest(unittest.TestCase):
 		"""
 		Creates a new item in persistent storage if we pass validation.
 		"""
-		foo_id = 123
-		storage.create = CopyingMock(return_value=foo_id)
-		foos = api.interfaces['foos']
+		foos = self.get_interface('foos')
+		foos.storage.create = CopyingMock(return_value='123')
 		foo = foos.create({'stuff':'foo'})
-		storage.create.assert_called_once_with(Foo, {'stuff':'foo'})
-		self.assertEquals(foo, {'_id':foo_id, 'stuff':'foo'})
+		foos.storage.create.assert_called_once_with(Foo, {'stuff':'foo'})
+		self.assertEquals(foo, {'_id':'123', 'stuff':'foo'})
 		
 		
 	def test_list(self):
@@ -179,10 +254,11 @@ class InterfaceTest(unittest.TestCase):
 				{'stuff':'foo#%d' % i, '_id':i}
 			)
 		
-		storage.get = CopyingMock(return_value=saved_foos)
-		foos = api.interfaces['foos']
+		foos = self.get_interface('foos')
+		foos.storage.get = CopyingMock(return_value=saved_foos)
+		
 		fetched_foos = foos.list()
-		storage.get.assert_called_once_with(Foo, sort=(), filter=None, limit=0, offset=0, count=False)
+		foos.storage.get.assert_called_once_with(Foo, sort=(), filter=None, limit=0, offset=0, count=False)
 		self.assertEquals(fetched_foos, saved_foos)
 		
 		
@@ -190,11 +266,11 @@ class InterfaceTest(unittest.TestCase):
 		"""
 		Can get a single item
 		"""
+		foos = self.get_interface('foos')
 		foo = {'_id':123, 'stuff':'foo'}
-		storage.get_by_id = CopyingMock(return_value=foo)
-		foos = api.interfaces['foos']
+		foos.storage.get_by_id = CopyingMock(return_value=foo)
 		fetched_foo = foos.get(foo['_id'])
-		storage.get_by_id.assert_called_once_with(Foo, foo['_id'])
+		foos.storage.get_by_id.assert_called_once_with(Foo, foo['_id'])
 		self.assertEquals(fetched_foo, foo)
 		
 		
@@ -202,20 +278,21 @@ class InterfaceTest(unittest.TestCase):
 		"""
 		Trying to fetch a nonexistent item raises an error.
 		"""
-		storage.get_by_id = Mock(return_value=None)
+		foos = self.get_interface('foos')
+		foos.storage.get_by_id = Mock(return_value=None)
 		with self.assertRaises(errors.NotFoundError):
-			api.interfaces['foos'].get(123)
+			foos.get(123)
 		
 		
 	def test_update(self):
 		"""
 		Can update a subset of fields
 		"""
+		foos = self.get_interface('foos')
 		foo = {'_id':123, 'stuff':'baz'}
-		storage.update = Mock(return_value=foo)
-		foos = api.interfaces['foos']
+		foos.storage.update = Mock(return_value=foo)
 		updated_foo = foos.update(123, {'stuff':'baz'})
-		storage.update.assert_called_once_with(Foo, 123, {'stuff':'baz'}, replace=False)
+		foos.storage.update.assert_called_once_with(Foo, 123, {'stuff':'baz'}, replace=False)
 		self.assertEquals(updated_foo, foo)
 		
 		
@@ -223,20 +300,21 @@ class InterfaceTest(unittest.TestCase):
 		"""
 		Trying to update a nonexistent item raises an error.
 		"""
-		storage.update = Mock(return_value=None)
+		foos = self.get_interface('foos')
+		foos.storage.update = Mock(return_value=None)
 		with self.assertRaises(errors.NotFoundError):
-			api.interfaces['foos'].update(123, {})
+			foos.update(123, {})
 		
 		
 	def test_replace(self):
 		"""
 		Can replace a whole existing item
 		"""
+		foos = self.get_interface('foos')
 		foo = {'_id':123, 'stuff':'baz'}
-		storage.update = Mock(return_value=foo)
-		foos = api.interfaces['foos']
+		foos.storage.update = Mock(return_value=foo)
 		updated_foo = foos.replace(123, {'stuff':'baz'})
-		storage.update.assert_called_once_with(Foo, 123, {'stuff':'baz'}, replace=True)
+		foos.storage.update.assert_called_once_with(Foo, 123, {'stuff':'baz'}, replace=True)
 		self.assertEquals(updated_foo, foo)
 		
 		
@@ -244,39 +322,43 @@ class InterfaceTest(unittest.TestCase):
 		"""
 		Trying to replace a nonexistent item raises an error.
 		"""
-		storage.update = Mock(return_value=None)
+		foos = self.get_interface('foos')
+		foos.storage.update = Mock(return_value=None)
 		with self.assertRaises(errors.NotFoundError):
-			api.interfaces['foos'].replace(123, {'stuff':'foo'})
+			foos.replace(123, {'stuff':'foo'})
 		
 		
 	def test_delete_nonexistent(self):
 		"""
 		Raise an error when trying to delete an item that doesn't exist
 		"""
-		storage.get_by_id = Mock(return_value=None)
+		foos = self.get_interface('foos')
+		foos.storage.get_by_id = Mock(return_value=None)
 		with self.assertRaises(errors.NotFoundError):
-			api.interfaces['foos'].delete(123)
+			foos.delete(123, inverse_delete=False)
 		
 		
 	def test_delete(self):
 		"""
 		Can remove an existing item
 		"""
-		storage.get_by_id = Mock({'_id':123, 'stuff':'foo'})
-		storage.delete = Mock(return_value=None)
-		api.interfaces['foos'].delete(123)
-		storage.get_by_id.assert_called_once_with(Foo, 123)
-		storage.delete.assert_called_once_with(Foo, 123)
+		foos = self.get_interface('foos')
+		foos.storage.get_by_id = Mock(return_value={'_id':123, 'stuff':'foo'})
+		foos.storage.delete = Mock(return_value=None)
+		foos.delete(123, inverse_delete=False)
+		foos.storage.get_by_id.assert_called_once_with(Foo, 123)
+		foos.storage.delete.assert_called_once_with(Foo, 123)
 		
 		
 	def test_single_link_validation_fail(self):
 		"""
 		Fails validation if setting a link to a non-existent ID.
 		"""
-		storage.get_by_id = Mock(return_value=None)
+		foos = api.interfaces['foos']
+		bars = api.interfaces['bars']
+		foos.storage.get_by_id = Mock(return_value=None)
 		with self.assertRaises(errors.CompoundValidationError):
-			bars = api.interfaces['bars']
-			bar = bars.create({'foo':'123'})
+			bars.create({'foo':'123'})
 		
 		
 	def test_single_link(self):
@@ -286,14 +368,10 @@ class InterfaceTest(unittest.TestCase):
 		foo = {'_id':'123', 'stuff':'foo'}
 		bar = {'_id':'321', 'foo':'123'}
 		
-		foos = api.interfaces['foos']
-		bars = api.interfaces['bars']
-		foos.storage = Storage()
-		bars.storage = Storage()
+		foos = self.get_interface('foos')
+		bars = self.get_interface('bars')
 		foos.storage.get_by_id = Mock(return_value=foo)
 		bars.storage.get_by_id = Mock(return_value=bar)
-		
-		bars = api.interfaces['bars']
 		
 		linked_foo = bars.link('321', 'foo')
 		self.assertEquals(linked_foo, foo)
@@ -309,10 +387,8 @@ class InterfaceTest(unittest.TestCase):
 		foo = {'_id':'123', 'stuff':'foo'}
 		bar = {'_id':'321', 'embedded_foo':'123'}
 		
-		foos = api.interfaces['foos']
-		bars = api.interfaces['bars']
-		foos.storage = Storage()
-		bars.storage = Storage()
+		foos = self.get_interface('foos')
+		bars = self.get_interface('bars')
 		foos.storage.get_by_id = Mock(return_value=foo)
 		bars.storage.get_by_id = Mock(return_value=bar)
 		
@@ -333,11 +409,12 @@ class InterfaceTest(unittest.TestCase):
 			
 		foo = {'_id':'123', 'bazes':baz_ids}
 		
-		foos = api.interfaces['foos']
-		bazes = api.interfaces['bazes']
-		storage.get_by_id = Mock(return_value=foo)
-		storage.check_filter = Mock(return_value=None)
-		storage.get_by_ids = Mock(return_value=created_bazes)
+		foos = self.get_interface('foos')
+		bazes = self.get_interface('bazes')
+		foos.storage.get_by_id = Mock(return_value=foo)
+		foos.storage.check_filter = Mock(return_value=None)
+		bazes.storage.get_by_ids = Mock(return_value=created_bazes)
+		bazes.storage.check_filter = Mock(return_value=None)
 		
 		linked_bazes = foos.link(foo['_id'], 'bazes', sort=('+name',), filter={'name':'foo'}, offset=10, limit=20)
 		self.assertEquals(linked_bazes, created_bazes)
@@ -362,9 +439,9 @@ class InterfaceTest(unittest.TestCase):
 		
 		foos = api.interfaces['foos']
 		bazes = api.interfaces['bazes']
-		storage.get_by_id = Mock(return_value=foo)
-		storage.check_filter = Mock(return_value=None)
-		storage.get_by_ids = Mock(return_value=random_bazes)
+		foos.storage.get_by_id = Mock(return_value=foo)
+		bazes.storage.check_filter = Mock(return_value=None)
+		bazes.storage.get_by_ids = Mock(return_value=random_bazes)
 		
 		linked_bazes = foos.link(foo['_id'], 'bazes')
 		self.assertEquals(linked_bazes, ordered_bazes)
@@ -385,10 +462,8 @@ class InterfaceTest(unittest.TestCase):
 			
 		foo = {'_id':'123', 'embedded_bazes':baz_ids}
 		
-		foos = api.interfaces['foos']
-		bazes = api.interfaces['bazes']
-		foos.storage = Storage()
-		bazes.storage = Storage()
+		foos = self.get_interface('foos')
+		bazes = self.get_interface('bazes')
 		foos.storage.get_by_id = Mock(return_value=foo)
 		bazes.storage.get_by_ids = Mock(return_value=created_bazes)
 		
@@ -409,10 +484,8 @@ class InterfaceTest(unittest.TestCase):
 			
 		foo = {'_id':'123', 'bazes':baz_ids}
 		
-		foos = api.interfaces['foos']
-		bazes = api.interfaces['bazes']
-		foos.storage = Storage()
-		bazes.storage = Storage()
+		foos = self.get_interface('foos')
+		bazes = self.get_interface('bazes')
 		foos.storage.get = Mock(return_value=[foo])
 		bazes.storage.get_by_id = Mock(return_value=created_bazes[0])
 		
@@ -435,10 +508,12 @@ class InterfaceTest(unittest.TestCase):
 			
 		foo = {'_id':'123', 'bazes':baz_ids}
 		
-		storage.get = Mock(return_value=[foo])
-		storage.get_by_id = Mock(return_value=created_bazes[0])
+		foos = self.get_interface('foos')
+		foos.storage.get = Mock(return_value=[foo])
+		bazes = self.get_interface('bazes')
+		bazes.storage.get_by_id = Mock(return_value=created_bazes[0])
 		
-		baz = api.interfaces['bazes'].get(baz_ids[0], embed=('embedded_foo',))
+		baz = bazes.get(baz_ids[0], embed=('embedded_foo',))
 		self.assertEquals(baz['embedded_foo'], foo)
 		
 		
@@ -448,34 +523,37 @@ class InterfaceTest(unittest.TestCase):
 		"""
 		foo = {'stuff':'foo', '_id':'123'}
 		
-		bars = []
+		bar_items = []
 		bar_ids = []
 		for i in range(0,3):
 			bar = {'foo':foo['_id'], '_id':'%s' % i}
-			bars.append(bar)
+			bar_items.append(bar)
 			bar_ids.append(bar['_id'])
 		
-		storage.get_by_id = Mock(return_value=foo)
-		storage.get = Mock(return_value=bars)
-		storage.check_filter = Mock(return_value=None)
+		foos = self.get_interface('foos')
+		foos.storage.get_by_id = Mock(return_value=foo)
+		foos.storage.check_filter = Mock(return_value=None)
+		bars = self.get_interface('bars')
+		bars.storage.get = Mock(return_value=bar_items)
+		bars.storage.check_filter = Mock(return_value=None)
 		
 		linked_bars = api.interfaces['foos'].link(foo['_id'], 'bars', sort=('-name',), filter={'number':'7'}, limit=10, offset=20)
-		storage.get_by_id.assert_called_once_with(Foo, foo['_id'])
-		storage.get.assert_called_once_with(Bar, sort=('-name',), filter={'foo': '123', 'number':'7'}, limit=10, offset=20, count=False)
-		self.assertEquals(linked_bars, bars)
+		foos.storage.get_by_id.assert_called_once_with(Foo, foo['_id'])
+		bars.storage.get.assert_called_once_with(Bar, sort=('-name',), filter={'foo': '123', 'number':'7'}, limit=10, offset=20, count=False)
+		self.assertEquals(linked_bars, bar_items)
 		
 		
 	def test_embed_polymorphic(self):
 		"""Interfaces properly embed links when fetching descendants of the interface's entity"""
-		littorinas = api.interfaces['littorinas']
-		shells = api.interfaces['shells']
+		littorinas = self.get_interface('littorinas')
+		shells = self.get_interface('shells')
 		
-		storage.get = Mock(return_value=[
+		littorinas.storage.get = Mock(return_value=[
 			{'_id': '1', '_type':'Littorina.LittorinaLittorea', 'shell':'2'}])
-		storage.get_by_id = Mock(return_value={'_id':'2', 'color': 'Really brown'})
+		shells.storage.get_by_id = Mock(return_value={'_id':'2', 'color': 'Really brown'})
 		
 		result = littorinas.list()
-		storage.get_by_id.assert_called_once_with(Shell, '2')
+		shells.storage.get_by_id.assert_called_once_with(Shell, '2')
 		self.assertEquals(result, [{'_id': '1', '_type':'Littorina.LittorinaLittorea', 'shell':{'_id':'2', 'color': 'Really brown'}}])
 		
 		
@@ -491,9 +569,10 @@ class InterfaceTest(unittest.TestCase):
 		"""
 		If no sort is set, the default is used.
 		"""
-		storage.get = Mock(return_value=[])
-		api.interfaces['bars'].list()
-		storage.get.assert_called_once_with(Bar, sort=('+name',), filter=None, limit=0, offset=0, count=False)
+		bars = self.get_interface('bars')
+		bars.storage.get = Mock(return_value=[])
+		bars.list()
+		bars.storage.get.assert_called_once_with(Bar, sort=('+name',), filter=None, limit=0, offset=0, count=False)
 		
 		
 	def test_auth_required_not_present(self):
@@ -504,8 +583,9 @@ class InterfaceTest(unittest.TestCase):
 			
 	def test_auth_required_present(self):
 		"""Don't raise NotAuthenticatedError if authentication is required and present."""
-		storage.get = Mock(return_value=[])
-		api.interfaces['hiddens'].list(context={'identity':{'foo':'bar'}})
+		hiddens = self.get_interface('hiddens')
+		hiddens.storage.get = Mock(return_value=[])
+		hiddens.list(context={'identity':{'foo':'bar'}})
 		
 		
 	def test_auth_failed(self):
@@ -519,13 +599,14 @@ class InterfaceTest(unittest.TestCase):
 			
 	def test_auth_pass(self):
 		"""Does not raise NotAuthorizedError if the authorization rule passes"""
-		storage.create = Mock(return_value={})
-		api.interfaces['hiddens'].create({}, context={'identity':{'role':'admin'}})
+		hiddens = self.get_interface('hiddens')
+		hiddens.storage.create = Mock(return_value={})
+		hiddens.create({}, context={'identity':{'role':'admin'}})
 		
 		
 	def test_auth_result_fail(self):
 		"""Raises NotAuthorizedError if a result rule doesn't pass."""
-		hiddens = api.interfaces['hiddens']
+		hiddens = self.get_interface('hiddens')
 		hiddens.storage.get_by_id = Mock(return_value={'foo':700})
 		with self.assertRaises(errors.NotAuthorizedError):
 			hiddens.get(123)
@@ -533,7 +614,7 @@ class InterfaceTest(unittest.TestCase):
 			
 	def test_auth_result_fail_list(self):
 		"""Raises NotAuthorizedError if a member of a result list doesn't pass a rule."""
-		planets = api.interfaces['planets']
+		planets = self.get_interface('planets')
 		planets.storage.get = Mock(return_value=[{'foo':700}])
 		with self.assertRaises(errors.NotAuthorizedError):
 			planets.list()
@@ -541,49 +622,51 @@ class InterfaceTest(unittest.TestCase):
 		
 	def test_auth_result_pass(self):
 		"""Does not raise NotAuthorizedError if a result rule passes."""
-		hiddens = api.interfaces['hiddens']
+		hiddens = self.get_interface('hiddens')
 		hiddens.storage.get_by_id = Mock(return_value={'foo':23})
 		hiddens.get(123)
 		
 		
 	def test_hidden_result(self):
 		"""Hidden fields aren't shown in results."""
-		storage.create = Mock(return_value={'_id':'123', 'name':'foo'})
-		hiddens = api.interfaces['hiddens']
+		hiddens = self.get_interface('hiddens')
+		hiddens.storage.create = Mock(return_value={'_id':'123', 'name':'foo'})
 		obj = hiddens.create({'name':'foo'}, context={'identity':{'role':'admin'}})
 		self.assertNotIn('name', obj)
 		
 		
 	def test_hidden_show_fail(self):
 		"""Hidden fields aren't shown in results even when show_hidden=True if the user is not authorized."""
-		storage.get_by_id = Mock(return_value={'_id':'123', 'name':'foo', 'foo':23})
-		hiddens = api.interfaces['hiddens']
+		hiddens = self.get_interface('hiddens')
+		hiddens.storage.get_by_id = Mock(return_value={'_id':'123', 'name':'foo', 'foo':23})
 		obj = hiddens.get('123', show_hidden=True)
 		self.assertNotIn('name', obj)
 		
 		
 	def test_hidden_succeed(self):
 		"""Hidden fields are shown when show_hidden=True and the user is authorized."""
-		storage.get_by_id = Mock(return_value={'_id':'123', 'name':'foo', 'foo':23})
-		hiddens = api.interfaces['hiddens']
+		hiddens = self.get_interface('hiddens')
+		hiddens.storage.get_by_id = Mock(return_value={'_id':'123', 'name':'foo', 'foo':23})
 		obj = hiddens.get('123', show_hidden=True, context={'identity':{'foo':'bar'}})
 		self.assertIn('name', obj)
 		
 		
 	def test_hidden_filter(self):
 		"""Can't filter by a hidden field without authorization."""
-		storage.check_filter = Mock(side_effect=errors.DisabledFieldError)
+		hiddens = self.get_interface('hiddens')
+		hiddens.storage.check_filter = Mock(side_effect=errors.DisabledFieldError)
 		with self.assertRaises(errors.DisabledFieldError):
-			api.interfaces['hiddens'].list(filter={'name':'zoomy'}, context={'identity':{}})
-		storage.check_filter.assert_called_once_with({'name':'zoomy'}, set(['_type', '_id']), {'identity': {}})
+			hiddens.list(filter={'name':'zoomy'}, context={'identity':{}})
+		hiddens.storage.check_filter.assert_called_once_with({'name':'zoomy'}, set(['_type', '_id']), {'identity': {}})
 		
 		
 	def test_hidden_filter_authorized(self):
 		"""Can filter by a hidden field when authorized."""
-		storage.check_filter = Mock(return_value=None)
-		storage.get = Mock(return_value=[])
-		api.interfaces['hiddens'].list(filter={'name':'zoomy'}, context={'identity':{'foo':'bar'}})
-		storage.check_filter.assert_called_once_with({'name':'zoomy'}, set(['name', '_type', '_id']),  {'item': [], 'identity': {'foo': 'bar'}})
+		hiddens = self.get_interface('hiddens')
+		hiddens.storage.check_filter = Mock(return_value=None)
+		hiddens.storage.get = Mock(return_value=[])
+		hiddens.list(filter={'name':'zoomy'}, context={'identity':{'foo':'bar'}})
+		hiddens.storage.check_filter.assert_called_once_with({'name':'zoomy'}, set(['name', '_type', '_id']),  {'item': [], 'identity': {'foo': 'bar'}})
 		
 		
 	def test_hidden_sort_fail(self):
@@ -595,10 +678,10 @@ class InterfaceTest(unittest.TestCase):
 		
 	def test_authorization_bypass(self):
 		"""Can bypass authorization for methods, filters and sort."""
-		storage.get = Mock(return_value=[{'name':'zoomy', 'foo':23}])
-		hiddens = api.interfaces['hiddens']
+		hiddens = self.get_interface('hiddens')
+		hiddens.storage.get = Mock(return_value=[{'name':'zoomy', 'foo':23}])
 		results = hiddens.list(filter={'name':'zoomy'}, sort=('+name',), bypass_authorization=True, show_hidden=True)
-		storage.get.assert_called_once_with(Hidden, sort=('+name',), filter={'name':'zoomy'}, limit=0, offset=0, count=False)
+		hiddens.storage.get.assert_called_once_with(Hidden, sort=('+name',), filter={'name':'zoomy'}, limit=0, offset=0, count=False)
 		self.assertEquals(results, [{'name':'zoomy', 'foo':23}])
 		
 		
@@ -610,7 +693,7 @@ class InterfaceTest(unittest.TestCase):
 		after_update = CopyingMock()
 		before_delete = CopyingMock()
 		after_delete = CopyingMock()
-		foos = api.interfaces['foos']
+		foos = self.get_interface('foos')
 		hooks = foos.entity.hooks
 		hooks.before_create(before_create)
 		hooks.after_create(after_create)
@@ -621,12 +704,10 @@ class InterfaceTest(unittest.TestCase):
 		
 		context = {'foo':23}
 		
-		storage.create = Mock(return_value='123')
-		storage.update = Mock(return_value={'_id':'123', 'stuff':'nothings'})
-		storage.delete = Mock(return_value=None)
-		storage.get_by_id = Mock(return_value={'_id':'123', 'stuff':'nothings'})
-		
-		foos = api.interfaces['foos']
+		foos.storage.create = Mock(return_value='123')
+		foos.storage.update = Mock(return_value={'_id':'123', 'stuff':'nothings'})
+		foos.storage.delete = Mock(return_value=None)
+		foos.storage.get_by_id = Mock(return_value={'_id':'123', 'stuff':'nothings'})
 		
 		foo = foos.create({'stuff':'things'}, context=context.copy())
 		create_context = context.copy()
@@ -634,15 +715,11 @@ class InterfaceTest(unittest.TestCase):
 		before_create.assert_called_once_with({'stuff':'things'}, context)
 		after_create.assert_called_once_with(foo, create_context)
 		
-		foos = api.interfaces['foos']
-		
 		foo = foos.update(foo['_id'], {'stuff':'nothings'}, context=context.copy())
 		update_context = context.copy()
 		update_context['item'] = foo
 		before_update.assert_called_with(foo['_id'], {'stuff':'nothings'}, context)
 		after_update.assert_called_with(foo, update_context)
-		
-		foos = api.interfaces['foos']
 		
 		foo = foos.replace(foo['_id'], {'stuff':'somethings'}, context=context.copy())
 		replace_context = context.copy()
@@ -650,7 +727,7 @@ class InterfaceTest(unittest.TestCase):
 		before_update.assert_called_with(foo['_id'], {'stuff':'somethings'}, context)
 		after_update.assert_called_with(foo, replace_context)
 		
-		api.interfaces['foos'].delete(foo['_id'], context=context.copy())
+		foos.delete(foo['_id'], context=context.copy(), inverse_delete=False)
 		delete_context = context.copy()
 		delete_context['item'] = foo
 		before_delete.assert_called_once_with(foo['_id'], context)
@@ -665,7 +742,7 @@ class InterfaceTest(unittest.TestCase):
 		after_update = CopyingMock()
 		before_delete = CopyingMock()
 		after_delete = CopyingMock()
-		foos = api.interfaces['foos']
+		foos = self.get_interface('foos')
 		hooks = foos.hooks
 		hooks.before_create(before_create)
 		hooks.after_create(after_create)
@@ -676,12 +753,10 @@ class InterfaceTest(unittest.TestCase):
 		
 		context = {'foo':23}
 		
-		storage.create = Mock(return_value='123')
-		storage.update = Mock(return_value={'_id':'123', 'stuff':'nothings'})
-		storage.delete = Mock(return_value=None)
-		storage.get_by_id = Mock(return_value={'_id':'123', 'stuff':'nothings'})
-		
-		foos = api.interfaces['foos']
+		foos.storage.create = Mock(return_value='123')
+		foos.storage.update = Mock(return_value={'_id':'123', 'stuff':'nothings'})
+		foos.storage.delete = Mock(return_value=None)
+		foos.storage.get_by_id = Mock(return_value={'_id':'123', 'stuff':'nothings'})
 		
 		foo = foos.create({'stuff':'things'}, context=context.copy())
 		create_context = context.copy()
@@ -689,15 +764,11 @@ class InterfaceTest(unittest.TestCase):
 		before_create.assert_called_once_with({'stuff':'things'}, context)
 		after_create.assert_called_once_with(foo, create_context)
 		
-		foos = api.interfaces['foos']
-		
 		foo = foos.update(foo['_id'], {'stuff':'nothings'}, context=context.copy())
 		update_context = context.copy()
 		update_context['item'] = foo
 		before_update.assert_called_with(foo['_id'], {'stuff':'nothings'}, context)
 		after_update.assert_called_with(foo, update_context)
-		
-		foos = api.interfaces['foos']
 		
 		foo = foos.replace(foo['_id'], {'stuff':'somethings'}, context=context.copy())
 		replace_context = context.copy()
@@ -705,7 +776,7 @@ class InterfaceTest(unittest.TestCase):
 		before_update.assert_called_with(foo['_id'], {'stuff':'somethings'}, context)
 		after_update.assert_called_with(foo, replace_context)
 		
-		api.interfaces['foos'].delete(foo['_id'], context=context.copy())
+		foos.delete(foo['_id'], context=context.copy(), inverse_delete=False)
 		delete_context = context.copy()
 		delete_context['item'] = foo
 		before_delete.assert_called_once_with(foo['_id'], context)
@@ -720,63 +791,68 @@ class InterfaceTest(unittest.TestCase):
 		
 	def test_default_limit(self):
 		"""A default limit is used when limit is not passed"""
-		storage.get = Mock(return_value=[])
-		api.interfaces['bazes'].list()
-		storage.get.assert_called_once_with(Baz, sort=(), filter=None, offset=0, limit=10, count=False)
+		bazes = self.get_interface('bazes')
+		bazes.storage.get = Mock(return_value=[])
+		bazes.list()
+		bazes.storage.get.assert_called_once_with(Baz, sort=(), filter=None, offset=0, limit=10, count=False)
 		
 		
 	def test_max_limit(self):
 		"""Limit can't exceed max_limit"""
-		storage.get = Mock(return_value=[])
-		api.interfaces['bazes'].list(limit=50)
-		storage.get.assert_called_once_with(Baz, sort=(), filter=None, offset=0, limit=20, count=False)
+		bazes = self.get_interface('bazes')
+		bazes.storage.get = Mock(return_value=[])
+		bazes.list(limit=50)
+		bazes.storage.get.assert_called_once_with(Baz, sort=(), filter=None, offset=0, limit=20, count=False)
 		
 		
 	def test_default_embedded_not_default(self):
 		"""A link can be embeddable but not embedded"""
-		storage.get = Mock(return_value=[{'_id':'123', 'embedded_foos':['1','2','3']}])
-		storage.get_by_ids = Mock(return_value=[])
-		api.interfaces['foos'].list()
-		self.assertFalse(storage.get_by_ids.called)
+		foos = self.get_interface('foos')
+		foos.storage.get = Mock(return_value=[{'_id':'123', 'embedded_foos':['1','2','3']}])
+		foos.storage.get_by_ids = Mock(return_value=[])
+		foos.list()
+		self.assertFalse(foos.storage.get_by_ids.called)
 		
 		
 	def test_default_not_embedded_not_default_included(self):
 		"""A link that is not embedded by default can still be embedded"""
-		storage.get = Mock(return_value=[{'_id':'123', 'embedded_foos':['1','2','3']}])
-		storage.get_by_ids = Mock(return_value=[])
-		api.interfaces['foos'].list(embed=['embedded_foos'])
-		storage.get_by_ids.assert_called_once_with(Foo, ['1','2','3'], sort=(), filter=None, limit=0, offset=0, count=False)
+		foos = self.get_interface('foos')
+		foos.storage.get = Mock(return_value=[{'_id':'123', 'embedded_foos':['1','2','3']}])
+		foos.storage.get_by_ids = Mock(return_value=[])
+		foos.list(embed=['embedded_foos'])
+		foos.storage.get_by_ids.assert_called_once_with(Foo, ['1','2','3'], sort=(), filter=None, limit=0, offset=0, count=False)
 		
 		
 	def test_embeddable_included_if_fields_set(self):
 		"""An embeddable field is included if it is in the fields argument"""
-		storage.get = Mock(return_value=[{'_id':'123', 'embedded_foos':['1','2','3']}])
-		storage.get_by_ids = Mock(return_value=[])
-		api.interfaces['foos'].list(fields=['embedded_foos'])
-		storage.get_by_ids.assert_called_once_with(Foo, ['1','2','3'], sort=(), filter=None, limit=0, offset=0, count=False)
+		foos = self.get_interface('foos')
+		foos.storage.get = Mock(return_value=[{'_id':'123', 'embedded_foos':['1','2','3']}])
+		foos.storage.get_by_ids = Mock(return_value=[])
+		foos.list(fields=['embedded_foos'])
+		foos.storage.get_by_ids.assert_called_once_with(Foo, ['1','2','3'], sort=(), filter=None, limit=0, offset=0, count=False)
 		
 		
 	def test_embeddable_fields(self):
 		"""Only fields in an entity's embedded_fields list are included"""
-		storage.get = Mock(return_value=[{'_id':'123', 'embedded_foos':['1','2','3']}])
-		storage.get_by_ids = Mock(return_value=[{'_id':'2', 'stuff':123, 'optional_stuff':456}])
-		foos = api.interfaces['foos']
+		foos = self.get_interface('foos')
+		foos.storage.get = Mock(return_value=[{'_id':'123', 'embedded_foos':['1','2','3']}])
+		foos.storage.get_by_ids = Mock(return_value=[{'_id':'2', 'stuff':123, 'optional_stuff':456}])
 		result = foos.list(embed=('embedded_foos',))
 		self.assertEquals(result, [{'_id':'123', 'embedded_foos':[{'_id':'2', 'stuff':123}]}])
 		
 		
 	def test_field_subset(self):
 		"""Can fetch only a subset of fields"""
-		storage.get_by_id = CopyingMock(return_value={'_id':'123', 'stuff':123, 'optional_stuff':456})
-		foos = api.interfaces['foos']
+		foos = self.get_interface('foos')
+		foos.storage.get_by_id = CopyingMock(return_value={'_id':'123', 'stuff':123, 'optional_stuff':456})
 		result = foos.get('123', fields=('optional_stuff',))
 		self.assertEquals(result, {'_id':'123', 'optional_stuff':456})
 		
 		
 	def test_no_fields(self):
 		"""Only an item's ID is included if fields is an empty list"""
-		storage.get_by_id = CopyingMock(return_value={'_id':'123', 'stuff':123, 'optional_stuff':456})
-		foos = api.interfaces['foos']
+		foos = self.get_interface('foos')
+		foos.storage.get_by_id = CopyingMock(return_value={'_id':'123', 'stuff':123, 'optional_stuff':456})
 		result = foos.get('123', fields=())
 		self.assertEquals(result, {'_id':'123'})
 		
@@ -784,45 +860,46 @@ class InterfaceTest(unittest.TestCase):
 	def test_fields_empty(self):
 		"""All of an item's visible fields are returned if the fields list is omitted"""
 		foo = {'_id':'123', 'stuff':123, 'optional_stuff':456}
-		storage.get_by_id = CopyingMock(return_value=foo)
-		foos = api.interfaces['foos']
+		foos = self.get_interface('foos')
+		foos.storage.get_by_id = CopyingMock(return_value=foo)
 		result = foos.get('123')
 		self.assertEquals(result, foo)
 		
 		
 	def test_fields_empty_hidden_field(self):
 		"""All of an item's visible fields are returned if the fields list is omitted when an entity has hidden fields"""
-		storage.get_by_id = CopyingMock(return_value={'_id':'123', 'name':'hidden', 'foo':23})
-		hiddens = api.interfaces['hiddens']
+		hiddens = self.get_interface('hiddens')
+		hiddens.storage.get_by_id = CopyingMock(return_value={'_id':'123', 'name':'hidden', 'foo':23})
 		result = hiddens.get('123')
 		self.assertEquals(result, {'_id':'123', 'foo':23})
 		
 		
 	def test_fields_empty_hidden_list(self):
 		"""All of an item's visible fields are returned when listing items"""
-		storage.get = CopyingMock(return_value=[{'_id':'123', 'stuff':'foo', 'secret':'i like valuer'}])
-		foos = api.interfaces['foos']
+		foos = self.get_interface('foos')
+		foos.storage.get = CopyingMock(return_value=[{'_id':'123', 'stuff':'foo', 'secret':'i like valuer'}])
 		result = foos.list()
 		self.assertEquals(result, [{'_id':'123', 'stuff':'foo'}])
 		
 		
 	def test_count(self):
 		"""Can get a count instead of a list of items"""
-		storage.get = Mock(return_value=42)
-		foos = api.interfaces['foos']
+		foos = self.get_interface('foos')
+		foos.storage.get = Mock(return_value=42)
 		result = foos.list(count=True)
 		self.assertEquals(result, 42)
-		storage.get.assert_called_once_with(Foo, filter=None, sort=(), offset=0, limit=0, count=True)
+		foos.storage.get.assert_called_once_with(Foo, filter=None, sort=(), offset=0, limit=0, count=True)
 		
 		
 	def test_count_link(self):
 		"""Can count a list link instead of getting the items"""
-		storage.get_by_id = Mock(return_value={'_id':'123', 'bazes':['1','2','3']})
-		storage.get_by_ids = Mock(return_value=42)
-		foos = api.interfaces['foos']
+		foos = self.get_interface('foos')
+		bazes = self.get_interface('bazes')
+		foos.storage.get_by_id = Mock(return_value={'_id':'123', 'bazes':['1','2','3']})
+		bazes.storage.get_by_ids = Mock(return_value=42)
 		result = foos.link('123', 'bazes', count=True)
 		self.assertEquals(result, 42)
-		storage.get_by_ids.assert_called_with(Baz, ['1','2','3'], filter=None, sort=(), offset=0, limit=10, count=True)
+		bazes.storage.get_by_ids.assert_called_with(Baz, ['1','2','3'], filter=None, sort=(), offset=0, limit=10, count=True)
 		
 		
 	def test_count_inverse_link(self):
@@ -836,9 +913,9 @@ class InterfaceTest(unittest.TestCase):
 		
 		foos = api.interfaces['foos']
 		bars = api.interfaces['bars']
-		storage.get_by_id = Mock(return_value=foo)
-		storage.get = Mock(return_value=3)
-		storage.check_filter = Mock(return_value=None)
+		foos.storage.get_by_id = Mock(return_value=foo)
+		bars.storage.get = Mock(return_value=3)
+		bars.storage.check_filter = Mock(return_value=None)
 		
 		result = foos.link(foo['_id'], 'bars', count=True)
 		self.assertEquals(result, 3)
@@ -847,17 +924,60 @@ class InterfaceTest(unittest.TestCase):
 		
 	def test_reverse_delete_null_single(self):
 		"""Removing a single linked item with a NULL rule, nulls the referencing item's link field"""
-		foos = api.interfaces['foos']
-		bars = api.interfaces['bars']
-		foos.storage = Storage()
-		bars.storage = Storage()
-		foos.storage.delete = Mock()
-		foos.storage.get_by_id = Mock(return_value={'_id':'123'})
-		bars.storage.get = Mock(return_value=[{'_id':'666'}])
-		bars.storage.update = Mock(return_value={'_id':'666'})
+		targets = self.get_interface('nullsingletargets')
+		targets.storage.get_by_id = Mock(return_value={'_id':'123'})
+		targets.storage.delete = Mock()
 		
-		foos.delete('123')
+		referrers = self.get_interface('nullsinglereferrers')
+		referrers.storage.get = Mock(return_value=[{'_id':'666'}])
+		referrers.storage.check_filter = Mock(return_value=None)
+		referrers.storage.update = Mock(return_value={})
 		
-		bars.storage.get.assert_called_once_with(Bar, filter={'foo':'123'})
-		bars.storage.update.assert_called_once_with(Bar, '666', {'foo':None})
+		targets.delete('123')
+		
+		targets.storage.get_by_id.assert_called_once_with(NullSingleTarget, '123')
+		targets.storage.delete.assert_called_once_with(NullSingleTarget, '123')
+		referrers.storage.get.assert_called_once_with(NullSingleReferrer, filter={'target':'123'}, count=False, sort=(), offset=0, limit=0)
+		referrers.storage.update.assert_called_once_with(NullSingleReferrer, '666', {'target':None}, replace=False)
+		
+		
+	def test_reverse_delete_null_multi(self):
+		"""Removing a multi-linked item with a NULL rule, removes the links in the referencing item's field"""
+		targets = api.interfaces['nullmultitargets']
+		targets.storage.get_by_id = Mock(return_value={'_id':'123'})
+		targets.storage.delete = Mock()
+		
+		referrers = api.interfaces['nullmultireferrers']
+		referrers.storage.get = Mock(return_value=[{'_id':'666', 'targets':['555', '123', '888']}])
+		referrers.storage.check_filter = Mock(return_value=None)
+		referrers.storage.update = Mock(return_value={})
+		
+		targets.delete('123')
+		
+		targets.storage.get_by_id.assert_any_call(NullMultiTarget, '123')
+		targets.storage.get_by_id.assert_any_call(NullMultiTarget, '555', fields={})
+		targets.storage.get_by_id.assert_any_call(NullMultiTarget, '888', fields={})
+		targets.storage.delete.assert_called_once_with(NullMultiTarget, '123')
+		referrers.storage.get.assert_called_once_with(NullMultiReferrer, filter={'targets':'123'}, count=False, sort=(), offset=0, limit=0)
+		referrers.storage.update.assert_called_once_with(NullMultiReferrer, '666', {'targets':['555', '888']}, replace=False)
+		
+		
+	def test_reverse_delete_cascade(self):
+		"""Removing a single linked item with a CASCADE rule, deletes the referencing item"""
+		targets = self.get_interface('cascadetargets')
+		targets.storage.get_by_id = Mock(return_value={'_id':'123'})
+		targets.storage.delete = Mock()
+		
+		referrers = self.get_interface('cascadereferrers')
+		referrers.storage.get = Mock(return_value=[{'_id':'666'}])
+		referrers.storage.get_by_id = Mock(return_value={'_id':'666'})
+		referrers.storage.check_filter = Mock(return_value=None)
+		referrers.storage.delete = Mock()
+		
+		targets.delete('123')
+		
+		targets.storage.get_by_id.assert_called_once_with(CascadeTarget, '123')
+		targets.storage.delete.assert_called_once_with(CascadeTarget, '123')
+		referrers.storage.get.assert_called_once_with(CascadeReferrer, filter={'target':'123'}, count=False, sort=(), offset=0, limit=0)
+		referrers.storage.delete.assert_called_once_with(CascadeReferrer, '666')
 		

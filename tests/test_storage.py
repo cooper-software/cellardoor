@@ -26,4 +26,4 @@ class TestStorage(unittest.TestCase):
 			storage.delete(None, None)
 			
 		with self.assertRaises(NotImplementedError):
-			storage.check_filter(None, None)
+			storage.check_filter(None, None, None)
