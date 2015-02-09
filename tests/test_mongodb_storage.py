@@ -79,6 +79,15 @@ class TestMongoDBStorage(unittest.TestCase):
 		self.assertEquals(results[0], {'_id':foo_id, 'a':'dog'})
 		
 		
+	def test_replace_polymorphic(self):
+		human_id = storage.create(Human, {'foo':123})
+		results = storage.get(Human)
+		self.assertEquals(results[0], {'_id':human_id, 'foo':123, '_type':'Primate.Human'})
+		storage.update(Human, human_id, {'foo':666}, replace=True)
+		results = storage.get(Human)
+		self.assertEquals(results[0], {'_id':human_id, 'foo':666, '_type':'Primate.Human'})
+		
+		
 	def test_update(self):
 		"""
 		Should modify an existing document and return the modified version.

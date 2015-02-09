@@ -99,6 +99,9 @@ class MongoDBStorage(Storage):
 		
 		
 	def update(self, entity, id, fields, replace=False):
+		type_name = self.get_type_name(entity)
+		if type_name:
+			fields['_type'] = type_name
 		try:
 			collection = self.get_collection(entity)
 			obj_id = self._objectid(id)
