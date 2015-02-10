@@ -1,352 +1,223 @@
-import functools
-from flask.views import MethodView
-import logging
 import inspect
-from ..api.methods import LIST, CREATE, GET, REPLACE, UPDATE, DELETE, get_http_methods
-from ..serializers import JSONSerializer, MsgPackSerializer
-from ..views import View
-from ..views.minimal import MinimalView
-from .. import errors
-
-__all__ = ['create_blueprint']
-
+from functools import wraps
+import logging
+import collections
+from flask import Blueprint, request, abort, make_response
+from flask.views import MethodView
+from cellardoor import errors
+from cellardoor.serializers import JSONSerializer, MsgPackSerializer
+from cellardoor.wsgi import parse_params, get_context
+from cellardoor.views.minimal import MinimalView
+from cellardoor.views import View
+from cellardoor.api.methods import LIST, CREATE, GET, UPDATE, REPLACE, DELETE
 
 class Resource(MethodView):
-	"""
-	A resource exposes an interface through a flask view
-	"""
 	
-	# The types of content that are accepted.
+	def response(self, content, status_code=200):
+		_, view = View.choose(request.headers.get('accept'), self.views)
+		serialize_fn = view.get_list_response if isinstance(content, collections.Sequence) else view.get_individual_response
+		content_type, body = serialize_fn(request.headers.get('accept'), content)
+		res = make_response(body)
+		res.status_code = status_code
+		res.headers['content-type'] = content_type
+		return res
+		
+		
+	def parse_params(self, *args):
+		return parse_params(request.environ, *args)
+		
+		
+	def get_fields_from_request(self):
+		for serializer in self.accept_serializers:
+			if request.headers.get('content-type', '').startswith( serializer.mimetype ):
+				try:
+					return serializer.unserialize(request.stream)
+				except Exception:
+					self.logger.exception('Could not parse request body.')
+					abort(400)
+		abort(415)
+
+
+class EntityResource(Resource):
+	
 	accept_serializers = (JSONSerializer(), MsgPackSerializer())
-	params_serializer = JSONSerializer()
-	
 	
 	def __init__(self, interface, views):
 		self.interface = interface
 		self.views = views
 		self.logger = logging.getLogger(__name__)
 		
-	def get(self, user_id):
-        if user_id is None:
-            pass
-        else:
-            pass
-
-    def post(self):
-        pass
-
-    def delete(self, user_id):
-        pass
-
-    def put(self, user_id):
-        pass
+		
+	def get(self, id):
+		if id:
+			kwargs = self.parse_params('show_hidden', 'context', 'embedded')
+			item = self.interface.get(id, **kwargs)
+			return self.response(item)
+		else:
+			kwargs = self.parse_params()
+			items = self.interface.list(**kwargs)
+			return self.response(items)
 		
 		
-	def add_to_falcon(self, app):
-		methods = self.interface.rules.enabled_methods
-		interface_methods = methods.intersection((LIST, CREATE))
-		individual_methods = methods.intersection((GET, REPLACE, UPDATE, DELETE))
-		
-		if not interface_methods and not individual_methods:
-			raise Exception, "The '%s' interface exposes no methods" % self.interface.plural_name
-		
-		if interface_methods:
-			app.add_route('/%s' % self.interface.plural_name, ListEndpoint(self, interface_methods))
-			
-		if individual_methods:
-			app.add_route('/%s/{id}' % self.interface.plural_name, IndividualEndpoint(self, individual_methods))
-		
-		for link_name, link in self.interface.entity.get_links().items():
-			if self.interface.api.get_interface_for_entity(link.entity):
-				app.add_route('/%s/{id}/%s' % (self.interface.plural_name, link_name), 
-					ReferenceEndpoint(self, link_name))
-			
-	
-	def list(self, req, resp):
-		kwargs = self.get_kwargs(req)
-		items = self.interface.list(**kwargs)
-		self.send_list(req, resp, items)
-		
-		
-	def count(self, req, resp):
-		kwargs = self.get_kwargs(req)
+	def head(self):
+		kwargs = self.parse_params()
 		kwargs['count'] = True
-		result = self.interface.list(**kwargs)
-		resp.content_type, _ = View.choose(req, self.views)
-		resp.set_header('X-Count', str(result))
+		count = self.interface.list(**kwargs)
+		res = make_response('')
+		res.headers['Content-Type'], _ = View.choose(request.headers.get('accept'), self.views)
+		res.headers['X-Count'] = str(count)
+		return res
 		
 		
-	def create(self, req, resp):
-		fields = self.get_fields_from_request(req)
-		kwargs = self.get_kwargs(req, 'show_hidden', 'context', 'embedded')
-		item = self.interface.create(fields, **kwargs)
-		resp.status = falcon.HTTP_201
-		self.send_one(req, resp, item)
-		
-	
-	def get(self, req, resp, id):
-		kwargs = self.get_kwargs(req, 'show_hidden', 'context', 'embedded')
-		item = self.interface.get(id, **kwargs)
-		self.send_one(req, resp, item)
+	def post(self):
+		fields = self.get_fields_from_request()
+		kwargs = self.parse_params('show_hidden', 'context', 'embedded')
+		try:
+			item = self.interface.create(fields, **kwargs)
+		except errors.CompoundValidationError, e:
+			return self.response(e.errors, status_code=400)
+		return self.response(item, status_code=201)
 		
 		
-	def update(self, req, resp, id):
-		fields = self.get_fields_from_request(req)
-		kwargs = self.get_kwargs(req, 'show_hidden', 'context', 'embedded')
-		item = self.interface.update(id, fields, **kwargs)
-		self.send_one(req, resp, item)
-		
-		
-	def replace(self, req, resp, id):
-		fields = self.get_fields_from_request(req)
-		kwargs = self.get_kwargs(req, 'show_hidden', 'context', 'embedded')
+	def put(self, id):
+		fields = self.get_fields_from_request()
+		kwargs = self.parse_params('show_hidden', 'context', 'embedded')
 		item = self.interface.replace(id, fields, **kwargs)
-		self.send_one(req, resp, item)
+		return self.response(item)
 		
 		
-	def delete(self, req, resp, id):
-		self.interface.delete(id, context=self.get_context(req))
+	def patch(self, id):
+		fields = self.get_fields_from_request()
+		kwargs = self.parse_params('show_hidden', 'context', 'embedded')
+		item = self.interface.update(id, fields, **kwargs)
+		return self.response(item)
 		
 		
-	def get_link_or_reference(self, req, resp, id, link_name):
-		kwargs = self.get_kwargs(req)
-		result = self.interface.link(id, link_name, **kwargs)
-		if isinstance(result, dict):
-			self.send_one(req, resp, result)
-		else:
-			self.send_list(req, resp, result)
-			
-			
-	def count_link_or_reference(self, req, resp, id, link_name):
-		kwargs = self.get_kwargs(req)
-		kwargs['count'] = True
-		result = self.interface.link(id, link_name, **kwargs)
-		resp.content_type, _ = View.choose(req, self.views)
-		if isinstance(result, int):
-			resp.set_header('X-Count', str(result))
-		
-		
-	def send_one(self, req, resp, item):
-		resp.content_type, resp.body = self.serialize_one(req, item)
-		
-		
-	def send_list(self, req, resp, items):
-		resp.content_type, resp.body = self.serialize_list(req, items)
-		
-		
-	def serialize_one(self, req, data):
-		return self.serialize(req, 'get_individual_response', data)
-		
-			
-	def serialize_list(self, req, data):
-		return self.serialize(req, 'get_list_response', data)
-		
-		
-	def serialize(self, req, method_name, data):
-		view = self.get_view(req)
-		method = getattr(view, method_name)
-		try:
-			return method(req, data)
-		except Exception, e:
-			self.logger.exception('Failed to serialize response.')
-			raise falcon.HTTPInternalServerError('Internal Server Error', '')
-			
-			
-	def get_view(self, req):
-		"""Get the correct view based on the Accept header"""
-		_, view = View.choose(req, self.views)
-		return view
-			
-			
-	def get_fields_from_request(self, req):
-		"""Unserializes the request body based on the request's content type"""
-		for serializer in self.accept_serializers:
-			if req.content_type.startswith( serializer.mimetype ):
-				try:
-					return serializer.unserialize(req.stream)
-				except Exception:
-					self.logger.exception('Could not parse request body.')
-					raise falcon.HTTPBadRequest('Bad Request', 'Could not parse request body.')
-		raise falcon.HTTPUnsupportedMediaType(
-			'The supported types are: %s' % ', '.join([x.mimetype for x in self.accept_serializers]))
-		
-		
-	def get_kwargs(self, req, *include):
-		"""Parse out the filter, sort, etc., parameters from a request"""
-		params = (
-			('embedded', self.params_serializer.unserialize_string, None),
-			('filter', self.params_serializer.unserialize_string, None),
-			('sort', self.params_serializer.unserialize_string, None),
-			('offset', int, 0),
-			('limit', int, 0),
-			('show_hidden', self.bool_field, False)
-		)
-		results = {}
-		if len(include) > 0:
-			include = set(include)
-		else:
-			include = None
-		for name, fn, default in params:
-			if include and name not in include:
-				continue
-			results[name] = self.get_param(req, name, fn, default=default)
-			
-		if not include or 'context' in include:
-			results['context'] = self.get_context(req)
-		return results
-		
-		
-	def bool_field(self, value):
-		return True if value.lower() == 'true' or value == '1' else False
-		
-		
-	def get_param(self, req, param_name, parsing_fn, default=None):
-		"""Get a parsed query param"""
-		param = req.get_param(param_name)
-		if not param:
-			return default
-		try:
-			return parsing_fn(param)
-		except Exception, e:
-			raise falcon.HTTPBadRequest("Bad Request", "Could not parse %s parameter" % param_name)
-			
-			
-	def get_context(self, req):
-		context = {}
-		identity = req.env.get('cellardoor.identity')
-		if identity:
-			context['identity'] = identity
-		return context
-		
-			
-			
-			
-class Endpoint(object):
+	def delete(self, id):
+		self.interface.delete(id, context=get_context(request.environ))
+		return ''
 	
-	def __init__(self, resource, methods):
-		self.resource = resource
-		self.register_methods(methods)
-		
-		
-	def register_methods(self, methods):
-		for method in methods:
-			fn = getattr(self, method)
-			for http_method in get_http_methods(method):
-				setattr(self, 'on_%s' % http_method, fn)
-		if LIST in methods:
-			setattr(self, 'on_head', self.count)
-			
-
-class ListEndpoint(Endpoint):
 	
-	def list(self, req, resp):
-		return self.resource.list(req, resp)
-		
-		
-	def count(self, req, resp):
-		return self.resource.count(req, resp)
-		
-		
-	def create(self, req, resp):
-		return self.resource.create(req, resp)
-		
-		
-class IndividualEndpoint(Endpoint):
+class LinkResource(Resource):
 	
-		
-	def get(self, req, resp, id):
-		return self.resource.get(req, resp, id)
-		
-		
-	def update(self, req, resp, id):
-		return self.resource.update(req, resp, id)
-		
-		
-	def replace(self, req, resp, id):
-		return self.resource.replace(req, resp, id)
-		
-		
-	def delete(self, req, resp, id):
-		return self.resource.delete(req, resp, id)
-		
-		
-class ReferenceEndpoint(object):
-	
-	def __init__(self, resource, link_name):
-		self.resource = resource
+	def __init__(self, interface, link_name, views):
+		self.interface = interface
 		self.link_name = link_name
+		self.views = views
 		
 		
-	def on_get(self, req, resp, id):
-		return self.resource.get_link_or_reference(req, resp, id, self.link_name)
+	def get(self, id):
+		kwargs = self.parse_params()
+		result = self.interface.link(id, self.link_name, **kwargs)
+		return self.response(result)
 		
 		
-	def on_head(self, req, resp, id):
-		return self.resource.count_link_or_reference(req, resp, id, self.link_name)
-		
-		
-		
-def not_found_handler(exc, req, resp, params):
-	raise falcon.HTTPNotFound()
+	def head(self, id):
+		kwargs = self.parse_params()
+		kwargs['count'] = True
+		count = self.interface.link(id, self.link_name, **kwargs)
+		res = make_response('')
+		res.headers['content-type'], _ = View.choose(request.headers.get('accept'), self.views)
+		res.headers['X-Count'] = str(count)
+		return res
 
 
-def not_authenticated_handler(exc, req, resp, params):
-	raise falcon.HTTPUnauthorized('Unauthorized', 'You must authenticate to access this resource.')
-	
-	
-def not_authorized_handler(exc, req, resp, params):
-	raise falcon.HTTPForbidden('Forbidden', 'You are not allowed to access this resource.')
-	
-	
-def validation_error_handler(views, exc, req, resp, params):
-	_, view = View.choose(req, views)
-	resp.content_type, resp.body = view.get_individual_response(req, exc.errors)
-	resp.status = falcon.HTTP_400
-	
-	
-def disabled_field_error(exc, req, resp, params):
-	raise falcon.HTTPUnauthorized('Unauthorized', exc.message)
-	
-	
-def duplicate_field_error(views, exc, req, resp, params):
-	error = {}
-	error[exc.message] = 'A duplicate value already exists.'
-	_, view = View.choose(req, views)
-	resp.content_type, resp.body = view.get_individual_response(req, error)
-	resp.status = falcon.HTTP_400
+def error_response(code, item=None, views=[]):
+	if not item:
+		abort(code)
+	else:
+		_, view = View.choose(request.headers.get('accept'), views)
+		content_type, body = view.get_individual_response(request.headers.get('accept'), item)
+		res = make_response(body)
+		res.status_code = code
+		res.headers['content-type'] = content_type
+		return res
+
+def handle_errors(fn, views):
+	@wraps(fn)
+	def wrapper(*args, **kwargs):
+		try:
+			return fn(*args, **kwargs)
+		except errors.NotFoundError:
+			return error_response(404, views=views)
+		except errors.NotAuthenticatedError:
+			return error_response(401, views=views)
+		except errors.NotAuthorizedError:
+			return error_response(403, views=views)
+		except errors.CompoundValidationError, e:
+			return error_response(400, e.errors, views=views)
+		except errors.DisabledFieldError:
+			return error_response(401, views=views)
+		except errors.DuplicateError, e:
+			return error_response(400, {e.message:'A duplicate already exists.'}, views=views)
+		except errors.ParseError, e:
+			return error_response(400, e.message, views=views)
+	return wrapper
 		
 		
-class FalconApp(object):
+def create_blueprint(api, name="api", import_name=__name__, views=(MinimalView,)):
+	bp = Blueprint(name, import_name)
 	
-	def __init__(self, api, falcon_app=None, views=(MinimalView,)):
-		if falcon_app is None:
-			falcon_app = falcon.API()
-		self.falcon_app = falcon_app
-		self.api = api
-		self.resources = {}
-		
-		views_by_type = []
-		
-		for v in views:
-			if inspect.isclass(v):
-				v = v()
-			for mimetype, _ in v.serializers:
-				views_by_type.append((mimetype, v))
-				
-		falcon_app.add_error_handler(errors.NotFoundError, not_found_handler)
-		falcon_app.add_error_handler(errors.NotAuthenticatedError, not_authenticated_handler)
-		falcon_app.add_error_handler(errors.NotAuthorizedError, not_authorized_handler)
-		validation_error_handler_with_views = functools.partial(validation_error_handler, views_by_type)
-		falcon_app.add_error_handler(errors.CompoundValidationError, validation_error_handler_with_views)
-		falcon_app.add_error_handler(errors.DisabledFieldError, disabled_field_error)
-		duplicate_field_error_with_views = functools.partial(duplicate_field_error, views_by_type)
-		falcon_app.add_error_handler(errors.DuplicateError, duplicate_field_error_with_views)
-		
-		for interface in api.interfaces.values():
-			resource = Resource(interface, views_by_type)
-			resource.add_to_falcon(falcon_app)
-			self.resources[interface.plural_name] = resource
-			
-			
-	def __call__(self, *args, **kwargs):
-		return self.falcon_app(*args, **kwargs)
+	views_by_type = []
+	
+	for v in views:
+		if inspect.isclass(v):
+			v = v()
+		for mimetype, _ in v.serializers:
+			views_by_type.append((mimetype, v))
+	
+	for interface_name, interface in api.interfaces.items():
+		view = handle_errors(EntityResource.as_view(interface_name, interface, views_by_type), views_by_type)
+		if LIST in interface.rules.enabled_methods:
+			bp.add_url_rule(
+				'/%s/' % interface_name,
+				defaults={'id':None},
+				view_func=view,
+				methods=['GET']
+			)
+			bp.add_url_rule(
+				'/%s/' % interface_name,
+				view_func=view,
+				methods=['HEAD']
+			)
+		if CREATE in interface.rules.enabled_methods:
+			bp.add_url_rule(
+				'/%s/' % interface_name,
+				view_func=view,
+				methods=['POST']
+			)
+		if GET in interface.rules.enabled_methods:
+			bp.add_url_rule(
+				'/%s/<id>' % interface_name,
+				view_func=view,
+				methods=['GET']
+			)
+		if UPDATE in interface.rules.enabled_methods:
+			bp.add_url_rule(
+				'/%s/<id>' % interface_name,
+				view_func=view,
+				methods=['PATCH']
+			)
+		if REPLACE in interface.rules.enabled_methods:
+			bp.add_url_rule(
+				'/%s/<id>' % interface_name,
+				view_func=view,
+				methods=['PUT']
+			)
+		if DELETE in interface.rules.enabled_methods:
+			bp.add_url_rule(
+				'/%s/<id>' % interface_name,
+				view_func=view,
+				methods=['DELETE']
+			)
+		for link_name, link in interface.entity.get_links().items():
+			if interface.api.get_interface_for_entity(link.entity):
+				link_view = handle_errors(LinkResource.as_view('%s.%s' % (interface_name, link_name), interface, link_name, views_by_type), views_by_type)
+				trailing_slash = '/' if interface.entity.is_multiple_link(getattr(interface.entity, link_name)) else ''
+				bp.add_url_rule(
+					'/%s/<id>/%s%s' % (interface_name, link_name, trailing_slash),
+					view_func=link_view,
+					methods=['GET', 'HEAD']
+				)
+	return bp
+	

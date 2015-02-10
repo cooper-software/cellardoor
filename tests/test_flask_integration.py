@@ -3,24 +3,17 @@ import json
 import msgpack
 from mock import Mock
 import urllib
-from falcon.testing import TestBase, create_environ
-import falcon
+from flask import Flask
 from cellardoor import errors
 from cellardoor.api import API
-from cellardoor.wsgi.falcon_integration import FalconApp
+from cellardoor.wsgi.flask_integration import create_blueprint
 from cellardoor.model import Model, Entity, Text, Link, ListOf
 from cellardoor.storage import Storage
 from cellardoor.api.interface import ALL, LIST, GET, CREATE
 
 
-def create_fake_request(*args, **kwargs):
-	environ = create_environ(*args, **kwargs)
-	return Request(environ)
-
-
 model = Model(storage=Storage())
 api  = API(model)
-
 
 class Foo(model.Entity):
 	name = Text(required=True)
@@ -58,57 +51,43 @@ class Bazes(api.Interface):
 	}
 
 
-class TestResource(TestBase):
+class TestResource(unittest.TestCase):
 	
 	def setUp(self):
-		super(TestResource, self).setUp()
 		api.refresh()
-		FalconApp(api, falcon_app=self.api)
-	
-	
-	def test_fail_no_methods(self):
-		model = Model(storage=Mock())
-		
-		class Foo(model.Entity):
-			pass
-		
-		empty_api = API(model)
-		
-		class Foos(empty_api.Interface):
-			entity = Foo
-			
-		self.assertRaises(Exception, FalconApp, empty_api)
+		bp = create_blueprint(api)
+		app = Flask(__name__)
+		app.register_blueprint(bp)
+		self.app = app.test_client()
 
 		
 	def test_create_fail_content_type(self):
 		"""
 		Create fails if the request body is not json or msgpack
 		"""
-		self.simulate_request(
-			'/foos',
-			method='POST',
+		res = self.app.post(
+			'/foos/',
 			headers={
 				'content-type': 'foo/bar'
 			}
 		)
-		self.assertEquals(self.srmock.status, '415 Unsupported Media Type')
+		self.assertEquals(res.status.upper(), '415 Unsupported Media Type'.upper())
 		
 		
 	def test_create_fail_validation(self):
 		"""
 		If validation fails, the response is a 400 error with the specific issues in the body.
 		"""
-		result = self.simulate_request(
-			'/foos',
-			method='POST',
+		res = self.app.post(
+			'/foos/',
 			headers={
 				'accept': 'application/json',
 				'content-type': 'application/json'
 			},
-			body=json.dumps({})
+			data=json.dumps({})
 		)
-		errors = json.loads(''.join(result))
-		self.assertEquals(self.srmock.status, '400 Bad Request')
+		errors = json.loads(''.join(res.data))
+		self.assertEquals(res.status.upper(), '400 Bad Request'.upper())
 		self.assertEquals(errors, {'name':'This field is required.'})
 		
 		
@@ -116,129 +95,124 @@ class TestResource(TestBase):
 		"""
 		If the body can't be parsed, the response is a 400 error with the specific issues in the body.
 		"""
-		result = self.simulate_request(
-			'/foos',
-			method='POST',
+		res = self.app.post(
+			'/foos/',
 			headers={
 				'accept': 'application/json',
 				'content-type': 'application/json'
 			},
-			body='}{'
+			data='}{'
 		)
-		self.assertEquals(self.srmock.status, '400 Bad Request')
+		self.assertEquals(res.status.upper(), '400 Bad Request'.upper())
 		
 		
 	def test_create_succeed(self):
 		"""If the body matches the content type and the data passes validation, an item is created."""
 		foo = {'_id':'123', 'name':'foo'}
 		api.interfaces['foos'].create = Mock(return_value=foo)
-		result = self.simulate_request(
-			'/foos',
-			method='POST',
+		res = self.app.post(
+			'/foos/',
 			headers={
 				'accept': 'application/json',
 				'content-type': 'application/json'
 			},
-			body=json.dumps({'name':'foo'})
+			data=json.dumps({'name':'foo'})
 		)
-		created_foo = json.loads(''.join(result))
+		created_foo = json.loads(''.join(res.data))
 		self.assertEquals(created_foo, foo)
-		self.assertEquals(self.srmock.status, '201 Created')
+		self.assertEquals(res.status.upper(), '201 Created'.upper())
 		api.interfaces['foos'].create.assert_called_with({'name':'foo'}, show_hidden=False, embedded=None, context={})
 		
 		
 	def test_create_msgpack(self):
 		foo = {'_id':'123', 'name':'foo'}
 		api.interfaces['foos'].create = Mock(return_value=foo)
-		result = self.simulate_request(
-			'/foos',
-			method='POST',
+		res = self.app.post(
+			'/foos/',
 			headers={
 				'accept': 'application/x-msgpack',
 				'content-type': 'application/x-msgpack'
 			},
-			body=msgpack.packb({'name':'foo'})
+			data=msgpack.packb({'name':'foo'})
 		)
-		created_foo = msgpack.unpackb(''.join(result))
+		created_foo = msgpack.unpackb(''.join(res.data))
 		self.assertEquals(created_foo, foo)
-		self.assertEquals(self.srmock.status, '201 Created')
+		self.assertEquals(res.status.upper(), '201 Created'.upper())
 		api.interfaces['foos'].create.assert_called_with({'name':'foo'}, show_hidden=False, embedded=None, context={})
 		
 		
 	def test_not_found(self):
 		"""If a collection raises NotFoundError, a 404 status is returned"""
 		api.interfaces['foos'].get = Mock(side_effect=errors.NotFoundError())
-		self.simulate_request('/foos/123', method='GET')
-		self.assertEquals(self.srmock.status, '404 Not Found')
+		res = self.app.get('/foos/123')
+		self.assertEquals(res.status.upper(), '404 Not Found'.upper())
 		api.interfaces['foos'].get.assert_called_with('123', show_hidden=False, embedded=None, context={})
 		
 		
 	def test_method_not_allowed(self):
 		"""If attempting to use a disabled method, a 405 status is returned"""
-		self.simulate_request('/bars/123', method="PUT")
-		self.assertEquals(self.srmock.status, '405 Method Not Allowed')
+		res = self.app.put('/bars/123')
+		self.assertEquals(res.status.upper(), '405 Method Not Allowed'.upper())
 		
 		
 	def test_forbidden(self):
 		"""If authorization fails a 403 status is returned"""
 		api.interfaces['foos'].get = Mock(side_effect=errors.NotAuthorizedError)
-		self.simulate_request('/foos/123', method='GET')
-		self.assertEquals(self.srmock.status, '403 Forbidden')
+		res = self.app.get('/foos/123')
+		self.assertEquals(res.status.upper(), '403 Forbidden'.upper())
 		
 		
 	def test_unauthenticated(self):
 		"""If a method is enabled but requires authentication, a 401 status is returned"""
 		api.interfaces['foos'].get = Mock(side_effect=errors.NotAuthenticatedError)
-		self.simulate_request('/foos/123', method='GET')
-		self.assertEquals(self.srmock.status, '401 Unauthorized')
+		res = self.app.get('/foos/123')
+		self.assertEquals(res.status.upper(), '401 Unauthorized'.upper())
 		
 		
 	def test_disabled_field(self):
 		"""If a request attempts to filter or sort by a disabled field, a 401 status is returned"""
 		api.interfaces['foos'].list = Mock(side_effect=errors.DisabledFieldError)
-		self.simulate_request('/foos', query_string=urllib.urlencode({'filter':json.dumps({'name':'bob'})}))
-		self.assertEquals(self.srmock.status, '401 Unauthorized')
+		res = self.app.get('/foos/?%s' % urllib.urlencode({'filter':json.dumps({'name':'bob'})}))
+		self.assertEquals(res.status.upper(), '401 Unauthorized'.upper())
 		
 		
 	def test_unique_field(self):
 		"""If a create request fails with a duplicate field error, a 400 status is returned"""
 		api.interfaces['foos'].list = Mock(side_effect=errors.DuplicateError)
-		self.simulate_request('/foos')
-		self.assertEquals(self.srmock.status, '400 Bad Request')
+		res = self.app.get('/foos/')
+		self.assertEquals(res.status.upper(), '400 Bad Request'.upper())
 		
 		
 	def test_list(self):
 		"""Will return a list of items structured by the view"""
 		foos = [{'name':'foo'}, {'name':'bar'}]
 		api.interfaces['foos'].list = Mock(return_value=foos)
-		data = self.simulate_request(
-			'/foos',
-			method='GET',
-			headers={
-				'accept': 'application/json',
-				'content-type': 'application/json'
-			},
-			query_string=urllib.urlencode({
+		res = self.app.get(
+			'/foos/?%s' % urllib.urlencode({
 				'sort':json.dumps(['+name']),
 				'filter':json.dumps({'foo':23}),
 				'offset': 7,
 				'limit': 10,
 				'show_hidden': True
-			})
+			}),
+			headers={
+				'accept': 'application/json',
+				'content-type': 'application/json'
+			}
 		)
-		result = json.loads(''.join(data))
-		self.assertEquals(self.srmock.status, '200 OK')
-		self.assertEquals(result, foos)
+		items = json.loads(''.join(res.data))
+		self.assertEquals(res.status.upper(), '200 OK'.upper())
+		self.assertEquals(items, foos)
 		api.interfaces['foos'].list.assert_called_with(sort=['+name'], filter={'foo':23}, offset=7, limit=10, show_hidden=True, embedded=None, context={})
 		
 		
 	def test_get(self):
 		"""A GET with a path to /collection/{id} calls colleciton.get"""
 		api.interfaces['foos'].get = Mock(return_value={'_id':'123', 'name':'foo'})
-		data = self.simulate_request('/foos/123', method='GET', headers={'accept':'application/json'})
-		result = json.loads(''.join(data))
-		self.assertEquals(self.srmock.status, '200 OK')
-		self.assertEquals(result, {'name':'foo', '_id':'123'})
+		res = self.app.get('/foos/123', headers={'accept':'application/json'})
+		item = json.loads(''.join(res.data))
+		self.assertEquals(res.status.upper(), '200 OK'.upper())
+		self.assertEquals(item, {'name':'foo', '_id':'123'})
 		api.interfaces['foos'].get.assert_called_with('123', show_hidden=False, embedded=None, context={})
 		
 		
@@ -246,93 +220,88 @@ class TestResource(TestBase):
 		"""
 		If validation fails, the response is a 400 error with the specific issues in the body.
 		"""
-		result = self.simulate_request(
+		res = self.app.patch(
 			'/foos/123',
-			method='PUT',
 			headers={
 				'accept': 'application/json',
 				'content-type': 'application/json'
 			},
-			body=json.dumps({'name':123})
+			data=json.dumps({'name':123})
 		)
 		
-		errors = json.loads(''.join(result))
-		self.assertEquals(self.srmock.status, '400 Bad Request')
+		errors = json.loads(''.join(res.data))
+		self.assertEquals(res.status.upper(), '400 Bad Request'.upper())
 		self.assertEquals(errors, {'name':'Expected a text value.'})
 		
 		
 	def test_update(self):
 		"""A PATCH with a path to /collection/{id} calls colleciton.update"""
 		api.interfaces['foos'].update = Mock(return_value={'_id':'123', 'name':'bar'})
-		data = self.simulate_request(
+		res = self.app.patch(
 			'/foos/123', 
-			method='PATCH', 
 			headers={
 				'accept':'application/json',
 				'content-type': 'application/json'
 			},
-			body=json.dumps({'name':'bar'})
-			)
-		result = json.loads(''.join(data))
-		self.assertEquals(self.srmock.status, '200 OK')
-		self.assertEquals(result, {'name':'bar', '_id':'123'})
+			data=json.dumps({'name':'bar'})
+		)
+		item = json.loads(''.join(res.data))
+		self.assertEquals(res.status.upper(), '200 OK'.upper())
+		self.assertEquals(item, {'name':'bar', '_id':'123'})
 		api.interfaces['foos'].update.assert_called_with('123', {'name':'bar'}, show_hidden=False, embedded=None, context={})
 		
 		
 	def test_replace(self):
 		"""A PUT with a path to /collection/{id} calls colleciton.replace"""
 		api.interfaces['foos'].replace = Mock(return_value={'_id':'123', 'name':'bar'})
-		data = self.simulate_request(
+		res = self.app.put(
 			'/foos/123', 
-			method='PUT', 
 			headers={
 				'accept':'application/json',
 				'content-type': 'application/json'
 			},
-			body=json.dumps({'name':'bar'})
-			)
-		result = json.loads(''.join(data))
-		self.assertEquals(self.srmock.status, '200 OK')
-		self.assertEquals(result, {'name':'bar', '_id':'123'})
+			data=json.dumps({'name':'bar'})
+		)
+		item = json.loads(''.join(res.data))
+		self.assertEquals(res.status.upper(), '200 OK'.upper())
+		self.assertEquals(item, {'name':'bar', '_id':'123'})
 		api.interfaces['foos'].replace.assert_called_with('123', {'name':'bar'}, show_hidden=False, embedded=None, context={})
 		
 		
 	def test_delete(self):
 		"""A DELETE with a path to /collection/{id} calls collection.delete"""
 		api.interfaces['foos'].delete = Mock()
-		self.simulate_request('/foos/123', method='DELETE')
-		self.assertEquals(self.srmock.status, '200 OK')
+		res = self.app.delete('/foos/123')
+		self.assertEquals(res.status.upper(), '200 OK'.upper())
 		api.interfaces['foos'].delete.assert_called_with('123', context={})
 		
 		
 	def test_get_single_link(self):
 		"""A GET with a path to /collection/{id}/link calls collection.link"""
 		api.interfaces['foos'].link = Mock(return_value={'_id':'123'})
-		data = self.simulate_request('/foos/123/bar', method='GET', headers={'accept':'application/json'})
-		result = json.loads(''.join(data))
-		self.assertEquals(self.srmock.status, '200 OK')
-		self.assertEquals(result, {'_id':'123'})
+		res = self.app.get('/foos/123/bar', headers={'accept':'application/json'})
+		item = json.loads(''.join(res.data))
+		self.assertEquals(res.status.upper(), '200 OK'.upper())
+		self.assertEquals(item, {'_id':'123'})
 		api.interfaces['foos'].link.assert_called_with('123', 'bar', filter=None, sort=None, offset=0, limit=0, show_hidden=False, embedded=None, context={})
 		
 		
 	def test_get_multiple_link(self):
 		"""A GET with a path to /collection/{id}/link calls collection.link"""
 		api.interfaces['foos'].link = Mock(return_value=[{'_id':'123'}])
-		data = self.simulate_request(
-			'/foos/123/bazes', 
-			method='GET', 
-			headers={'accept':'application/json'},
-			query_string=urllib.urlencode({
+		res = self.app.get(
+			'/foos/123/bazes/?%s' % urllib.urlencode({
 				'sort':json.dumps(['+name']),
 				'filter':json.dumps({'foo':23}),
 				'offset': 7,
 				'limit': 10,
 				'show_hidden': True
-			})
+			}),
+			headers={'accept':'application/json'}
 		)
-		result = json.loads(''.join(data))
-		self.assertEquals(self.srmock.status, '200 OK')
-		self.assertEquals(result, [{'_id':'123'}])
+		items = json.loads(''.join(res.data))
+		self.assertEquals(res.status.upper(), '200 OK'.upper())
+		self.assertEquals(items, [{'_id':'123'}])
 		api.interfaces['foos'].link.assert_called_with('123', 'bazes', sort=['+name'], filter={'foo':23}, offset=7, limit=10, show_hidden=True, embedded=None, context={})
 		
 		
@@ -340,22 +309,19 @@ class TestResource(TestBase):
 		"""
 		Passing an unparseable query param results in a 400 error
 		"""
-		self.simulate_request(
-			'/foos/123/bazes', 
-			method='GET', 
-			headers={'accept':'application/json'},
-			query_string=urllib.urlencode({
+		res = self.app.get(
+			'/foos/123/bazes/?%s' % urllib.urlencode({
 				'filter':'{blarg}'
-			})
+			}),
+			headers={'accept':'application/json'}
 		)
-		self.assertEquals(self.srmock.status, '400 Bad Request')
+		self.assertEquals(res.status.upper(), '400 Bad Request'.upper())
 		
 		
 	def test_pass_identity(self):
 		api.interfaces['foos'].list = Mock(return_value=[])
-		environ = create_environ('/foos')
-		environ['cellardoor.identity'] = 'foo'
-		self.api(environ, lambda *args, **kwargs: [])
+		environ_overrides = {'cellardoor.identity':'foo'}
+		self.app.get('/foos/', environ_overrides=environ_overrides)
 		api.interfaces['foos'].list.assert_called_with(sort=None, filter=None, offset=0, limit=0, show_hidden=False, embedded=None, context={'identity': 'foo'})
 		
 		
@@ -365,12 +331,12 @@ class TestResource(TestBase):
 		api.interfaces['foos'].create = Mock(return_value=None)
 		api.interfaces['foos'].get = Mock(return_value=None)
 		
-		self.simulate_request('/foos', query_string='show_hidden=1')
-		self.assertEquals(self.srmock.status, '200 OK')
-		self.simulate_request('/foos', method='POST', headers={'content-type':'application/json'}, body='{}', query_string='show_hidden=1')
-		self.assertEquals(self.srmock.status, '201 Created')
-		self.simulate_request('/foos/123', query_string='show_hidden=1')
-		self.assertEquals(self.srmock.status, '200 OK')
+		res = self.app.get('/foos/?show_hidden=1')
+		self.assertEquals(res.status.upper(), '200 OK'.upper())
+		res = self.app.post('/foos/?show_hidden=1', headers={'content-type':'application/json'}, data='{}')
+		self.assertEquals(res.status.upper(), '201 Created'.upper())
+		res = self.app.get('/foos/123?show_hidden=1')
+		self.assertEquals(res.status.upper(), '200 OK'.upper())
 		
 		api.interfaces['foos'].list.assert_called_with(sort=None, filter=None, offset=0, limit=0, show_hidden=True, embedded=None, context={})
 		api.interfaces['foos'].create.assert_called_with({}, show_hidden=True, embedded=None, context={})
@@ -380,63 +346,14 @@ class TestResource(TestBase):
 	def test_count(self):
 		"""A HEAD request returns an X-Count header"""
 		api.interfaces['foos'].list = Mock(return_value=52)
-		self.simulate_request('/foos', method='HEAD')
-		self.assertEquals(self.srmock.headers_dict['x-count'], '52')
+		res = self.app.head('/foos/')
+		self.assertEquals(res.headers.get('x-count'), '52')
 		api.interfaces['foos'].list.assert_called_with(sort=None, filter=None, offset=0, limit=0, show_hidden=False, embedded=None, context={}, count=True)
 		
 		
 	def test_count_link(self):
 		api.interfaces['foos'].link = Mock(return_value=52)
-		self.simulate_request('/foos/123/bazes', method='HEAD')
-		self.assertEquals(self.srmock.headers_dict['x-count'], '52')
+		res = self.app.head('/foos/123/bazes/')
+		self.assertEquals(res.headers.get('x-count'), '52')
 		api.interfaces['foos'].link.assert_called_with('123', 'bazes', sort=None, filter=None, offset=0, limit=0, show_hidden=False, embedded=None, context={}, count=True)
-		
-		
-	def test_serialization_error(self):
-		"""Catches a serialization error on the server side"""
-		model = Model(storage=Mock())
-		
-		class Foo(model.Entity):
-			pass
-		
-		dummy_api = API(model)
-		
-		class Foos(dummy_api.Interface):
-			entity = Foo
-			method_authorization = {ALL:None}
-			
-		app = FalconApp(dummy_api)
-		foos = app.resources['foos']
-		view = Mock()
-		view.serialize_one = Mock()
-		view.serialize_one.side_effect = Exception
-		foos.get_view = Mock(return_value=view)
-		
-		self.assertRaises(falcon.HTTPInternalServerError, foos.serialize, None, 'serialize_one', {})
-		
-		
-class TestFalconApp(unittest.TestCase):
-	
-	def test_wsgi(self):
-		"""
-		A FalconApp is a wsgi app
-		"""
-		model = Model(storage=Mock())
-		
-		class Foo(model.Entity):
-			pass
-		
-		dummy_api = API(model)
-		
-		class Foos(dummy_api.Interface):
-			entity = Foo
-			method_authorization = {ALL:None}
-		
-		falcon_app = Mock(return_value='foo')
-		app = FalconApp(dummy_api, falcon_app=falcon_app)
-		
-		result = app('1', '2', thing='3')
-		self.assertEquals(result, 'foo')
-		falcon_app.assert_called_once_with('1', '2', thing='3')
-		
 		

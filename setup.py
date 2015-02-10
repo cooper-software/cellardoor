@@ -31,7 +31,6 @@ setup(
     license='MIT',
     packages=find_packages(exclude=['tests']),
     install_requires=[
-        'falcon',
         'pymongo',
         'timelib',
         'msgpack-python'
@@ -42,6 +41,8 @@ setup(
         'timelib', 
         'python-dateutil', 
         'msgpack-python', 
-        'pymongo'],
+        'pymongo',
+        'falcon',
+        'flask'],
     test_suite='nose.collector'
 )

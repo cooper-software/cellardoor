@@ -1,4 +1,3 @@
-from . import create_fake_request
 from cellardoor.views import View
 from cellardoor.serializers import Serializer
 import unittest

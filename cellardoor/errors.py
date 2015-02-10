@@ -37,4 +37,8 @@ class DuplicateError(Exception):
 	pass
 	
 	
+class ParseError(Exception):
+	pass
+	
+	
 from model import ValidationError, CompoundValidationError
