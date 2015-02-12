@@ -353,7 +353,7 @@ class TestEntitySerializer(unittest.TestCase):
 			{
 				'default': None, 
 				'format': 'Enum', 
-				'enum': set(['a', 'b', 'c'])
+				'enum': ('a', 'b', 'c')
 			}
 		)
 		

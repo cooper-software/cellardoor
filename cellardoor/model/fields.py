@@ -412,11 +412,12 @@ class Enum(Field):
     
     def __init__(self, *values, **kwargs):
         super(Enum, self).__init__(**kwargs)
-        self.values = set(values)
+        self.values = values
+        self.values_set = set(values)
     
     
     def _validate(self, value):
-        if value in self.values:
+        if value in self.values_set:
             return value
         raise ValidationError(self.NOT_IN_LIST)
         
