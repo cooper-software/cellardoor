@@ -2,7 +2,7 @@ language: python
 python:
   - "2.7"
 
-install: "pip install falcon timelib python-dateutil msgpack-python pymongo coveralls nose"
+install: "pip install falcon flask timelib python-dateutil msgpack-python pymongo coveralls nose"
 
 script:
   nosetests --with-coverage --cover-package=cellardoor
