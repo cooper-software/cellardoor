@@ -564,7 +564,7 @@ class Compound(Field):
     """
     NOT_A_DICT = "Not a dict"
     
-    def __init__(self, required=False, default=None, **kwargs):
+    def __init__(self, required=False, default=None, hidden=False, unique=False, label=None, description=None, **kwargs):
         super(Compound, self).__init__(required, default)
         self.fields = kwargs
         self.enforce_required = True
