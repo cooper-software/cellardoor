@@ -6,7 +6,7 @@ from ..model import ListOf, Link, InverseLink
 from ..events import EventManager
 from .. import errors
 from .methods import *
-
+from ..authorization import AuthorizationExpression
 
 __all__ = [
 	'Interface'
@@ -28,7 +28,7 @@ class RuleSet(object):
 					self.enabled_methods.add(method)
 					if v is None:
 						continue
-					if v.uses('item'):
+					if not isinstance(v, AuthorizationExpression) or v.uses('item'):
 						rules = self.item_rules
 					else:
 						rules = self.non_item_rules
@@ -58,7 +58,7 @@ class RuleSet(object):
 		context['item'] = item
 		no_identity = 'identity' not in context
 		for rule in rules:
-			if no_identity and rule.uses('identity'):
+			if no_identity and isinstance(rule, AuthorizationExpression) and rule.uses('identity'):
 				raise errors.NotAuthenticatedError()
 			if not rule(context):
 				raise errors.NotAuthorizedError()
@@ -122,7 +122,8 @@ class OptionsFactory(object):
 			
 	def can_show_hidden(self, context):
 		if self.hidden_field_authorization:
-			if self.hidden_field_authorization.uses('identity') and 'identity' not in context:
+			if isinstance(self.hidden_field_authorization, AuthorizationExpression) and \
+				 self.hidden_field_authorization.uses('identity') and 'identity' not in context:
 				return False
 			elif not self.hidden_field_authorization(context):
 				return False

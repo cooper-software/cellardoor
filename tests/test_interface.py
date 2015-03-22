@@ -23,6 +23,7 @@ storage = Storage()
 model = Model(storage=storage)
 api = API(model)
 
+
 class Foo(model.Entity):
 	stuff = Text(required=True)
 	optional_stuff = Text()
@@ -90,6 +91,10 @@ class CascadeTarget(model.Entity):
 	
 class CascadeReferrer(model.Entity):
 	target = Link(CascadeTarget, ondelete=Link.CASCADE)
+	
+	
+class AnyFunctionAuthModel(model.Entity):
+	pass
 	
 	
 class Foos(api.Interface):
@@ -204,6 +209,16 @@ class CascadeReferrers(api.Interface):
 	entity = CascadeReferrer
 	method_authorization = {
 		ALL: None
+	}
+	
+
+auth_fn_get = Mock(return_value=False)
+auth_fn_list = Mock(return_value=True)
+class AnyFunctionAuthModels(api.Interface):
+	entity = AnyFunctionAuthModel
+	method_authorization = {
+		GET: auth_fn_get,
+		LIST: auth_fn_list
 	}
 	
 
@@ -625,6 +640,21 @@ class InterfaceTest(unittest.TestCase):
 		hiddens = self.get_interface('hiddens')
 		hiddens.storage.get_by_id = Mock(return_value={'foo':23})
 		hiddens.get(123)
+		
+		
+	def test_auth_arbitrary_function(self):
+		"""Will use an arbitrary function to check authorization"""
+		anyfunctionauthmodels = self.get_interface('anyfunctionauthmodels')
+		anyfunctionauthmodels.storage.get_by_id = Mock(return_value={'foo':'123'})
+		anyfunctionauthmodels.storage.get = Mock(return_value=[{'foo':'a'}])
+		
+		with self.assertRaises(errors.NotAuthorizedError):
+			anyfunctionauthmodels.get('666')
+		
+		auth_fn_get.assert_called_once_with({'item':{'foo':'123'}})
+		
+		anyfunctionauthmodels.list()
+		auth_fn_list.assert_called_once_with({'item':{'foo':'a'}})
 		
 		
 	def test_hidden_result(self):
