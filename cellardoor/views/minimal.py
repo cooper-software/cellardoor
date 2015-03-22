@@ -1,5 +1,3 @@
-import falcon
-
 from . import View
 from ..serializers import JSONSerializer, MsgPackSerializer
 
