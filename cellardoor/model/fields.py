@@ -185,14 +185,20 @@ class DateTime(Field):
     NOT_DATE = "Unrecognized date format"
     
     def __init__(self, default_format="%x %X", use_timelib=True, use_dateutil=True,
-             **kwargs):
+             always_now=False, **kwargs):
         super(DateTime, self).__init__(**kwargs)
         self.default_format = default_format
         self.use_timelib = use_timelib
         self.use_dateutil = use_dateutil
+        self.always_now = always_now
+        if self.always_now:
+            self.default = datetime.utcnow
         
         
     def _validate(self, value):
+        if self.always_now:
+            return datetime.utcnow()
+        
         if isinstance(value, datetime):
             return value
         

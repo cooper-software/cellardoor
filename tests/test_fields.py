@@ -330,6 +330,18 @@ class TestDateTime(unittest.TestCase):
             self.assertEquals(now_date, field.validate(now))
         except ValidationError:
             self.fail("Failed to pass an int timestamp")
+            
+            
+    def test_always_now(self):
+        """
+        If always_now is True, validating should always return the current time.
+        """
+        field = DateTime(always_now=True)
+        a = field.validate(None)
+        b = field.validate(None)
+        self.assertIsInstance(a, datetime)
+        self.assertIsInstance(b, datetime)
+        self.assertNotEqual(a.isoformat(), b.isoformat())
         
         
 class TestBoolean(unittest.TestCase):

@@ -1,6 +1,7 @@
 import re
 from datetime import datetime
 from cellardoor.model import *
+from .fields import *
 from .storage import storage
 from .hash_password import hash_password
 
@@ -12,6 +13,17 @@ class Slug(Text):
 	
 	def __init__(self, *args, **kwargs):
 		super(Slug, self).__init__(maxlength=50, regex=re.compile('^[\w\-]+$', re.UNICODE))
+		
+		
+class Password(Text):
+    
+    def _validate(self, value):
+        return hash_password(value)
+        
+        
+class Timestamped(Mixin):
+	created = DateTime(default=datetime.utcnow)
+	modified = DateTime(default=datetime.utcnow, always_now=True)
 
 
 class Person(model.Entity):
@@ -19,19 +31,8 @@ class Person(model.Entity):
 	first_name = Text(maxlength=50, required=True)
 	last_name = Text(maxlength=50, required=True)
 	email = Email(required=True, hidden=True)
-	password = Text(maxlength=50, hidden=True, required=True)
+	password = Password(maxlength=50, hidden=True, required=True)
 	role = Enum('anonymous', 'normal', 'admin', default='anonymous')
-	
-	
-	def before_create(self, fields, context):
-		self.hash_password(fields)
-		
-	def before_update(self, id, fields, context):
-		self.hash_password(fields)
-		
-	def hash_password(self, fields):
-		if 'password' in fields:
-			fields['password'] = hash_password(fields['password'])
 	
 	
 class Post(model.Entity):
@@ -46,6 +47,7 @@ class Post(model.Entity):
 	
 	
 class Tag(model.Entity):
+	mixins = (Timestamped,)
 	name = Text(maxlength=50, required=True)
 	slug = Slug(required=True)
 	
