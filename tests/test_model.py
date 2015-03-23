@@ -52,71 +52,6 @@ class TestEntity(unittest.TestCase):
         self.assertEquals(result, obj)
         
         
-    def test_hooks(self):
-        """
-        Entities have an event manager with create, update and delete events
-        """
-        model = Model()
-        
-        class Foo(model.Entity):
-            pass
-                
-        f = Foo()
-        f.hooks.before_create(lambda x: x)
-        f.hooks.after_create(lambda x: x)
-        f.hooks.before_update(lambda x: x)
-        f.hooks.after_update(lambda x: x)
-        f.hooks.before_delete(lambda x: x)
-        f.hooks.after_delete(lambda x: x)
-        
-        
-    def test_default_hooks(self):
-        """
-        before_* and after_* methods the entity defines are automatically registered as hooks
-        """
-        model = Model()
-        called_hooks = {}
-        
-        class Foo(model.Entity):
-            
-            def before_create(cls, *args, **kwargs):
-                called_hooks['before_create'] = 1
-                
-            def after_create(cls, *args, **kwargs):
-                called_hooks['after_create'] = 1
-                
-            def before_update(cls, *args, **kwargs):
-                called_hooks['before_update'] = 1
-                
-            def after_update(cls, *args, **kwargs):
-                called_hooks['after_update'] = 1
-                
-            def before_delete(cls, *args, **kwargs):
-                called_hooks['before_delete'] = 1
-                
-            def after_delete(cls, *args, **kwargs):
-                called_hooks['after_delete'] = 1
-        
-        
-        Foo.hooks.fire_before_create()
-        self.assertTrue(called_hooks['before_create'])
-        
-        Foo.hooks.fire_after_create()
-        self.assertTrue(called_hooks['after_create'])
-        
-        Foo.hooks.fire_before_update()
-        self.assertTrue(called_hooks['before_update'])
-        
-        Foo.hooks.fire_after_update()
-        self.assertTrue(called_hooks['after_update'])
-        
-        Foo.hooks.fire_before_delete()
-        self.assertTrue(called_hooks['before_delete'])
-        
-        Foo.hooks.fire_after_delete()
-        self.assertTrue(called_hooks['after_delete'])
-        
-        
     def test_multiple_inheritance_fail(self):
         """
         Raises an error when extending more than one Entity
@@ -221,69 +156,6 @@ class TestEntity(unittest.TestCase):
         self.assertEquals(foo.name.__class__, Text)
         
         
-    def test_mixin_hooks(self):
-        """Mixins can have hooks that are registered on an entity"""
-        model = Model()
-        
-        
-        class Fooable(object):
-            
-            def before_create(self, fields, *args, **kwargs):
-                fields['foo'] = 123
-        
-                
-        class Bar(model.Entity):
-            mixins = (Fooable,)
-            
-        bar = Bar()
-        fields = {}
-        bar.hooks.fire_before_create(fields)
-        self.assertIn('foo', fields)
-        self.assertEquals(fields['foo'], 123)
-        
-        
-    def test_multiple_mixin_hooks(self):
-        """An entity can have multiple mixins with the same hook"""
-        model = Model()
-        
-        
-        class Fooable(object):
-            
-            def before_create(self, fields, *args, **kwargs):
-                fields['foo'] = 123
-                
-                
-        class Barable(object):
-            
-            def before_create(self, fields, *args, **kwargs):
-                fields['bar'] = 456
-        
-                
-        class Baz(model.Entity):
-            mixins = (Fooable, Barable)
-            
-            def before_create(self, fields, *args, **kwargs):
-                fields['baz'] = 789
-                
-                
-        class Qux(Baz):
-            
-            def before_create(self, fields, *args, **kwargs):
-                fields['qux'] = 000
-            
-        qux = Qux()
-        fields = {}
-        qux.hooks.fire_before_create(fields)
-        self.assertIn('foo', fields)
-        self.assertEquals(fields['foo'], 123)
-        self.assertIn('bar', fields)
-        self.assertEquals(fields['bar'], 456)
-        self.assertIn('baz', fields)
-        self.assertEquals(fields['baz'], 789)
-        self.assertIn('qux', fields)
-        self.assertEquals(fields['qux'], 000)
-        
-        
     def test_inherited_mixin_fields(self):
         """Mixin fields should be inherited"""
         model = Model()
@@ -307,34 +179,6 @@ class TestEntity(unittest.TestCase):
         st = SpecificThing()
         self.assertTrue(hasattr(st, 'foo'))
         self.assertTrue(hasattr(st, 'bar'))
-        
-        
-    def test_inherited_mixin_hooks(self):
-        """Mixin hooks should be inherited"""
-        model = Model()
-        
-        
-        class Fooable(model.Entity):
-            def before_create(self, fields):
-                fields['foo'] = 1
-                
-        
-        class Barable(model.Entity):
-            def before_create(self, fields):
-                fields['bar'] = 1
-            
-        
-        class Thing(model.Entity):
-            mixins = (Fooable,)
-            
-        
-        class SpecificThing(Thing):
-            mixins = (Barable,)
-            
-        st = SpecificThing()
-        fields = {}
-        st.hooks.fire_before_create(fields)
-        self.assertEquals(fields, {'foo':1, 'bar':1})
         
         
         

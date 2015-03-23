@@ -1,5 +1,4 @@
 import inspect
-from  ..events import EventManager
 from .fields import Field, ListOf, Compound, Text, ValidationError
 
 __all__ = [
@@ -86,15 +85,6 @@ class EntityType(type):
                 if base.__name__ != 'Entity':
                     hierarchy = list(base.hierarchy)
                     hierarchy.append(base)
-                    #if hasattr(base, 'mixins') and base.mixins:
-                    #    mixins.update(base.mixins)
-        
-        
-        # Add fields and hooks from the mixins
-        hooks = EventManager('create', 'update', 'delete')
-        
-        if parent and hasattr(parent, 'hooks'):
-            hooks.update_from(parent.hooks)
         
         if mixins:
             for mixin in mixins:
@@ -103,11 +93,6 @@ class EntityType(type):
                 for k,v in inspect.getmembers(mixin):
                     if k not in attrs and isinstance(v, (Field, Link, InverseLink)):
                         attrs[k] = v
-                    if k.startswith('before_') or k.startswith('after_'):
-                        parts = k.split('_')
-                        when, event = parts[0], '_'.join(parts[1:])
-                        method_name = '%s_%s' % (when, event)
-                        getattr(hooks, method_name)(v)
         
         fields = {}
         hidden_fields = set()
@@ -150,7 +135,6 @@ class EntityType(type):
         
         # Create the new class
         attrs.update(dict(
-            hooks = hooks,
             hierarchy = hierarchy,
             fields = fields,
             hidden_fields = hidden_fields,
@@ -164,14 +148,6 @@ class EntityType(type):
         ))
         
         new_cls = super(EntityType, cls).__new__(cls, name, bases, attrs)
-        
-        # Set up the default hooks, if any
-        for k,v in attrs.items():
-            if k.startswith('before_') or k.startswith('after_'):
-                parts = k.split('_')
-                when, event = parts[0], '_'.join(parts[1:])
-                method_name = '%s_%s' % (when, event)
-                getattr(new_cls.hooks, method_name)(v.__get__(new_cls, new_cls.__class__))
         
         # Add the new class to the children list of its base entities
         for base in hierarchy:

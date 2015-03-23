@@ -306,6 +306,7 @@ class InterfaceTest(unittest.TestCase):
 		foos = self.get_interface('foos')
 		foo = {'_id':123, 'stuff':'baz'}
 		foos.storage.update = Mock(return_value=foo)
+		foos.storage.get_by_id = Mock(return_value=foo)
 		updated_foo = foos.update(123, {'stuff':'baz'})
 		foos.storage.update.assert_called_once_with(Foo, 123, {'stuff':'baz'}, replace=False)
 		self.assertEquals(updated_foo, foo)
@@ -317,6 +318,7 @@ class InterfaceTest(unittest.TestCase):
 		"""
 		foos = self.get_interface('foos')
 		foos.storage.update = Mock(return_value=None)
+		foos.storage.get_by_id = Mock(return_value={})
 		with self.assertRaises(errors.NotFoundError):
 			foos.update(123, {})
 		
@@ -328,6 +330,7 @@ class InterfaceTest(unittest.TestCase):
 		foos = self.get_interface('foos')
 		foo = {'_id':123, 'stuff':'baz'}
 		foos.storage.update = Mock(return_value=foo)
+		foos.storage.get_by_id = Mock(return_value={})
 		updated_foo = foos.replace(123, {'stuff':'baz'})
 		foos.storage.update.assert_called_once_with(Foo, 123, {'stuff':'baz'}, replace=True)
 		self.assertEquals(updated_foo, foo)
@@ -339,6 +342,7 @@ class InterfaceTest(unittest.TestCase):
 		"""
 		foos = self.get_interface('foos')
 		foos.storage.update = Mock(return_value=None)
+		foos.storage.get_by_id = Mock(return_value={})
 		with self.assertRaises(errors.NotFoundError):
 			foos.replace(123, {'stuff':'foo'})
 		
@@ -715,102 +719,46 @@ class InterfaceTest(unittest.TestCase):
 		self.assertEquals(results, [{'name':'zoomy', 'foo':23}])
 		
 		
-	def test_entity_hooks(self):
-		"""Interfaces call entity create, update and delete hooks"""
-		before_create = CopyingMock()
-		after_create = CopyingMock()
-		before_update = CopyingMock()
-		after_update = CopyingMock()
-		before_delete = CopyingMock()
-		after_delete = CopyingMock()
+	def test_hooks(self):
 		foos = self.get_interface('foos')
-		hooks = foos.entity.hooks
-		hooks.before_create(before_create)
-		hooks.after_create(after_create)
-		hooks.before_update(before_update)
-		hooks.after_update(after_update)
-		hooks.before_delete(before_delete)
-		hooks.after_delete(after_delete)
+		foos.storage.get_by_id = Mock(return_value={'foo':23})
+		foos.storage.get = Mock(return_value=[{'foo':23}])
+		foos.storage.create = Mock(return_value=123)
+		foos.storage.update = Mock(return_value={'foo':23})
+		foos.storage.delete = Mock()
+		foos.inverse_delete = Mock()
+		foos.storage.check_filter = Mock()
+		foos.before_get = Mock()
+		foos.after_get = Mock()
+		foos.before_list = Mock()
+		foos.after_list = Mock()
+		foos.before_create = Mock()
+		foos.after_create = Mock()
+		foos.before_update = Mock()
+		foos.after_update = Mock()
+		foos.before_delete = Mock()
+		foos.after_delete = Mock()
+		context = {'identity':{'foo':'bar'}}
 		
-		context = {'foo':23}
+		foos.get(123, context=context)
+		foos.before_get.assert_called_once_with(context['identity'], 123)
+		foos.after_get.assert_called_once_with(context['identity'], {'foo':23})
 		
-		foos.storage.create = Mock(return_value='123')
-		foos.storage.update = Mock(return_value={'_id':'123', 'stuff':'nothings'})
-		foos.storage.delete = Mock(return_value=None)
-		foos.storage.get_by_id = Mock(return_value={'_id':'123', 'stuff':'nothings'})
+		foos.list(filter={'stuff':'things'}, context=context)
+		foos.before_list.assert_called_once_with(context['identity'], {'stuff':'things'})
+		foos.after_list.assert_called_once_with(context['identity'], [{'foo':23}])
 		
-		foo = foos.create({'stuff':'things'}, context=context.copy())
-		create_context = context.copy()
-		create_context['item'] = foo
-		before_create.assert_called_once_with({'stuff':'things'}, context)
-		after_create.assert_called_once_with(foo, create_context)
+		foos.create({'stuff':'things'}, context=context)
+		foos.before_create.assert_called_once_with(context['identity'], {'stuff':'things'})
+		foos.after_create.assert_called_once_with(context['identity'], {'stuff':'things', '_id':123})
 		
-		foo = foos.update(foo['_id'], {'stuff':'nothings'}, context=context.copy())
-		update_context = context.copy()
-		update_context['item'] = foo
-		before_update.assert_called_with(foo['_id'], {'stuff':'nothings'}, context)
-		after_update.assert_called_with(foo, update_context)
+		foos.update(123, {'things':'stuff'}, context=context)
+		foos.before_update.assert_called_once_with(context['identity'], {'foo':23}, {'things':'stuff'})
+		foos.after_update.assert_called_once_with(context['identity'], {'foo':23})
 		
-		foo = foos.replace(foo['_id'], {'stuff':'somethings'}, context=context.copy())
-		replace_context = context.copy()
-		replace_context['item'] = foo
-		before_update.assert_called_with(foo['_id'], {'stuff':'somethings'}, context)
-		after_update.assert_called_with(foo, replace_context)
-		
-		foos.delete(foo['_id'], context=context.copy(), inverse_delete=False)
-		delete_context = context.copy()
-		delete_context['item'] = foo
-		before_delete.assert_called_once_with(foo['_id'], context)
-		after_delete.assert_called_once_with(foo['_id'], delete_context)
-		
-		
-	def test_interface_hooks(self):
-		"""Interfaces have create, update and delete hooks"""
-		before_create = CopyingMock()
-		after_create = CopyingMock()
-		before_update = CopyingMock()
-		after_update = CopyingMock()
-		before_delete = CopyingMock()
-		after_delete = CopyingMock()
-		foos = self.get_interface('foos')
-		hooks = foos.hooks
-		hooks.before_create(before_create)
-		hooks.after_create(after_create)
-		hooks.before_update(before_update)
-		hooks.after_update(after_update)
-		hooks.before_delete(before_delete)
-		hooks.after_delete(after_delete)
-		
-		context = {'foo':23}
-		
-		foos.storage.create = Mock(return_value='123')
-		foos.storage.update = Mock(return_value={'_id':'123', 'stuff':'nothings'})
-		foos.storage.delete = Mock(return_value=None)
-		foos.storage.get_by_id = Mock(return_value={'_id':'123', 'stuff':'nothings'})
-		
-		foo = foos.create({'stuff':'things'}, context=context.copy())
-		create_context = context.copy()
-		create_context['item'] = foo
-		before_create.assert_called_once_with({'stuff':'things'}, context)
-		after_create.assert_called_once_with(foo, create_context)
-		
-		foo = foos.update(foo['_id'], {'stuff':'nothings'}, context=context.copy())
-		update_context = context.copy()
-		update_context['item'] = foo
-		before_update.assert_called_with(foo['_id'], {'stuff':'nothings'}, context)
-		after_update.assert_called_with(foo, update_context)
-		
-		foo = foos.replace(foo['_id'], {'stuff':'somethings'}, context=context.copy())
-		replace_context = context.copy()
-		replace_context['item'] = foo
-		before_update.assert_called_with(foo['_id'], {'stuff':'somethings'}, context)
-		after_update.assert_called_with(foo, replace_context)
-		
-		foos.delete(foo['_id'], context=context.copy(), inverse_delete=False)
-		delete_context = context.copy()
-		delete_context['item'] = foo
-		before_delete.assert_called_once_with(foo['_id'], context)
-		after_delete.assert_called_once_with(foo['_id'], delete_context)
+		foos.delete(123, context=context)
+		foos.before_delete.assert_called_once_with(context['identity'], {'foo':23})
+		foos.after_delete.assert_called_once_with(context['identity'], {'foo':23})
 		
 		
 	def test_disabled_method(self):
@@ -962,6 +910,7 @@ class InterfaceTest(unittest.TestCase):
 		referrers.storage.get = Mock(return_value=[{'_id':'666'}])
 		referrers.storage.check_filter = Mock(return_value=None)
 		referrers.storage.update = Mock(return_value={})
+		referrers.storage.get_by_id = Mock(return_value={})
 		
 		targets.delete('123')
 		

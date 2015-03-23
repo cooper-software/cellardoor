@@ -246,6 +246,7 @@ class TestResource(TestBase):
 		"""
 		If validation fails, the response is a 400 error with the specific issues in the body.
 		"""
+		api.interfaces['foos'].storage.get_by_id = Mock(return_value={})
 		result = self.simulate_request(
 			'/foos/123',
 			method='PUT',

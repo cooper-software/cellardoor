@@ -220,6 +220,7 @@ class TestResource(unittest.TestCase):
 		"""
 		If validation fails, the response is a 400 error with the specific issues in the body.
 		"""
+		api.interfaces['foos'].storage.get_by_id = Mock(return_value={})
 		res = self.app.patch(
 			'/foos/123',
 			headers={
