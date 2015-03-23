@@ -29,6 +29,12 @@ class TestAbstractField(unittest.TestCase):
         self.assertEqual(value, 23)
         
         
+    def test_field_default_fn(self):
+        field=Field(default=lambda: 23)
+        value = field.validate(None)
+        self.assertEqual(value, 23)
+        
+        
     def test_field_hidden(self):
         field = Field()
         self.assertEquals(field.hidden, False)

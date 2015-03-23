@@ -84,7 +84,10 @@ class Field(object):
         if value is None:
             if self.required:
                 raise ValidationError, "This field is required."
-            return self.default
+            if callable(self.default):
+                return self.default()
+            else:
+                return self.default
         
         return self._validate(value)
         
@@ -181,8 +184,8 @@ class DateTime(Field):
     """
     NOT_DATE = "Unrecognized date format"
     
-    def __init__(self, default_format="%x %X", use_timelib=True, 
-            use_dateutil=True, **kwargs):
+    def __init__(self, default_format="%x %X", use_timelib=True, use_dateutil=True,
+             **kwargs):
         super(DateTime, self).__init__(**kwargs)
         self.default_format = default_format
         self.use_timelib = use_timelib
