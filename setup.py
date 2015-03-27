@@ -41,8 +41,6 @@ setup(
         'timelib', 
         'python-dateutil', 
         'msgpack-python', 
-        'pymongo',
-        'falcon',
-        'flask'],
+        'pymongo'],
     test_suite='nose.collector'
 )

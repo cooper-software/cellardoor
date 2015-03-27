@@ -1,6 +1,7 @@
 import re
 from datetime import datetime
 from .dateparsers import *
+from . import observer
 
 __all__ = [
     'ValidationError',
@@ -22,7 +23,8 @@ __all__ = [
     'URL',
     'OneOf',
     'ListOf',
-    'Anything'
+    'Anything',
+    'Schema'
 ]
 
 class ValidationError(Exception):
@@ -72,14 +74,14 @@ class Field(object):
     create your own field.
     """
     
-    def __init__(self, required=False, default=None, hidden=False, unique=False, label=None, description=None):
+    def __init__(self, required=False, default=None, unique=False, label=None, description=None):
         self.required = required
         self.default = default
-        self.hidden = hidden
         self.unique = unique
         self.label = label
         self.description = description
         
+
     def validate(self, value):
         if value is None:
             if self.required:
@@ -90,7 +92,8 @@ class Field(object):
                 return self.default
         
         return self._validate(value)
-        
+
+
     def _validate(self, value):
         raise NotImplementedError
                 
@@ -113,12 +116,14 @@ class Text(Field):
     NO_REGEX_MATCH = 'Does not match regex.'
     NOT_UTF8 = 'Expected a UTF-8 string.'
     
+
     def __init__(self, minlength=None, maxlength=None, regex=None, **kwargs):
         self.minlength = minlength
         self.maxlength = maxlength
         self.regex = re.compile(regex) if regex else None
         super(Text, self).__init__(**kwargs)
         
+
     def _validate(self, value):
         if not isinstance(value, basestring):
             raise ValidationError(self.NOT_TEXT)
@@ -301,13 +306,13 @@ class Float(Range):
     
     NOT_A_FLOAT = "Expected a real number."
     
-    def _validate(self, value):
+    def validate(self, value):
         try:
             value = float(value)
         except (ValueError, TypeError):
             raise ValidationError(self.NOT_A_FLOAT)
             
-        return super(Float, self)._validate(value)
+        return super(Float, self).validate(value)
         
     def str_value(self, value):
         return '%.2f' % value
@@ -325,7 +330,7 @@ class Integer(Range):
     
     NOT_AN_INTEGER = "Expected an integer."
     
-    def _validate(self, value):
+    def validate(self, value):
         if isinstance(value, float):
             raise ValidationError(self.NOT_AN_INTEGER)
         try:
@@ -333,7 +338,7 @@ class Integer(Range):
         except (ValueError, TypeError):
             raise ValidationError(self.NOT_AN_INTEGER)
         
-        return super(Integer, self)._validate(value)
+        return super(Integer, self).validate(value)
         
     def str_value(self, value):
         return '%d' % value
@@ -354,6 +359,7 @@ class BoundingBox(Field):
     NOT_STRING_OR_LIST = "Expected a comma-separated list of values or a list or tuple object."
     
     def _validate(self, value):
+
         if not isinstance(value, (list, tuple)):
             if isinstance(value, basestring):
                 value = [v.strip() for v in value.split(',')]
@@ -389,6 +395,7 @@ class LatLng(Field):
     NOT_STRING_OR_LIST = "Expected a comma-separated list of values or a list or tuple object."
     
     def _validate(self, value):
+
         if not isinstance(value, (list, tuple)):
             if not isinstance(value, basestring):
                 raise ValidationError(self.NOT_STRING_OR_LIST)
@@ -532,7 +539,7 @@ class ListOf(Field):
         self.field = field
         
         
-    def validate(self, values):
+    def _validate(self, values):
         if not isinstance(values, list):
             raise ValidationError(self.NOT_A_LIST)
         
@@ -549,7 +556,7 @@ class Anything(Field):
     """
     Passes anything
     """
-    
+
     def _validate(self, value):
         return value
         
@@ -573,8 +580,9 @@ class Compound(Field):
     """
     NOT_A_DICT = "Not a dict"
     
-    def __init__(self, required=False, default=None, hidden=False, unique=False, label=None, description=None, **kwargs):
-        super(Compound, self).__init__(required, default, hidden, unique, label, description)
+
+    def __init__(self, required=False, default=None, unique=False, label=None, description=None, **kwargs):
+        super(Compound, self).__init__(required, default, unique, label, description)
         self.fields = kwargs
         self.enforce_required = True
         
@@ -582,8 +590,8 @@ class Compound(Field):
     def validate(self, value, enforce_required=True):
         self.enforce_required = enforce_required
         return super(Compound, self).validate(value)
-        
-        
+
+
     def _validate(self, value):
         if not isinstance(value, dict):
             raise ValidationError(self.NOT_A_DICT)
@@ -618,4 +626,38 @@ class Compound(Field):
         
         return validated
 
-                
+
+class ItemID(Text):
+
+	def __init__(self, **kwargs):
+		super(ItemID, self).__init__(maxlength=50, minlength=1, **kwargs)
+
+
+class Schema(object):
+
+	def __init__(self, *mixins, **fields):
+		self.mixins = mixins
+		self.fields = {}
+
+		for m in self.mixins:
+			self.fields.update(m.fields)
+
+		self.validator = Compound(**self.fields)
+
+		events = ['validate']
+		self.before = observer.Subject(*events)
+		self.after = observer.Subject(*events)
+
+
+	def validate(self, fields):
+		for m in self.mixins:
+			m.before.fire('validate', request, fields)
+		self.before.fire('validate', request, fields)
+
+		validated_fields = self.validator._validate(request, fields)
+
+		for m in self.mixins:
+			m.after.fire('validate', request, validated_fields)
+		self.after.fire('validate', request, validated_fields)
+
+		return validated_fields

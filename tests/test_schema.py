@@ -1,8 +1,5 @@
-"""
-Unit tests for data fields
-"""
 import unittest
-from cellardoor.model import *
+from cellardoor.schema import *
 from datetime import datetime
 import time
 
@@ -27,20 +24,6 @@ class TestAbstractField(unittest.TestCase):
         field = Field(default=23)
         value = field.validate(None)
         self.assertEqual(value, 23)
-        
-        
-    def test_field_default_fn(self):
-        field=Field(default=lambda: 23)
-        value = field.validate(None)
-        self.assertEqual(value, 23)
-        
-        
-    def test_field_hidden(self):
-        field = Field()
-        self.assertEquals(field.hidden, False)
-        
-        field = Field(hidden=True)
-        self.assertEquals(field.hidden, True)
         
         
     def test_field_unique(self):
@@ -330,18 +313,6 @@ class TestDateTime(unittest.TestCase):
             self.assertEquals(now_date, field.validate(now))
         except ValidationError:
             self.fail("Failed to pass an int timestamp")
-            
-            
-    def test_always_now(self):
-        """
-        If always_now is True, validating should always return the current time.
-        """
-        field = DateTime(always_now=True)
-        a = field.validate(None)
-        b = field.validate(None)
-        self.assertIsInstance(a, datetime)
-        self.assertIsInstance(b, datetime)
-        self.assertNotEqual(a.isoformat(), b.isoformat())
         
         
 class TestBoolean(unittest.TestCase):
@@ -901,6 +872,17 @@ class TestAnything(unittest.TestCase):
                 self.assertEqual(anything, field.validate(anything))
             except ValidationError:
                 self.fail('Failed something')
+
+
+
+class TestSchema(unittest.TestCase):
+
+    def test_validate(self):
+        """
+        A schema has fields
+        """
+        foo = Schema()
+        self.assertEquals(foo.fields, {})
                 
                 
         
