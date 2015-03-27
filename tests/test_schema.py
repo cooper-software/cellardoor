@@ -1,7 +1,9 @@
 import unittest
-from cellardoor.schema import *
+from mock import Mock
 from datetime import datetime
 import time
+from cellardoor.schema import *
+from cellardoor import observer
 
 
 class TestAbstractField(unittest.TestCase):
@@ -877,14 +879,47 @@ class TestAnything(unittest.TestCase):
 
 class TestSchema(unittest.TestCase):
 
-    def test_validate(self):
-        """
-        A schema has fields
-        """
+    def test_has_fields(self):
+        field = Text()
+        foo = Schema(bar=field)
+        self.assertEquals(foo.fields, { 'bar': field })
+        
+        
+    def test_has_mixins(self):
+        foo = Schema(bar=Text())
+        baz = Schema(foo)
+        self.assertEquals(baz.fields, foo.fields)
+        self.assertEquals(baz.mixins, (foo,))
+
+
+    def test_validate_is_called(self):
         foo = Schema()
-        self.assertEquals(foo.fields, {})
-                
-                
+        foo.validator.validate = Mock(return_value="validated fields")
+        result = foo.validate({'things':'stuff'})
+        foo.validator.validate.assert_called_once_with({'things':'stuff'})
+        self.assertEquals(result, "validated fields")
+
+
+    def test_has_subjects(self):
+        foo = Schema()
+        self.assertIsInstance(foo.before, observer.Subject)
+        self.assertIsInstance(foo.after, observer.Subject)
+
+
+    def test_observers_called(self):
+        foo = Schema()
+        foo.validator.validate = Mock(return_value="validated fields")
+        before = Mock()
+        after = Mock()
+        foo.before('validate', before)
+        foo.after('validate', after)
+        
+        foo.validate({})
+        
+        before.assert_called_once_with({})
+        after.assert_called_once_with("validated fields")
+        
+        
         
 if __name__ == "__main__":
     unittest.main()

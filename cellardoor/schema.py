@@ -629,35 +629,36 @@ class Compound(Field):
 
 class ItemID(Text):
 
-	def __init__(self, **kwargs):
-		super(ItemID, self).__init__(maxlength=50, minlength=1, **kwargs)
+    def __init__(self, **kwargs):
+        super(ItemID, self).__init__(maxlength=50, minlength=1, **kwargs)
 
 
 class Schema(object):
 
-	def __init__(self, *mixins, **fields):
-		self.mixins = mixins
-		self.fields = {}
+    def __init__(self, *mixins, **fields):
+        self.mixins = mixins
+        self.fields = {}
 
-		for m in self.mixins:
-			self.fields.update(m.fields)
+        for m in self.mixins:
+            self.fields.update(m.fields)
+        self.fields.update(fields)
 
-		self.validator = Compound(**self.fields)
+        self.validator = Compound(**self.fields)
+        
+        events = ['validate']
+        self.before = observer.Subject(*events)
+        self.after = observer.Subject(*events)
 
-		events = ['validate']
-		self.before = observer.Subject(*events)
-		self.after = observer.Subject(*events)
 
+    def validate(self, fields):
+        for m in self.mixins:
+            m.before.fire('validate', fields)
+        self.before.fire('validate', fields)
 
-	def validate(self, fields):
-		for m in self.mixins:
-			m.before.fire('validate', request, fields)
-		self.before.fire('validate', request, fields)
+        validated_fields = self.validator.validate(fields)
 
-		validated_fields = self.validator._validate(request, fields)
+        for m in self.mixins:
+            m.after.fire('validate', validated_fields)
+        self.after.fire('validate', validated_fields)
 
-		for m in self.mixins:
-			m.after.fire('validate', request, validated_fields)
-		self.after.fire('validate', request, validated_fields)
-
-		return validated_fields
+        return validated_fields
